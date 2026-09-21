@@ -120,7 +120,7 @@ Tests now **18 passing** (added week-accent mapping ×4, app-lock start-state/di
 
 ### Backlog
 - **Обращения / Requests** — full CRUD + dictionaries + comments + attachments (models in `IAppeal.ts`). *Deferred by request.*
-- **Native mail inbox** — *backlogged.* Mail is **on-prem Exchange 2016** (`webmail.marstu.net`, forest `marstu.net`, build 15.1.2507.61), **not M365** → no OAuth/Graph, so a native client needs **Basic auth with the AD domain password** (EWS or IMAP). ActiveSync is enabled (native phone Mail works). If built: **opt-in, single-user only**, password in Keystore + app-lock, never default. Confirm IMAP is enabled (webmail.marstu.net:993) first. Superseded for now by the in-app OWA WebView tab.
+- **Native mail inbox** — *backlogged.* The university mail is **on-prem Exchange (not Microsoft 365)**, so there is **no OAuth/Graph** — a native client would need **Basic auth with the domain password** (EWS or IMAP). If built: **opt-in, single-user only**, password in Keystore + app-lock, never default; confirm IMAP is enabled first. Superseded for now by the in-app OWA WebView tab. *(Server/forest specifics kept in internal notes.)*
 - iOS signing pass (7.6), CI (7.4), week/agenda overview + "Сегодня" jump (4.3).
 
 ### Sprint 5 — Branding + in-app web — DONE ✅
@@ -145,7 +145,7 @@ Tests now **18 passing** (added week-accent mapping ×4, app-lock start-state/di
 
 ### C. Bigger features
 - **C1. Обращения / Requests** — full CRUD + dictionaries + comments + attachments (models in `IAppeal.ts`). Largest remaining feature; buildable without new capture.
-- **C2. Native mail inbox** — backlogged (on-prem Exchange 2016, no OAuth → Basic auth only). Opt-in/single-user/Keystore+app-lock if ever built; confirm IMAP `webmail.marstu.net:993` first.
+- **C2. Native mail inbox** — backlogged (on-prem Exchange, not M365 → Basic auth only). Opt-in/single-user/Keystore+app-lock if ever built; confirm IMAP first.
 
 ### D. Engineering
 - **D1. iOS pass** — signing + run on device/simulator (Android-verified only so far).
