@@ -19,15 +19,34 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
 
 - **Login** with JWT + auto-refresh; tokens in the OS keystore, the password is
   never stored.
-- **Расписание занятий** — day view, swipe between days, offline cache, and a
-  week-type accent colour (red for week 1, blue for week 2).
+- **Расписание занятий** — day view, swipe between days, offline cache, a
+  week-type accent colour (red for week 1, blue for week 2), and an **«Обзор
+  недели»** overview (Пн–Вс, lessons per day, gaps «окна», total pairs, tap a
+  day to jump).
 - **Расписание экзаменов** — study-year picker, grouped by date, offline cache.
-- **Профиль** — photo, position/department, experience.
+- **Профиль** — photo, birthday, and every appointment (main department first)
+  with its **ставка / почасовая** load, department and start date, plus a
+  combined-load line and work experience.
 - **Настройки** — theme (system / light / dark) and an optional
   fingerprint / PIN **app-lock**.
 - **Почта** and **Портал** — OWA mail and the corporate portal open **in-app**
   (WebView), keeping only the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.2.0 (in development)
+
+- **«Обзор недели»** — a whole-week schedule overview off the Расписание screen:
+  Пн–Вс day cards, lessons per day, first–last span, gaps («окна»), total pairs,
+  the week colour, and tap-a-day to jump. Pure aggregation over the already-loaded
+  week — no extra network calls.
+- **Профиль** enriched from the real `GetInfo` data: birthday, every appointment
+  ranked with the main department first (+ «основное» badge), each with its rate
+  and start date, a **ставка vs почасовая** split with a «Суммарная нагрузка»
+  line, and corrected Russian plurals for стаж.
+- **iOS** — the build is now verified on every push by a macOS CI job
+  (`flutter build ios --no-codesign`); a signed release (device / TestFlight /
+  App Store) is documented in [docs/IOS_RELEASE.md](docs/IOS_RELEASE.md).
+- More unit tests (schedule week-summary, profile parsing, RU pluralisation).
 
 ## What's new — v0.1.0
 
