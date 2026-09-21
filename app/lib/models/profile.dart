@@ -11,26 +11,47 @@ class SalaryEntry {
   final String? postName; // dictPost.postName
   final String? departmentName; // department.fullName
   final bool isMainJob; // actualSalaries[].isMainJob — the primary appointment
-  const SalaryEntry(
-      {this.postName, this.departmentName, this.isMainJob = false});
+  final double? salary; // actualSalaries[].salary — rate share (% of a ставка)
+  final DateTime? dateBegin; // actualSalaries[].dateBegin (date only)
+  final int? postOrder; // dictPost.postOrder — post rank (higher = more senior)
+  const SalaryEntry({
+    this.postName,
+    this.departmentName,
+    this.isMainJob = false,
+    this.salary,
+    this.dateBegin,
+    this.postOrder,
+  });
+
+  static DateTime? _date(dynamic v) =>
+      (v is String && v.isNotEmpty) ? apiCalendarDate(v) : null;
 
   factory SalaryEntry.fromJson(Map<String, dynamic> j) => SalaryEntry(
         postName: (j['dictPost']?['postName'] ?? j['postName']) as String?,
         departmentName:
             (j['department']?['fullName'] ?? j['departmentName']) as String?,
         isMainJob: j['isMainJob'] == true,
+        salary: (j['salary'] as num?)?.toDouble(),
+        dateBegin: _date(j['dateBegin']),
+        postOrder: (j['dictPost']?['postOrder'] ?? j['postOrder']) as int?,
       );
 
   Map<String, dynamic> toJson() => {
         'postName': postName,
         'departmentName': departmentName,
         'isMainJob': isMainJob,
+        'salary': salary,
+        'dateBegin': dateBegin?.toIso8601String(),
+        'postOrder': postOrder,
       };
 
   factory SalaryEntry.fromCache(Map<String, dynamic> j) => SalaryEntry(
         postName: j['postName'] as String?,
         departmentName: j['departmentName'] as String?,
         isMainJob: j['isMainJob'] == true,
+        salary: (j['salary'] as num?)?.toDouble(),
+        dateBegin: _date(j['dateBegin']),
+        postOrder: j['postOrder'] as int?,
       );
 }
 
@@ -77,11 +98,18 @@ class PersonProfile {
   String? get fullName => personFIO;
   String? get photoName => fileName;
 
-  /// Appointments with the primary one (isMainJob) first, order otherwise kept.
+  /// Appointments ranked: the primary one (isMainJob) first, then by post rank
+  /// (dictPost.postOrder, higher = more senior). Stable for equal keys.
   List<SalaryEntry> get salariesMainFirst {
-    final list = List<SalaryEntry>.from(salaries);
-    list.sort((a, b) => (b.isMainJob ? 1 : 0) - (a.isMainJob ? 1 : 0));
-    return list;
+    final indexed = salaries.asMap().entries.toList();
+    indexed.sort((a, b) {
+      final byMain = (b.value.isMainJob ? 1 : 0) - (a.value.isMainJob ? 1 : 0);
+      if (byMain != 0) return byMain;
+      final byOrder = (b.value.postOrder ?? 0) - (a.value.postOrder ?? 0);
+      if (byOrder != 0) return byOrder;
+      return a.key - b.key; // keep original order otherwise
+    });
+    return indexed.map((e) => e.value).toList();
   }
 
   static DateTime? _date(dynamic v) =>
