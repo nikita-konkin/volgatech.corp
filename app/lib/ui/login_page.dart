@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../core/login_utils.dart';
 import '../core/prefs.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
@@ -42,11 +43,16 @@ class _LoginPageState extends State<LoginPage> {
     final auth = context.read<AuthController>();
     final prefs = context.read<Prefs>();
 
+    // Accept a full e-mail as the login and reduce it to the bare account name
+    // (KonkinNA@volgatech.net -> konkinna); show the cleaned value in the field.
+    final login = normalizeLogin(_login.text);
+    if (login != _login.text) _login.text = login;
+
     // Remember (or forget) the username per the checkbox.
     await prefs.setRememberLogin(_remember);
-    await prefs.setRememberedLogin(_remember ? _login.text.trim() : null);
+    await prefs.setRememberedLogin(_remember ? login : null);
 
-    final ok = await auth.login(_login.text, _password.text);
+    final ok = await auth.login(login, _password.text);
     if (ok) {
       // Let the OS password manager offer to save the credentials.
       TextInput.finishAutofillContext();
