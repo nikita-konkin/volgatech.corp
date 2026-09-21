@@ -81,6 +81,16 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           ListTile(
+            leading: const Icon(Icons.person_outline, color: Brand.blue),
+            title: const Text('Профиль'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.calendar_month, color: Brand.blue),
             title: const Text('Расписание занятий'),
             onTap: () => Navigator.pop(context),

@@ -131,10 +131,16 @@ Tests now **18 passing** (added week-accent mapping ×4, app-lock start-state/di
 3. **In-app «Портал»** — same generic `WebViewScreen` now also powers `portal.volgatech.net` (was a link-out).
 4. **Easter egg** — Настройки → tap the version footer 7× reveals the РТФ (Радиотехнический факультет) crest.
 
-### Sprint 6 — Week summary + iOS — IN PROGRESS 🚧
+### Sprint 6 — Week summary + iOS — DONE ✅ (released v0.2.0)
 1. **«Обзор недели»** — new screen off the Расписание AppBar (`week_summary_page.dart`): Пн–Вс day cards over the already-loaded week, per-day lesson count (Russian plural пара/пары/пар), first–last time span, total gap time («окна»), total pairs, and the week accent colour. Today is highlighted; tapping a day calls `goToDay` and returns to that day. No new API — pure aggregation over `ScheduleController._byDay` (added `eventsOn`, `weekStart`, `weekDays`).
 2. **Profile tab enriched** — a **live `GetInfo` capture** (2026-09-21) showed the response is richer than the recovered source: it carries `birthday`, `isMale`, a top-level `postName`, and full `actualSalaries[]` (each with `isMainJob`, `dictPost.postName`, `department.fullName`) + `personExperiences[]` (`year`/`month`/`dictExperienceType.experienceTypeName`). Профиль now shows **Личная информация** (Дата рождения, day + month), **Должность** with the primary appointment (`isMainJob`) floated first + an «основное» badge, and **Стаж** with correct Russian plurals (год/года/лет · месяц/месяца/месяцев) via a new pure helper `core/ru_plural.dart` (`pluralRu`/`humanYearsMonths`, unit-tested). Each appointment shows its **rate + start date** (`salary`/`dateBegin`), and `salaryType` splits **ставка** rows (types 1 & 3 → «Ставка N%», summed into a «Суммарная нагрузка: N% · N ст.» line, max 1.5 ставки/150%) from **почасовые** rows (type 2 → «Почасовая», no misleading %). Posts ranked by `isMainJob` then `dictPost.postOrder`. Matches the portal «Сведения обо мне» for the fields the API exposes (education/languages/quals are portal-only, not in `api.volgatech.net`).
 3. **iOS release pass** — project made release-ready (bundle id `net.volgatech.volgatechPro`, display name, Face ID string, full AppIcon set, iOS 15 target) and an **`ios` CI job** (macOS runner) now builds `flutter build ios --release --no-codesign` on every push, catching iOS build breakage and archiving the unsigned `.app`. Signed IPA / TestFlight / App Store is documented in [`docs/IOS_RELEASE.md`](docs/IOS_RELEASE.md) and **blocked on an Apple Developer account** (user provides; the repo never handles Apple credentials). *Local build not possible on the dev Mac here — only Command Line Tools, no full Xcode/CocoaPods.*
+
+### Sprint 7 — Schedule & profile polish 🚧
+1. **Swipe between weeks** in «Обзор недели» (horizontal drag → prev/next week, like the day view); a thin loading bar shows while the new week loads. Controller gains `nextWeek`/`prevWeek`.
+2. **Auto-scrolling lesson names** — long subject titles that don't fit now gently ping-pong instead of truncating, via a self-contained `ui/widgets/marquee_text.dart` (no package; idle when text fits, so cheap on old devices).
+3. **«Профиль» in the drawer** — an explicit menu item (the header photo was tappable but not discoverable).
+4. **Почасовая hours** — hourly appointments now show an **approximate** annual load «≈N ч.» = `salary%` × `kHourlyNormPerYear` (300 ч/год, the ПГТУ почасовая ceiling; single constant, easy to change), and the «Суммарная нагрузка» line adds «+ ≈N ч. почасовой». Rate rows still show «Ставка N%».
 
 ---
 

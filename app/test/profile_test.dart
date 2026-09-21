@@ -68,10 +68,13 @@ void main() {
     // salaryType 2 appointment is flagged hourly (не показываем %)
     final hourly = p.salaries.firstWhere((s) => s.salaryType == 2);
     expect(hourly.isHourly, isTrue);
+    // hours ≈ salary% × norm (84.35% × 300 = 253.05)
+    expect(hourly.hourlyHours, closeTo(253.05, 0.001));
 
     // combined load counts only the ставка rows (100 + 20), not the hourly one
     expect(p.rateTotalPercent, 120.0);
     expect(p.hasHourly, isTrue);
+    expect(p.hourlyHoursTotal, closeTo(253.05, 0.001));
 
     // experience renders like the portal
     final e = p.experiences.single;

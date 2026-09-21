@@ -103,6 +103,12 @@ class ScheduleController extends ChangeNotifier {
   Future<void> prevDay() =>
       goToDay(selectedDay.subtract(const Duration(days: 1)));
 
+  /// Jump a whole week (used by the «Обзор недели» swipe). Lands on the new
+  /// week's Monday so the overview shows Пн–Вс of that week.
+  Future<void> nextWeek() => goToDay(weekStart.add(const Duration(days: 7)));
+  Future<void> prevWeek() =>
+      goToDay(weekStart.subtract(const Duration(days: 7)));
+
   Future<void> refresh() => _loadWeekOf(selectedDay);
 
   Future<void> _loadWeekOf(DateTime day) async {

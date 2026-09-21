@@ -6,6 +6,7 @@ import '../core/week_summary.dart';
 import '../models/schedule.dart';
 import '../state/schedule_controller.dart';
 import '../theme.dart';
+import 'widgets/marquee_text.dart';
 
 /// Whole-week overview (Пн–Вс): lessons per day, time span, gaps («окна»), and
 /// tap-a-day to jump. Reads the already-loaded week from [ScheduleController] —
@@ -36,26 +37,45 @@ class WeekSummaryPage extends StatelessWidget {
         '${_dayMonth.format(days.first)} – ${_dayMonth.format(days.last)}';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Обзор недели')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
-        children: [
-          _WeekHeader(
-              range: range, total: total, weekType: weekType, accent: accent),
-          const SizedBox(height: 8),
-          for (final d in days)
-            _DayCard(
-              events: c.eventsOn(d),
-              accent: accent,
-              isToday: _isToday(d),
-              weekdayLabel: _cap(_weekday.format(d)),
-              dayNum: _day.format(d),
-              onTap: () {
-                c.goToDay(d);
-                Navigator.of(context).pop();
-              },
-            ),
-        ],
+      appBar: AppBar(
+        title: const Text('Обзор недели'),
+        bottom: c.loading
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(2),
+                child: LinearProgressIndicator(minHeight: 2),
+              )
+            : null,
+      ),
+      // Swipe left → next week, right → previous week (like the day view).
+      body: GestureDetector(
+        onHorizontalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v < -250) {
+            c.nextWeek();
+          } else if (v > 250) {
+            c.prevWeek();
+          }
+        },
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+          children: [
+            _WeekHeader(
+                range: range, total: total, weekType: weekType, accent: accent),
+            const SizedBox(height: 8),
+            for (final d in days)
+              _DayCard(
+                events: c.eventsOn(d),
+                accent: accent,
+                isToday: _isToday(d),
+                weekdayLabel: _cap(_weekday.format(d)),
+                dayNum: _day.format(d),
+                onTap: () {
+                  c.goToDay(d);
+                  Navigator.of(context).pop();
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -216,11 +236,10 @@ class _DayCard extends StatelessWidget {
                           ),
                         ),
                         Expanded(
-                          child: Text(e.description ?? '',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          child: MarqueeText(e.description ?? '',
                               style: const TextStyle(fontSize: 13)),
                         ),
+                        const SizedBox(width: 6),
                         if ((e.room ?? '').isNotEmpty)
                           Text(e.room!,
                               style: TextStyle(
