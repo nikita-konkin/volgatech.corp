@@ -73,7 +73,7 @@ Effort: **S** ≤½day · **M** ~1–2 days · **L** ≥3 days. Status as of sca
 | 7.3 | **Crash monitoring** (Sentry/Crashlytics) with PII/token scrubbing. | P2 | S |
 | 7.4 | **CI** to build APK/IPA on push. | P2 | M |
 | 7.5 | **Finish the API contract**: capture `News`, `GetProfiles`, `GetInfo`, `GetProgressSemestrWithAtt` bodies. | P1 | S |
-| 7.6 | **iOS pass**: signing, run on old iOS/simulator (app is Android-verified only so far). | P1 | M |
+| 7.6 | **iOS pass**: unsigned build verified in CI ✅; remaining = **signing** (Apple Developer account) → device/TestFlight/App Store. See `docs/IOS_RELEASE.md`. | P1 | M |
 
 ## 8. To send VolgaTech IT (backend — we don't touch it, but they might fix)
 
@@ -121,7 +121,9 @@ Tests now **18 passing** (added week-accent mapping ×4, app-lock start-state/di
 ### Backlog
 - **Обращения / Requests** — full CRUD + dictionaries + comments + attachments (models in `IAppeal.ts`). *Deferred by request.*
 - **Native mail inbox** — *backlogged.* The university mail is **on-prem Exchange (not Microsoft 365)**, so there is **no OAuth/Graph** — a native client would need **Basic auth with the domain password** (EWS or IMAP). If built: **opt-in, single-user only**, password in Keystore + app-lock, never default; confirm IMAP is enabled first. Superseded for now by the in-app OWA WebView tab. *(Server/forest specifics kept in internal notes.)*
-- iOS signing pass (7.6), CI (7.4), week/agenda overview + "Сегодня" jump (4.3).
+- iOS **signing** pass (7.6 — unsigned build already in CI), week/agenda "Сегодня" jump (4.3).
+- **Group level badge (бакалавр / магистр / аспирант)** — *backlogged (user).* Not an API field. The **level appears to be encoded in the group-name suffix** (e.g. «ИТСм» → магистр), so it is *potentially* derivable client-side by parsing `fullDescription`/`groupName` — but the suffix set is unconfirmed (аспирант letter unknown, and non-suffixed groups must safely default to бакалавр). Deferred until the naming convention is confirmed; ships as a pure helper + unit tests when picked up.
+- **Group mode of study / форма обучения (очная / заочная / очно-заочная)** — *backlogged (user).* **Not present in any captured response** and **not derivable** from the group names we have ("ИСТ-110", "ИСТ-41", "ИТСм"). Needs either the distinguishing naming convention (a letter/prefix for заочная/очно-заочная groups) or a fresh live capture exposing the field. Cannot be built reliably until then.
 
 ### Sprint 5 — Branding + in-app web — DONE ✅
 1. **App identity** — display name **«Волгатех.Коллектив»** (Russian primary; Latin «Volgatech.CORP» retired), icon = the **official ВОЛГАТЕХ logo** upscaled + denoised (background whitened), generated for Android adaptive/legacy + iOS.
@@ -129,15 +131,19 @@ Tests now **18 passing** (added week-accent mapping ×4, app-lock start-state/di
 3. **In-app «Портал»** — same generic `WebViewScreen` now also powers `portal.volgatech.net` (was a link-out).
 4. **Easter egg** — Настройки → tap the version footer 7× reveals the РТФ (Радиотехнический факультет) crest.
 
+### Sprint 6 — Week summary + iOS — IN PROGRESS 🚧
+1. **«Обзор недели»** — new screen off the Расписание AppBar (`week_summary_page.dart`): Пн–Вс day cards over the already-loaded week, per-day lesson count (Russian plural пара/пары/пар), first–last time span, total gap time («окна»), total pairs, and the week accent colour. Today is highlighted; tapping a day calls `goToDay` and returns to that day. No new API — pure aggregation over `ScheduleController._byDay` (added `eventsOn`, `weekStart`, `weekDays`).
+2. **iOS release pass** — project made release-ready (bundle id `net.volgatech.volgatechPro`, display name, Face ID string, full AppIcon set, iOS 15 target) and an **`ios` CI job** (macOS runner) now builds `flutter build ios --release --no-codesign` on every push, catching iOS build breakage and archiving the unsigned `.app`. Signed IPA / TestFlight / App Store is documented in [`docs/IOS_RELEASE.md`](docs/IOS_RELEASE.md) and **blocked on an Apple Developer account** (user provides; the repo never handles Apple credentials). *Local build not possible on the dev Mac here — only Command Line Tools, no full Xcode/CocoaPods.*
+
 ---
 
 ## Future roadmap (planned)
 
 ### A. Schedule — the next focus
-- **A1. Whole-week summary view** *(user ask, P1, M)* — an overview of the entire week on one screen (Mon–Sun columns/rows), lesson counts per day, gaps/"окна", first/last pair, total hours, and the week colour. Tap a day → jump to it. Data is already loaded per-week (`ScheduleController._byDay`), so this is a UI/aggregation layer, no new API.
-- **A2. Group level badge** *(user ask, P1, S — feasible)* — the **education level is encoded in the group-name suffix**, not in any API field. Parse `fullDescription`/`groupName`: suffix **«м» → магистр**, **«а» → аспирант** *(letter to confirm)*, otherwise **бакалавр**. Show a small badge on each lesson/exam. Pure client-side helper + unit tests. ⚠️ Confirm the аспирант suffix letter before shipping.
-- **A3. Group mode of study (форма обучения)** *(user ask, P2, BLOCKED)* — очная / заочная / очно-заочная is **not present in any captured response** and **not obviously encoded** in the group names we have ("ИСТ-110", "ИСТ-41", "ИТСм"). To build it we need one of: (a) the **naming convention** that distinguishes заочная/очно-заочная groups (e.g. a letter/prefix — user to provide), or (b) confirmation of a field via a fresh live capture. Until then, can't be derived reliably.
+- ~~**A1. Whole-week summary view**~~ — **DONE ✅ (Sprint 6)**. «Обзор недели» screen (AppBar button on Расписание): Пн–Вс cards, per-day lesson count, first–last span, gaps («окна»), total pairs, week colour; today highlighted; tap a day → jumps to it. Pure aggregation over the already-loaded `ScheduleController._byDay` — no new API.
 - **A4. Week/agenda niceties** — "Сегодня" jump, colour-by-lesson-type already partly done (4.4), skeletons done.
+
+> **Group level & mode of study** — moved to the **Backlog** (below). Neither is exposed by the API, so both are deferred until we have a confirmed naming convention or a fresh live capture.
 
 ### B. Data-blocked features (need a live capture)
 - **B1. News** (`/api/News/2/0`) — no list template recovered; capture the body on a real device, then build.
@@ -148,8 +154,8 @@ Tests now **18 passing** (added week-accent mapping ×4, app-lock start-state/di
 - **C2. Native mail inbox** — backlogged (on-prem Exchange, not M365 → Basic auth only). Opt-in/single-user/Keystore+app-lock if ever built; confirm IMAP first.
 
 ### D. Engineering
-- **D1. iOS pass** — signing + run on device/simulator (Android-verified only so far).
-- **D2. CI** — build APK/IPA on push. **D3. Crash monitoring** (Sentry, token/PII-scrubbed). **D4. Prod/Test flavor toggle** (`api` ↔ `test-api`).
+- **D1. iOS pass** — *unsigned build DONE (CI, Sprint 6).* Remaining: **signing** (Apple Developer account) → device install / TestFlight / App Store, then optional signed-IPA CI automation. See [`docs/IOS_RELEASE.md`](docs/IOS_RELEASE.md).
+- **D2. CI** — APK build + unsigned iOS build on push ✅ (Sprint 6). Remaining: signed-IPA upload once Apple creds exist. **D3. Crash monitoring** (Sentry, token/PII-scrubbed). **D4. Prod/Test flavor toggle** (`api` ↔ `test-api`).
 
 ### Recommended order
-**A1 (week summary) → A2 (level badge)** next — both are pure client-side, high value, and directly requested. Then **A3** once the naming convention is known, and **B1 News** on the next live capture.
+**A1 (week summary) — shipped.** Next: **D1 iOS pass** (build + signing), then **C1 Обращения / Requests** (largest client-side feature). The level/mode badges and **B1 News** wait on a confirmed naming convention or a fresh live capture.

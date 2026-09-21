@@ -29,11 +29,22 @@ class ScheduleController extends ChangeNotifier {
 
   String _weekCacheKey(DateTime monday) => 'schedule_${_personId}_${_key(monday)}';
 
-  List<ScheduleEvent> get eventsForSelected {
-    final list = List<ScheduleEvent>.from(_byDay[_key(selectedDay)] ?? const []);
+  List<ScheduleEvent> get eventsForSelected => eventsOn(selectedDay);
+
+  /// Sorted lessons for any day in the loaded window (empty if none / not loaded).
+  List<ScheduleEvent> eventsOn(DateTime day) {
+    final list = List<ScheduleEvent>.from(_byDay[_key(day)] ?? const []);
     list.sort((a, b) => (a.timeBegin ?? '').compareTo(b.timeBegin ?? ''));
     return list;
   }
+
+  /// Monday of the selected day's week (the week loaded into `_byDay`).
+  DateTime get weekStart =>
+      _dateOnly(selectedDay).subtract(Duration(days: selectedDay.weekday - 1));
+
+  /// The seven dates Mon..Sun of the current week.
+  List<DateTime> get weekDays =>
+      List.generate(7, (i) => weekStart.add(Duration(days: i)));
 
   static int? _firstWeekNumber(List<ScheduleEvent>? events) {
     if (events == null) return null;
