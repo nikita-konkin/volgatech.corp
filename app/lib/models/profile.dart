@@ -7,6 +7,11 @@
 
 import '../core/date_utils.dart';
 
+/// Annual hour norm used to turn a почасовая appointment's `salary` coefficient
+/// into an approximate hour count (hours ≈ salary% × norm). 300 ч/год is the
+/// ПГТУ почасовая ceiling; change here if the real multiplier differs.
+const int kHourlyNormPerYear = 300;
+
 class SalaryEntry {
   final String? postName; // dictPost.postName
   final String? departmentName; // department.fullName
@@ -29,6 +34,12 @@ class SalaryEntry {
   /// so it must not be rendered as a percentage. (Confirmed with the user; in
   /// the live data types 1 & 3 sum to exactly the 1.5-ставки/150% ceiling.)
   bool get isHourly => salaryType == 2;
+
+  /// Approximate annual hours for a почасовая appointment: the `salary` value is
+  /// read as a percentage of [kHourlyNormPerYear] (e.g. 84.35 → ≈253 ч.). Null
+  /// for rate appointments (their «amount» is a ставка share, not hours).
+  double? get hourlyHours =>
+      (isHourly && salary != null) ? salary! / 100 * kHourlyNormPerYear : null;
 
   static DateTime? _date(dynamic v) =>
       (v is String && v.isNotEmpty) ? apiCalendarDate(v) : null;
@@ -115,6 +126,11 @@ class PersonProfile {
       .fold(0.0, (sum, s) => sum + s.salary!);
 
   bool get hasHourly => salaries.any((s) => s.isHourly);
+
+  /// Approximate total почасовая load (annual hours), summed across hourly rows.
+  double get hourlyHoursTotal => salaries
+      .map((s) => s.hourlyHours ?? 0)
+      .fold(0.0, (sum, h) => sum + h);
 
   /// Appointments ranked: the primary one (isMainJob) first, then by post rank
   /// (dictPost.postOrder, higher = more senior). Stable for equal keys.

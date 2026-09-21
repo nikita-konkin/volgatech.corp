@@ -73,7 +73,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: Text(
                           'Суммарная нагрузка: ${_num(p.rateTotalPercent)}%'
                           ' · ${_num(p.rateTotalPercent / 100)} ст.'
-                          '${p.hasHourly ? ' + почасовая' : ''}',
+                          '${p.hasHourly ? ' + ≈${_num(p.hourlyHoursTotal.roundToDouble())} ч. почасовой' : ''}',
                           style:
                               TextStyle(fontSize: 13, color: Brand.muted(context)),
                         ),
@@ -106,13 +106,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
   static final _dmy = DateFormat('dd.MM.yyyy', 'ru_RU');
 
-  /// "Ставка 100% · с 05.03.2026" (rate) or "Почасовая · с …" (hourly).
-  /// Hourly appointments never show a percentage — their number isn't a ставка.
+  /// "Ставка 100% · с 05.03.2026" (rate) or "Почасовая · ≈253 ч. · с …" (hourly).
+  /// Hourly appointments never show a percentage — their number isn't a ставка;
+  /// instead we show the approximate annual hours (salary% × norm).
   static String? _postMeta(SalaryEntry s) {
     final parts = <String>[
-      if (s.isHourly)
-        'Почасовая'
-      else if (s.salary != null)
+      if (s.isHourly) ...[
+        'Почасовая',
+        if ((s.hourlyHours ?? 0) >= 1) '≈${_num(s.hourlyHours!.roundToDouble())} ч.',
+      ] else if (s.salary != null)
         'Ставка ${_num(s.salary!)}%',
       if (s.dateBegin != null) 'с ${_dmy.format(s.dateBegin!)}',
     ];
