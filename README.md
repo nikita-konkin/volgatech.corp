@@ -33,7 +33,7 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
   (WebView), keeping only the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
 
-## What's new — v0.2.0 (in development)
+## What's new — v0.2.0
 
 - **«Обзор недели»** — a whole-week schedule overview off the Расписание screen:
   Пн–Вс day cards, lessons per day, first–last span, gaps («окна»), total pairs,
@@ -96,7 +96,7 @@ GitHub Actions (Flutter **stable** channel):
 Cut a release:
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
 ## Roadmap
