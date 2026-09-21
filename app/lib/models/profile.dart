@@ -1,25 +1,36 @@
 // Person profile.
 // - /api/Person/GetProfiles -> array; element [0] gives `personId`.
-// - /api/Person/GetInfo/{id} -> { personFIO, fileName, actualSalaries[],
-//   personExperiences[] }  (field names verified from the original templates).
+// - /api/Person/GetInfo/{id} -> { personFIO, fileName, birthday, isMale,
+//   postName, actualSalaries[]{ isMainJob, dictPost{postName}, department{fullName} },
+//   personExperiences[]{ year, month, dictExperienceType{experienceTypeName} } }
+//   (shape verified against a live capture, 2026-09-21).
+
+import '../core/date_utils.dart';
 
 class SalaryEntry {
   final String? postName; // dictPost.postName
   final String? departmentName; // department.fullName
-  const SalaryEntry({this.postName, this.departmentName});
+  final bool isMainJob; // actualSalaries[].isMainJob — the primary appointment
+  const SalaryEntry(
+      {this.postName, this.departmentName, this.isMainJob = false});
 
   factory SalaryEntry.fromJson(Map<String, dynamic> j) => SalaryEntry(
         postName: (j['dictPost']?['postName'] ?? j['postName']) as String?,
         departmentName:
             (j['department']?['fullName'] ?? j['departmentName']) as String?,
+        isMainJob: j['isMainJob'] == true,
       );
 
-  Map<String, dynamic> toJson() =>
-      {'postName': postName, 'departmentName': departmentName};
+  Map<String, dynamic> toJson() => {
+        'postName': postName,
+        'departmentName': departmentName,
+        'isMainJob': isMainJob,
+      };
 
   factory SalaryEntry.fromCache(Map<String, dynamic> j) => SalaryEntry(
         postName: j['postName'] as String?,
         departmentName: j['departmentName'] as String?,
+        isMainJob: j['isMainJob'] == true,
       );
 }
 
@@ -50,6 +61,7 @@ class PersonProfile {
   final int personId;
   final String? personFIO; // full name
   final String? fileName; // photo file name ("<guid>.jpg")
+  final DateTime? birthday; // birthday (date only)
   final List<SalaryEntry> salaries;
   final List<ExperienceEntry> experiences;
 
@@ -57,12 +69,23 @@ class PersonProfile {
     required this.personId,
     this.personFIO,
     this.fileName,
+    this.birthday,
     this.salaries = const [],
     this.experiences = const [],
   });
 
   String? get fullName => personFIO;
   String? get photoName => fileName;
+
+  /// Appointments with the primary one (isMainJob) first, order otherwise kept.
+  List<SalaryEntry> get salariesMainFirst {
+    final list = List<SalaryEntry>.from(salaries);
+    list.sort((a, b) => (b.isMainJob ? 1 : 0) - (a.isMainJob ? 1 : 0));
+    return list;
+  }
+
+  static DateTime? _date(dynamic v) =>
+      (v is String && v.isNotEmpty) ? apiCalendarDate(v) : null;
 
   /// From /api/Person/GetProfiles element (only personId guaranteed).
   factory PersonProfile.fromProfiles(Map<String, dynamic> j) => PersonProfile(
@@ -77,6 +100,7 @@ class PersonProfile {
         personId: (j['personId'] ?? personId) as int,
         personFIO: j['personFIO'] as String?,
         fileName: j['fileName'] as String?,
+        birthday: _date(j['birthday']),
         salaries: ((j['actualSalaries'] as List?) ?? const [])
             .map((e) => SalaryEntry.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
@@ -89,6 +113,7 @@ class PersonProfile {
         'personId': personId,
         'personFIO': personFIO,
         'fileName': fileName,
+        'birthday': birthday?.toIso8601String(),
         'salaries': salaries.map((e) => e.toJson()).toList(),
         'experiences': experiences.map((e) => e.toJson()).toList(),
       };
@@ -97,6 +122,7 @@ class PersonProfile {
         personId: (j['personId'] ?? 0) as int,
         personFIO: j['personFIO'] as String?,
         fileName: j['fileName'] as String?,
+        birthday: _date(j['birthday']),
         salaries: ((j['salaries'] as List?) ?? const [])
             .map((e) => SalaryEntry.fromCache(Map<String, dynamic>.from(e)))
             .toList(),

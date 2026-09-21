@@ -1,15 +1,11 @@
 import '../models/schedule.dart';
+import 'ru_plural.dart';
 
 /// Pure aggregation for the «Обзор недели» screen — no Flutter imports, so the
 /// counting/plural/gap logic is unit-tested directly (see test/week_summary_test.dart).
 
 /// Russian plural for «пара» (lesson pair): 1 пара · 2–4 пары · else пар.
-String russianPairs(int n) {
-  final n100 = n % 100, n10 = n % 10;
-  if (n10 == 1 && n100 != 11) return '$n пара';
-  if (n10 >= 2 && n10 <= 4 && !(n100 >= 12 && n100 <= 14)) return '$n пары';
-  return '$n пар';
-}
+String russianPairs(int n) => '$n ${pluralRu(n, 'пара', 'пары', 'пар')}';
 
 /// Minutes since midnight from an "HH:MM[:SS]" string, or null if unparseable.
 int? minutesOfDay(String? t) {

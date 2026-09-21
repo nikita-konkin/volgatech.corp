@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../core/ru_plural.dart';
 import '../data/volgatech_api.dart';
-import '../models/profile.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
 
@@ -58,12 +59,18 @@ class _ProfilePageState extends State<ProfilePage> {
                         fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 20),
+                  if (p.birthday != null) ...[
+                    _sectionTitle('Личная информация'),
+                    _row(context, 'Дата рождения', _birthday(p.birthday!)),
+                    const SizedBox(height: 12),
+                  ],
                   if (p.salaries.isNotEmpty) ...[
                     _sectionTitle('Должность'),
-                    ...p.salaries.map((s) => _row(
+                    ...p.salariesMainFirst.map((s) => _row(
                           context,
                           s.postName ?? '—',
                           s.departmentName ?? '',
+                          badge: s.isMainJob ? 'основное' : null,
                         )),
                   ],
                   if (p.experiences.isNotEmpty) ...[
@@ -72,7 +79,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ...p.experiences.map((e) => _row(
                           context,
                           e.typeName ?? '—',
-                          _experience(e),
+                          humanYearsMonths(e.year, e.month),
                         )),
                   ],
                 ],
@@ -81,12 +88,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  static String _experience(ExperienceEntry e) {
-    final parts = <String>[];
-    if (e.year != null) parts.add('${e.year} лет');
-    if (e.month != null) parts.add('${e.month} мес.');
-    return parts.join(' ');
-  }
+  static final _dayMonth = DateFormat('dd MMMM', 'ru_RU');
+  static String _birthday(DateTime d) => _dayMonth.format(d); // "05 февраля"
 
   Widget _sectionTitle(String t) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -97,7 +100,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: Brand.coral)),
       );
 
-  Widget _row(BuildContext context, String title, String value) => Container(
+  Widget _row(BuildContext context, String title, String value,
+          {String? badge}) =>
+      Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: Brand.card(context),
@@ -108,9 +113,30 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w600)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(title,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+                if (badge != null)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Brand.coral.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(badge,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Brand.coral)),
+                  ),
+              ],
+            ),
             if (value.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
