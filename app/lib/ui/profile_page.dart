@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../core/ru_plural.dart';
 import '../data/volgatech_api.dart';
 import '../models/profile.dart';
 import '../state/auth_controller.dart';
@@ -58,12 +60,30 @@ class _ProfilePageState extends State<ProfilePage> {
                         fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 20),
+                  if (p.birthday != null) ...[
+                    _sectionTitle('Личная информация'),
+                    _row(context, 'Дата рождения', _birthday(p.birthday!)),
+                    const SizedBox(height: 12),
+                  ],
                   if (p.salaries.isNotEmpty) ...[
                     _sectionTitle('Должность'),
-                    ...p.salaries.map((s) => _row(
+                    if (p.rateTotalPercent > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Суммарная нагрузка: ${_num(p.rateTotalPercent)}%'
+                          ' · ${_num(p.rateTotalPercent / 100)} ст.'
+                          '${p.hasHourly ? ' + почасовая' : ''}',
+                          style:
+                              TextStyle(fontSize: 13, color: Brand.muted(context)),
+                        ),
+                      ),
+                    ...p.salariesMainFirst.map((s) => _row(
                           context,
                           s.postName ?? '—',
                           s.departmentName ?? '',
+                          badge: s.isMainJob ? 'основное' : null,
+                          meta: _postMeta(s),
                         )),
                   ],
                   if (p.experiences.isNotEmpty) ...[
@@ -72,7 +92,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ...p.experiences.map((e) => _row(
                           context,
                           e.typeName ?? '—',
-                          _experience(e),
+                          humanYearsMonths(e.year, e.month),
                         )),
                   ],
                 ],
@@ -81,12 +101,27 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  static String _experience(ExperienceEntry e) {
-    final parts = <String>[];
-    if (e.year != null) parts.add('${e.year} лет');
-    if (e.month != null) parts.add('${e.month} мес.');
-    return parts.join(' ');
+  static final _dayMonth = DateFormat('dd MMMM', 'ru_RU');
+  static String _birthday(DateTime d) => _dayMonth.format(d); // "05 февраля"
+
+  static final _dmy = DateFormat('dd.MM.yyyy', 'ru_RU');
+
+  /// "Ставка 100% · с 05.03.2026" (rate) or "Почасовая · с …" (hourly).
+  /// Hourly appointments never show a percentage — their number isn't a ставка.
+  static String? _postMeta(SalaryEntry s) {
+    final parts = <String>[
+      if (s.isHourly)
+        'Почасовая'
+      else if (s.salary != null)
+        'Ставка ${_num(s.salary!)}%',
+      if (s.dateBegin != null) 'с ${_dmy.format(s.dateBegin!)}',
+    ];
+    return parts.isEmpty ? null : parts.join('  ·  ');
   }
+
+  /// Trim a trailing ".0": 100.0 -> "100", 84.35 -> "84.35".
+  static String _num(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
 
   Widget _sectionTitle(String t) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -97,7 +132,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: Brand.coral)),
       );
 
-  Widget _row(BuildContext context, String title, String value) => Container(
+  Widget _row(BuildContext context, String title, String value,
+          {String? badge, String? meta}) =>
+      Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
           color: Brand.card(context),
@@ -108,14 +145,41 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w600)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(title,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+                if (badge != null)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Brand.coral.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(badge,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Brand.coral)),
+                  ),
+              ],
+            ),
             if (value.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(value,
                     style: TextStyle(fontSize: 14, color: Brand.muted(context))),
+              ),
+            if (meta != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(meta,
+                    style: TextStyle(fontSize: 12, color: Brand.muted(context))),
               ),
           ],
         ),

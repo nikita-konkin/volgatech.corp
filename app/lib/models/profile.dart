@@ -1,25 +1,67 @@
 // Person profile.
 // - /api/Person/GetProfiles -> array; element [0] gives `personId`.
-// - /api/Person/GetInfo/{id} -> { personFIO, fileName, actualSalaries[],
-//   personExperiences[] }  (field names verified from the original templates).
+// - /api/Person/GetInfo/{id} -> { personFIO, fileName, birthday, isMale,
+//   postName, actualSalaries[]{ isMainJob, dictPost{postName}, department{fullName} },
+//   personExperiences[]{ year, month, dictExperienceType{experienceTypeName} } }
+//   (shape verified against a live capture, 2026-09-21).
+
+import '../core/date_utils.dart';
 
 class SalaryEntry {
   final String? postName; // dictPost.postName
   final String? departmentName; // department.fullName
-  const SalaryEntry({this.postName, this.departmentName});
+  final bool isMainJob; // actualSalaries[].isMainJob — the primary appointment
+  final double? salary; // actualSalaries[].salary — ставка share (%) OR hours
+  final DateTime? dateBegin; // actualSalaries[].dateBegin (date only)
+  final int? postOrder; // dictPost.postOrder — post rank (higher = more senior)
+  final int? salaryType; // 1 & 3 = ставка (rate), 2 = почасовая (hourly)
+  const SalaryEntry({
+    this.postName,
+    this.departmentName,
+    this.isMainJob = false,
+    this.salary,
+    this.dateBegin,
+    this.postOrder,
+    this.salaryType,
+  });
+
+  /// salaryType 2 = почасовая; the [salary] number is then NOT a ставка share,
+  /// so it must not be rendered as a percentage. (Confirmed with the user; in
+  /// the live data types 1 & 3 sum to exactly the 1.5-ставки/150% ceiling.)
+  bool get isHourly => salaryType == 2;
+
+  static DateTime? _date(dynamic v) =>
+      (v is String && v.isNotEmpty) ? apiCalendarDate(v) : null;
 
   factory SalaryEntry.fromJson(Map<String, dynamic> j) => SalaryEntry(
         postName: (j['dictPost']?['postName'] ?? j['postName']) as String?,
         departmentName:
             (j['department']?['fullName'] ?? j['departmentName']) as String?,
+        isMainJob: j['isMainJob'] == true,
+        salary: (j['salary'] as num?)?.toDouble(),
+        dateBegin: _date(j['dateBegin']),
+        postOrder: (j['dictPost']?['postOrder'] ?? j['postOrder']) as int?,
+        salaryType: j['salaryType'] as int?,
       );
 
-  Map<String, dynamic> toJson() =>
-      {'postName': postName, 'departmentName': departmentName};
+  Map<String, dynamic> toJson() => {
+        'postName': postName,
+        'departmentName': departmentName,
+        'isMainJob': isMainJob,
+        'salary': salary,
+        'dateBegin': dateBegin?.toIso8601String(),
+        'postOrder': postOrder,
+        'salaryType': salaryType,
+      };
 
   factory SalaryEntry.fromCache(Map<String, dynamic> j) => SalaryEntry(
         postName: j['postName'] as String?,
         departmentName: j['departmentName'] as String?,
+        isMainJob: j['isMainJob'] == true,
+        salary: (j['salary'] as num?)?.toDouble(),
+        dateBegin: _date(j['dateBegin']),
+        postOrder: j['postOrder'] as int?,
+        salaryType: j['salaryType'] as int?,
       );
 }
 
@@ -50,6 +92,7 @@ class PersonProfile {
   final int personId;
   final String? personFIO; // full name
   final String? fileName; // photo file name ("<guid>.jpg")
+  final DateTime? birthday; // birthday (date only)
   final List<SalaryEntry> salaries;
   final List<ExperienceEntry> experiences;
 
@@ -57,12 +100,38 @@ class PersonProfile {
     required this.personId,
     this.personFIO,
     this.fileName,
+    this.birthday,
     this.salaries = const [],
     this.experiences = const [],
   });
 
   String? get fullName => personFIO;
   String? get photoName => fileName;
+
+  /// Combined ставка load (percent) — sum of the rate-based appointments only
+  /// (hourly ones aren't ставки). E.g. 100 + 20 + 10 + 20 = 150 (= 1.5 ставки).
+  double get rateTotalPercent => salaries
+      .where((s) => !s.isHourly && s.salary != null)
+      .fold(0.0, (sum, s) => sum + s.salary!);
+
+  bool get hasHourly => salaries.any((s) => s.isHourly);
+
+  /// Appointments ranked: the primary one (isMainJob) first, then by post rank
+  /// (dictPost.postOrder, higher = more senior). Stable for equal keys.
+  List<SalaryEntry> get salariesMainFirst {
+    final indexed = salaries.asMap().entries.toList();
+    indexed.sort((a, b) {
+      final byMain = (b.value.isMainJob ? 1 : 0) - (a.value.isMainJob ? 1 : 0);
+      if (byMain != 0) return byMain;
+      final byOrder = (b.value.postOrder ?? 0) - (a.value.postOrder ?? 0);
+      if (byOrder != 0) return byOrder;
+      return a.key - b.key; // keep original order otherwise
+    });
+    return indexed.map((e) => e.value).toList();
+  }
+
+  static DateTime? _date(dynamic v) =>
+      (v is String && v.isNotEmpty) ? apiCalendarDate(v) : null;
 
   /// From /api/Person/GetProfiles element (only personId guaranteed).
   factory PersonProfile.fromProfiles(Map<String, dynamic> j) => PersonProfile(
@@ -77,6 +146,7 @@ class PersonProfile {
         personId: (j['personId'] ?? personId) as int,
         personFIO: j['personFIO'] as String?,
         fileName: j['fileName'] as String?,
+        birthday: _date(j['birthday']),
         salaries: ((j['actualSalaries'] as List?) ?? const [])
             .map((e) => SalaryEntry.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
@@ -89,6 +159,7 @@ class PersonProfile {
         'personId': personId,
         'personFIO': personFIO,
         'fileName': fileName,
+        'birthday': birthday?.toIso8601String(),
         'salaries': salaries.map((e) => e.toJson()).toList(),
         'experiences': experiences.map((e) => e.toJson()).toList(),
       };
@@ -97,6 +168,7 @@ class PersonProfile {
         personId: (j['personId'] ?? 0) as int,
         personFIO: j['personFIO'] as String?,
         fileName: j['fileName'] as String?,
+        birthday: _date(j['birthday']),
         salaries: ((j['salaries'] as List?) ?? const [])
             .map((e) => SalaryEntry.fromCache(Map<String, dynamic>.from(e)))
             .toList(),
