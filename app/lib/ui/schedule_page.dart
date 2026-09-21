@@ -10,6 +10,7 @@ import '../state/schedule_controller.dart';
 import '../theme.dart';
 import 'app_drawer.dart';
 import 'offline_banner.dart';
+import 'week_summary_page.dart';
 
 class SchedulePage extends StatelessWidget {
   const SchedulePage({super.key});
@@ -46,7 +47,25 @@ class _ScheduleView extends StatelessWidget {
     final accent = Brand.weekAccent(weekNumber, context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Расписание занятий')),
+      appBar: AppBar(
+        title: const Text('Расписание занятий'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_view_week),
+            tooltip: 'Обзор недели',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ChangeNotifierProvider<ScheduleController>.value(
+                    value: c,
+                    child: const WeekSummaryPage(),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       drawer: const AppDrawer(),
       body: Column(
         children: [

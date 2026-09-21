@@ -47,11 +47,14 @@ cd app
 flutter pub get
 flutter analyze
 flutter test
-flutter build apk --release --split-per-abi   # per-ABI APKs (arm64 ≈ 20 MB)
+flutter build apk --release --split-per-abi   # Android: per-ABI APKs (arm64 ≈ 20 MB)
+flutter build ios --release --no-codesign      # iOS: unsigned build (needs macOS + Xcode)
 ```
 
-Requirements: Flutter **stable** (developed on 3.47.5), JDK 17, Android SDK
-(compileSdk 36). minSdk is 24 (Android 7.0).
+Requirements: Flutter **stable**, JDK 17, Android SDK (compileSdk 36). minSdk is
+24 (Android 7.0). For iOS: macOS with **full Xcode** + CocoaPods; deployment
+target is iOS 15.0. A **signed** iOS build (device install / TestFlight / App
+Store) needs an Apple Developer account — see **[docs/IOS_RELEASE.md](docs/IOS_RELEASE.md)**.
 
 App icons are generated from `app/assets/icon/` with:
 
@@ -63,11 +66,13 @@ cd app && dart run flutter_launcher_icons
 
 GitHub Actions (Flutter **stable** channel):
 
-- [`ci.yml`](.github/workflows/ci.yml) — on every push/PR to `main`: `flutter
-  analyze`, `flutter test`, and a release APK build, uploaded as a workflow
-  artifact.
+- [`ci.yml`](.github/workflows/ci.yml) — on every push/PR to `main`: a Linux job
+  runs `flutter analyze` + `flutter test` and builds the release APKs, and a
+  macOS job builds the app for **iOS** (`--no-codesign`); both upload their output
+  as workflow artifacts.
 - [`release.yml`](.github/workflows/release.yml) — on a `v*` tag: builds the
-  per-ABI release APKs and attaches them to a GitHub Release.
+  per-ABI release APKs and attaches them to a GitHub Release. (A signed iOS
+  release needs an Apple Developer account — see [docs/IOS_RELEASE.md](docs/IOS_RELEASE.md).)
 
 Cut a release:
 

@@ -44,3 +44,39 @@ jobs:
           name: apk-release
           path: app/build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
+
+  ios:
+    name: Build iOS (unsigned)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # No Apple signing credentials in CI, so build unsigned. This compiles,
+      # links, and runs CocoaPods for all iOS plugins (webview_flutter,
+      # local_auth, …) — it proves the iOS build is healthy. A signed IPA for
+      # TestFlight/App Store needs an Apple Developer account (see README → iOS).
+      - name: Build iOS (no codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned .app
+        run: |
+          cd build/ios/iphoneos
+          zip -ryq Runner-unsigned-app.zip Runner.app
+
+      - name: Upload unsigned .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-unsigned
+          path: app/build/ios/iphoneos/Runner-unsigned-app.zip
+          if-no-files-found: error
