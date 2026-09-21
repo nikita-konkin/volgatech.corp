@@ -1,0 +1,37 @@
+# ---- macOS ----
+.DS_Store
+
+# ---- Flutter / Dart build artifacts ----
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/generated_plugin_registrant.*
+**/*.iml
+.idea/
+.vscode/
+
+# ---- Android ----
+app/android/.gradle/
+app/android/local.properties
+app/android/captures/
+app/android/key.properties
+**/*.jks
+**/*.keystore
+
+# ---- iOS ----
+app/ios/Flutter/Flutter.framework
+app/ios/Flutter/Flutter.podspec
+app/ios/Flutter/ephemeral/
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/**/*.env
+**/*.p12
+**/*.mobileprovision
+
+# ---- Reverse engineering (NOT published) ----
+# Contains the university's original proprietary app (APK + decompiled source)
+# and captured personal data. Kept local only. See IMPROVEMENTS.md for the
+# derived, publishable API contract knowledge that lives in the app code.
+reverse_engineering/
