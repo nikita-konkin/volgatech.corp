@@ -15,7 +15,8 @@ void main() {
     'actualSalaries': [
       {
         'isMainJob': false,
-        'salary': 20.0,
+        'salary': 84.35,
+        'salaryType': 2, // почасовая
         'dateBegin': '2026-09-02T22:31:25.17+03:00',
         'department': {'fullName': 'Кафедра А'},
         'dictPost': {'postName': 'преподаватель', 'postOrder': 0},
@@ -23,9 +24,18 @@ void main() {
       {
         'isMainJob': true,
         'salary': 100.0,
+        'salaryType': 1, // ставка
         'dateBegin': '2026-03-05T14:27:00.003+03:00',
         'department': {'fullName': 'Кафедра Б'},
         'dictPost': {'postName': 'старший преподаватель', 'postOrder': 1},
+      },
+      {
+        'isMainJob': false,
+        'salary': 20.0,
+        'salaryType': 3, // ставка (research)
+        'dateBegin': '2026-06-19T22:31:29.65+03:00',
+        'department': {'fullName': 'Сектор'},
+        'dictPost': {'postName': 'научный сотрудник', 'postOrder': 0},
       },
     ],
     'personExperiences': [
@@ -43,7 +53,7 @@ void main() {
     expect(p.photoName, 'photo.jpg');
     // birthday parsed as a wall-clock date (tz offset ignored)
     expect(p.birthday, DateTime(1990, 3, 15));
-    expect(p.salaries.length, 2);
+    expect(p.salaries.length, 3);
 
     // main job floats to the front, with its rate + start date parsed
     final first = p.salariesMainFirst.first;
@@ -53,6 +63,15 @@ void main() {
     expect(first.salary, 100.0);
     expect(first.postOrder, 1);
     expect(first.dateBegin, DateTime(2026, 3, 5));
+    expect(first.isHourly, isFalse); // salaryType 1
+
+    // salaryType 2 appointment is flagged hourly (не показываем %)
+    final hourly = p.salaries.firstWhere((s) => s.salaryType == 2);
+    expect(hourly.isHourly, isTrue);
+
+    // combined load counts only the ставка rows (100 + 20), not the hourly one
+    expect(p.rateTotalPercent, 120.0);
+    expect(p.hasHourly, isTrue);
 
     // experience renders like the portal
     final e = p.experiences.single;
