@@ -33,6 +33,17 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
   (WebView), keeping only the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
 
+## What's new — v0.3.0
+
+- **«Обзор недели» — swipe between weeks** (horizontal drag, like the day view),
+  with a loading bar while the next week loads.
+- **Auto-scrolling lesson names** — long subject titles that don't fit now gently
+  scroll instead of being cut off with «…».
+- **«Профиль» in the menu** — an explicit drawer entry (the header photo was
+  tappable but easy to miss).
+- **Почасовая appointments** show an approximate annual load («≈N ч.») alongside
+  the ставка rows and the combined-load line.
+
 ## What's new — v0.2.0
 
 - **«Обзор недели»** — a whole-week schedule overview off the Расписание screen:
