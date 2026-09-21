@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../core/cache.dart';
+import '../core/login_utils.dart';
 import '../core/session.dart';
 import '../data/volgatech_api.dart';
 import '../models/profile.dart';
@@ -44,7 +45,7 @@ class AuthController extends ChangeNotifier {
     status = AuthStatus.authenticating;
     notifyListeners();
     try {
-      final tokens = await _api.getToken(login.trim(), password);
+      final tokens = await _api.getToken(normalizeLogin(login), password);
       await _session.saveTokens(tokens);
       final base = await _api.getProfile(); // personId
       personId = base.personId;

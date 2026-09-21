@@ -33,6 +33,12 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
   (WebView), keeping only the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
 
+## What's new — v0.3.1
+
+- **Login accepts an e-mail** — typing your full corporate address
+  (`KonkinNA@volgatech.net`) now logs in: it's reduced to the bare account name
+  (`konkinna`), trimmed and lowercased.
+
 ## What's new — v0.3.0
 
 - **«Обзор недели» — swipe between weeks** (horizontal drag, like the day view),
