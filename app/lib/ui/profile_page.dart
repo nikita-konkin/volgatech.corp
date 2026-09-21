@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../core/ru_plural.dart';
 import '../data/volgatech_api.dart';
+import '../models/profile.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
 
@@ -71,6 +72,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           s.postName ?? '—',
                           s.departmentName ?? '',
                           badge: s.isMainJob ? 'основное' : null,
+                          meta: _postMeta(s),
                         )),
                   ],
                   if (p.experiences.isNotEmpty) ...[
@@ -91,6 +93,21 @@ class _ProfilePageState extends State<ProfilePage> {
   static final _dayMonth = DateFormat('dd MMMM', 'ru_RU');
   static String _birthday(DateTime d) => _dayMonth.format(d); // "05 февраля"
 
+  static final _dmy = DateFormat('dd.MM.yyyy', 'ru_RU');
+
+  /// "Ставка 100% · с 05.03.2026" — rate share and appointment start.
+  static String? _postMeta(SalaryEntry s) {
+    final parts = <String>[
+      if (s.salary != null) 'Ставка ${_num(s.salary!)}%',
+      if (s.dateBegin != null) 'с ${_dmy.format(s.dateBegin!)}',
+    ];
+    return parts.isEmpty ? null : parts.join('  ·  ');
+  }
+
+  /// Trim a trailing ".0": 100.0 -> "100", 84.35 -> "84.35".
+  static String _num(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+
   Widget _sectionTitle(String t) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(t,
@@ -101,7 +118,7 @@ class _ProfilePageState extends State<ProfilePage> {
       );
 
   Widget _row(BuildContext context, String title, String value,
-          {String? badge}) =>
+          {String? badge, String? meta}) =>
       Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
@@ -142,6 +159,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(value,
                     style: TextStyle(fontSize: 14, color: Brand.muted(context))),
+              ),
+            if (meta != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(meta,
+                    style: TextStyle(fontSize: 12, color: Brand.muted(context))),
               ),
           ],
         ),
