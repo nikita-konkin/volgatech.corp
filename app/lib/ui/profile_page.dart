@@ -67,6 +67,17 @@ class _ProfilePageState extends State<ProfilePage> {
                   ],
                   if (p.salaries.isNotEmpty) ...[
                     _sectionTitle('Должность'),
+                    if (p.rateTotalPercent > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Суммарная нагрузка: ${_num(p.rateTotalPercent)}%'
+                          ' · ${_num(p.rateTotalPercent / 100)} ст.'
+                          '${p.hasHourly ? ' + почасовая' : ''}',
+                          style:
+                              TextStyle(fontSize: 13, color: Brand.muted(context)),
+                        ),
+                      ),
                     ...p.salariesMainFirst.map((s) => _row(
                           context,
                           s.postName ?? '—',
@@ -95,10 +106,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   static final _dmy = DateFormat('dd.MM.yyyy', 'ru_RU');
 
-  /// "Ставка 100% · с 05.03.2026" — rate share and appointment start.
+  /// "Ставка 100% · с 05.03.2026" (rate) or "Почасовая · с …" (hourly).
+  /// Hourly appointments never show a percentage — their number isn't a ставка.
   static String? _postMeta(SalaryEntry s) {
     final parts = <String>[
-      if (s.salary != null) 'Ставка ${_num(s.salary!)}%',
+      if (s.isHourly)
+        'Почасовая'
+      else if (s.salary != null)
+        'Ставка ${_num(s.salary!)}%',
       if (s.dateBegin != null) 'с ${_dmy.format(s.dateBegin!)}',
     ];
     return parts.isEmpty ? null : parts.join('  ·  ');

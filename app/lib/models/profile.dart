@@ -11,9 +11,10 @@ class SalaryEntry {
   final String? postName; // dictPost.postName
   final String? departmentName; // department.fullName
   final bool isMainJob; // actualSalaries[].isMainJob — the primary appointment
-  final double? salary; // actualSalaries[].salary — rate share (% of a ставка)
+  final double? salary; // actualSalaries[].salary — ставка share (%) OR hours
   final DateTime? dateBegin; // actualSalaries[].dateBegin (date only)
   final int? postOrder; // dictPost.postOrder — post rank (higher = more senior)
+  final int? salaryType; // 1 & 3 = ставка (rate), 2 = почасовая (hourly)
   const SalaryEntry({
     this.postName,
     this.departmentName,
@@ -21,7 +22,13 @@ class SalaryEntry {
     this.salary,
     this.dateBegin,
     this.postOrder,
+    this.salaryType,
   });
+
+  /// salaryType 2 = почасовая; the [salary] number is then NOT a ставка share,
+  /// so it must not be rendered as a percentage. (Confirmed with the user; in
+  /// the live data types 1 & 3 sum to exactly the 1.5-ставки/150% ceiling.)
+  bool get isHourly => salaryType == 2;
 
   static DateTime? _date(dynamic v) =>
       (v is String && v.isNotEmpty) ? apiCalendarDate(v) : null;
@@ -34,6 +41,7 @@ class SalaryEntry {
         salary: (j['salary'] as num?)?.toDouble(),
         dateBegin: _date(j['dateBegin']),
         postOrder: (j['dictPost']?['postOrder'] ?? j['postOrder']) as int?,
+        salaryType: j['salaryType'] as int?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -43,6 +51,7 @@ class SalaryEntry {
         'salary': salary,
         'dateBegin': dateBegin?.toIso8601String(),
         'postOrder': postOrder,
+        'salaryType': salaryType,
       };
 
   factory SalaryEntry.fromCache(Map<String, dynamic> j) => SalaryEntry(
@@ -52,6 +61,7 @@ class SalaryEntry {
         salary: (j['salary'] as num?)?.toDouble(),
         dateBegin: _date(j['dateBegin']),
         postOrder: j['postOrder'] as int?,
+        salaryType: j['salaryType'] as int?,
       );
 }
 
@@ -97,6 +107,14 @@ class PersonProfile {
 
   String? get fullName => personFIO;
   String? get photoName => fileName;
+
+  /// Combined ставка load (percent) — sum of the rate-based appointments only
+  /// (hourly ones aren't ставки). E.g. 100 + 20 + 10 + 20 = 150 (= 1.5 ставки).
+  double get rateTotalPercent => salaries
+      .where((s) => !s.isHourly && s.salary != null)
+      .fold(0.0, (sum, s) => sum + s.salary!);
+
+  bool get hasHourly => salaries.any((s) => s.isHourly);
 
   /// Appointments ranked: the primary one (isMainJob) first, then by post rank
   /// (dictPost.postOrder, higher = more senior). Stable for equal keys.
