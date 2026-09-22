@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../core/lesson_grouping.dart';
 import '../core/week_summary.dart';
 import '../models/schedule.dart';
 import '../state/schedule_controller.dart';
@@ -32,7 +33,8 @@ class WeekSummaryPage extends StatelessWidget {
     final days = c.weekDays;
     final accent = Brand.weekAccent(c.weekNumberForSelected, context);
     final weekType = c.weekTypeForSelected;
-    final total = days.fold<int>(0, (s, d) => s + c.eventsOn(d).length);
+    final total = days.fold<int>(
+        0, (s, d) => s + groupParallelLessons(c.eventsOn(d)).length);
     final range =
         '${_dayMonth.format(days.first)} – ${_dayMonth.format(days.last)}';
 
@@ -157,7 +159,9 @@ class _DayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final muted = Brand.muted(context);
-    final stats = DayStats.from(events);
+    // Merge parallel groups so a shared slot counts once, not per group.
+    final slots = groupParallelLessons(events);
+    final stats = DayStats.from([for (final s in slots) s.lead]);
     final footer = [
       if (stats.span.isNotEmpty) stats.span,
       if (stats.gapMinutes > 0) 'окна ${humanDuration(stats.gapMinutes)}',
@@ -219,7 +223,7 @@ class _DayCard extends StatelessWidget {
                 )
               else ...[
                 const SizedBox(height: 8),
-                for (final e in events)
+                for (final s in slots)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
@@ -228,20 +232,30 @@ class _DayCard extends StatelessWidget {
                         SizedBox(
                           width: 44,
                           child: Text(
-                            (e.timeBegin != null && e.timeBegin!.length >= 5)
-                                ? e.timeBegin!.substring(0, 5)
+                            (s.lead.timeBegin != null &&
+                                    s.lead.timeBegin!.length >= 5)
+                                ? s.lead.timeBegin!.substring(0, 5)
                                 : '',
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w500),
                           ),
                         ),
                         Expanded(
-                          child: MarqueeText(e.description ?? '',
+                          child: MarqueeText(s.lead.description ?? '',
                               style: const TextStyle(fontSize: 13)),
                         ),
                         const SizedBox(width: 6),
-                        if ((e.room ?? '').isNotEmpty)
-                          Text(e.room!,
+                        if (s.isShared)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Text('${s.groups.length} гр.',
+                                style: TextStyle(
+                                    color: accent,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                          ),
+                        if ((s.lead.room ?? '').isNotEmpty)
+                          Text(s.lead.room!,
                               style: TextStyle(
                                   color: Brand.room(context), fontSize: 13)),
                       ],
