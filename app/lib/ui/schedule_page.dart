@@ -205,11 +205,11 @@ class _LessonCard extends StatelessWidget {
   IconData get _icon {
     switch (e.typeWorkName) {
       case 'Лекции':
-        return Icons.campaign_outlined;
+        return Icons.menu_book_outlined; // open book — theory
       case 'Практические':
-        return Icons.build_outlined;
+        return Icons.edit_outlined; // pencil — exercises / seminar
       case 'Лабораторные':
-        return Icons.science_outlined;
+        return Icons.biotech_outlined; // microscope — lab work
       default:
         return Icons.event_note_outlined;
     }
