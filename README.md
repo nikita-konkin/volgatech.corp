@@ -33,6 +33,15 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
   (WebView), keeping only the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
 
+## What's new — v0.3.2
+
+- **Shared lessons** — when two groups are taught together in the same room at
+  the same time, the schedule now shows **one card** with a «N групп вместе»
+  badge and the group chips (instead of duplicate cards); the week overview
+  merges those rows and counts distinct slots.
+- **Classical lesson icons** — Лекции = book, Практические = pencil,
+  Лабораторные = microscope.
+
 ## What's new — v0.3.1
 
 - **Login accepts an e-mail** — typing your full corporate address
