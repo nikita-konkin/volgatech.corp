@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../core/cache.dart';
+import '../core/lesson_grouping.dart';
+import '../core/ru_plural.dart';
 import '../data/volgatech_api.dart';
 import '../models/schedule.dart';
 import '../state/auth_controller.dart';
@@ -155,12 +157,14 @@ class _ScheduleView extends StatelessWidget {
         ),
       );
     }
+    // Merge lessons that share a time + room + subject (two groups together).
+    final slots = groupParallelLessons(events);
     return RefreshIndicator(
       onRefresh: c.refresh,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-        itemCount: events.length,
-        itemBuilder: (_, i) => _LessonCard(events[i], accent: accent),
+        itemCount: slots.length,
+        itemBuilder: (_, i) => _LessonCard(slots[i], accent: accent),
       ),
     );
   }
@@ -192,9 +196,11 @@ class _WeekTypeChip extends StatelessWidget {
 }
 
 class _LessonCard extends StatelessWidget {
-  const _LessonCard(this.e, {required this.accent});
-  final ScheduleEvent e;
+  const _LessonCard(this.slot, {required this.accent});
+  final LessonSlot slot;
   final Color accent;
+
+  ScheduleEvent get e => slot.lead;
 
   IconData get _icon {
     switch (e.typeWorkName) {
@@ -252,17 +258,7 @@ class _LessonCard extends StatelessWidget {
                     Text(e.description ?? '',
                         style: const TextStyle(
                             fontSize: 16, fontWeight: FontWeight.w500)),
-                    if ((e.fullDescription ?? '').isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          e.subGroup != null && e.subGroup!.isNotEmpty
-                              ? '${e.fullDescription}  ·  ${e.subGroup}'
-                              : e.fullDescription!,
-                          style:
-                              TextStyle(fontSize: 14, color: Brand.muted(context)),
-                        ),
-                      ),
+                    _groups(context),
                     if ((e.fio ?? '').isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
@@ -273,6 +269,59 @@ class _LessonCard extends StatelessWidget {
                   ],
                 ),
               ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One group → a plain line; several groups sharing this room/time → a
+  /// «N групп» badge above the group chips, so it reads as one shared session.
+  Widget _groups(BuildContext context) {
+    final groups = slot.groups;
+    if (groups.isEmpty) return const SizedBox.shrink();
+    if (groups.length == 1) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(groups.first,
+            style: TextStyle(fontSize: 14, color: Brand.muted(context))),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.groups_outlined, size: 16, color: accent),
+              const SizedBox(width: 4),
+              Text(
+                '${groups.length} ${pluralRu(groups.length, 'группа', 'группы', 'групп')} вместе',
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: accent),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final g in groups)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(g,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500)),
+                ),
             ],
           ),
         ],
