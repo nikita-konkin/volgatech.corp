@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "local-llm": {
+      "type": "http",
+      "url": "http://192.168.50.32:8765/mcp"
+    }
+  }
+}

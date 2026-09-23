@@ -9,6 +9,7 @@ import '../core/week_summary.dart';
 import '../state/schedule_controller.dart';
 import '../theme.dart';
 import 'widgets/marquee_text.dart';
+import 'widgets/skeleton.dart';
 
 /// Whole-week overview (Пн–Вс): lessons per day, time span, gaps («окна»), and
 /// tap-a-day to jump. Reads the already-loaded week from [ScheduleController] —
@@ -39,6 +40,8 @@ class WeekSummaryPage extends StatelessWidget {
       for (final d in days) groupParallelLessons(c.eventsOn(d))
     ];
     final total = slotsByDay.fold<int>(0, (s, slots) => s + slots.length);
+    // Nothing to show yet for this week: placeholders, not «Нет занятий».
+    final placeholders = c.loading && total == 0;
     final range =
         '${_dayMonth.format(days.first)} – ${_dayMonth.format(days.last)}';
 
@@ -62,29 +65,40 @@ class WeekSummaryPage extends StatelessWidget {
             unawaited(c.prevWeek());
           }
         },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
-          children: [
-            _WeekHeader(
-                range: range, total: total, weekType: weekType, accent: accent),
-            const SizedBox(height: 8),
-            for (final (i, d) in days.indexed)
-              _DayCard(
-                slots: slotsByDay[i],
-                accent: accent,
-                isToday: _isToday(d),
-                weekdayLabel: _cap(_weekday.format(d)),
-                dayNum: _day.format(d),
-                onTap: () {
-                  unawaited(c.goToDay(d));
-                  Navigator.of(context).pop();
-                },
-              ),
-          ],
+        child: _maybeShimmer(
+          placeholders,
+          ListView(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+            children: [
+              _WeekHeader(
+                  range: range,
+                  total: placeholders ? null : total,
+                  weekType: weekType,
+                  accent: accent),
+              const SizedBox(height: 8),
+              for (final (i, d) in days.indexed)
+                _DayCard(
+                  slots: slotsByDay[i],
+                  loading: placeholders,
+                  accent: accent,
+                  isToday: _isToday(d),
+                  weekdayLabel: _cap(_weekday.format(d)),
+                  dayNum: _day.format(d),
+                  onTap: () {
+                    unawaited(c.goToDay(d));
+                    Navigator.of(context).pop();
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  /// The shimmer ticker runs only while placeholders are on screen.
+  static Widget _maybeShimmer(bool on, Widget child) =>
+      on ? Shimmer(child: child) : child;
 }
 
 class _WeekHeader extends StatelessWidget {
@@ -94,7 +108,9 @@ class _WeekHeader extends StatelessWidget {
       required this.weekType,
       required this.accent});
   final String range;
-  final int total;
+
+  /// Lesson count; null while the week is still loading.
+  final int? total;
   final String? weekType;
   final Color accent;
 
@@ -134,9 +150,12 @@ class _WeekHeader extends StatelessWidget {
               ],
             ),
           ),
-          Text(russianPairs(total),
-              style: TextStyle(
-                  color: accent, fontSize: 16, fontWeight: FontWeight.bold)),
+          if (total == null)
+            const SkeletonBox(height: 18, width: 64, radius: 4)
+          else
+            Text(russianPairs(total!),
+                style: TextStyle(
+                    color: accent, fontSize: 16, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -146,6 +165,7 @@ class _WeekHeader extends StatelessWidget {
 class _DayCard extends StatelessWidget {
   const _DayCard({
     required this.slots,
+    required this.loading,
     required this.accent,
     required this.isToday,
     required this.weekdayLabel,
@@ -154,6 +174,9 @@ class _DayCard extends StatelessWidget {
   });
 
   final List<LessonSlot> slots;
+
+  /// The week is still loading: draw placeholder lines instead of «Нет занятий».
+  final bool loading;
   final Color accent;
   final bool isToday;
   final String weekdayLabel;
@@ -217,7 +240,19 @@ class _DayCard extends StatelessWidget {
                   const Icon(Icons.chevron_right, size: 18),
                 ],
               ),
-              if (stats.isEmpty)
+              if (loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(height: 12, radius: 4),
+                      SizedBox(height: 8),
+                      SkeletonBox(height: 12, width: 180, radius: 4),
+                    ],
+                  ),
+                )
+              else if (stats.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text('Нет занятий',

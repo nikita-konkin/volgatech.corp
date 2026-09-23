@@ -15,6 +15,7 @@ import '../theme.dart';
 import 'app_drawer.dart';
 import 'offline_banner.dart';
 import 'week_summary_page.dart';
+import 'widgets/skeleton.dart';
 
 class SchedulePage extends StatelessWidget {
   const SchedulePage({super.key});
@@ -365,54 +366,21 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-/// Shimmering placeholder cards shown while the first week loads — calmer than a
-/// bare spinner and hints at the list shape. No plugin: a moving gradient.
-class _ScheduleSkeleton extends StatefulWidget {
+/// Placeholder cards shown while the first week loads — calmer than a bare
+/// spinner and hints at the list shape.
+class _ScheduleSkeleton extends StatelessWidget {
   const _ScheduleSkeleton();
 
   @override
-  State<_ScheduleSkeleton> createState() => _ScheduleSkeletonState();
-}
-
-class _ScheduleSkeletonState extends State<_ScheduleSkeleton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ac = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _ac.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final base = dark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E4);
-    final hi = dark ? const Color(0xFF3A3A3A) : const Color(0xFFF2F2F2);
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-      itemCount: 5,
-      itemBuilder: (_, __) => AnimatedBuilder(
-        animation: _ac,
-        builder: (context, _) {
-          final t = _ac.value;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            height: 92,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              gradient: LinearGradient(
-                begin: Alignment(-1 - 2 * (1 - t), 0),
-                end: Alignment(1 - 2 * (1 - t), 0),
-                colors: [base, hi, base],
-                stops: const [0.35, 0.5, 0.65],
-              ),
-            ),
-          );
-        },
+    return Shimmer(
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+        itemCount: 5,
+        itemBuilder: (_, __) => const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: SkeletonBox(height: 92),
+        ),
       ),
     );
   }
