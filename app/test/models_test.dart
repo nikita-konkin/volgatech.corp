@@ -39,7 +39,8 @@ void main() {
   });
 
   test('Exam / StudyYear parse', () {
-    final y = StudyYear.fromJson({'studyYearValue': 2025, 'studyYearName': '2025 / 2026'});
+    final y = StudyYear.fromJson(
+        {'studyYearValue': 2025, 'studyYearName': '2025 / 2026'});
     expect(y.value, 2025);
     expect(y.name, '2025 / 2026');
 

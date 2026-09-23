@@ -48,13 +48,15 @@ class SalaryEntry {
       (v is String && v.isNotEmpty) ? apiCalendarDate(v) : null;
 
   factory SalaryEntry.fromJson(Map<String, dynamic> j) => SalaryEntry(
-        postName: (_field(j['dictPost'], 'postName') ?? j['postName']) as String?,
-        departmentName:
-            (_field(j['department'], 'fullName') ?? j['departmentName']) as String?,
+        postName:
+            (_field(j['dictPost'], 'postName') ?? j['postName']) as String?,
+        departmentName: (_field(j['department'], 'fullName') ??
+            j['departmentName']) as String?,
         isMainJob: j['isMainJob'] == true,
         salary: (j['salary'] as num?)?.toDouble(),
         dateBegin: _date(j['dateBegin']),
-        postOrder: (_field(j['dictPost'], 'postOrder') ?? j['postOrder']) as int?,
+        postOrder:
+            (_field(j['dictPost'], 'postOrder') ?? j['postOrder']) as int?,
         salaryType: j['salaryType'] as int?,
       );
 
@@ -131,9 +133,8 @@ class PersonProfile {
   bool get hasHourly => salaries.any((s) => s.isHourly);
 
   /// Approximate total почасовая load (annual hours), summed across hourly rows.
-  double get hourlyHoursTotal => salaries
-      .map((s) => s.hourlyHours ?? 0)
-      .fold(0.0, (sum, h) => sum + h);
+  double get hourlyHoursTotal =>
+      salaries.map((s) => s.hourlyHours ?? 0).fold(0.0, (sum, h) => sum + h);
 
   /// Appointments ranked: the primary one (isMainJob) first, then by post rank
   /// (dictPost.postOrder, higher = more senior). Stable for equal keys.
@@ -160,17 +161,20 @@ class PersonProfile {
       );
 
   /// From /api/Person/GetInfo/{id}.
-  factory PersonProfile.fromInfo(Map<String, dynamic> j, {required int personId}) =>
+  factory PersonProfile.fromInfo(Map<String, dynamic> j,
+          {required int personId}) =>
       PersonProfile(
         personId: (j['personId'] ?? personId) as int,
         personFIO: j['personFIO'] as String?,
         fileName: j['fileName'] as String?,
         birthday: _date(j['birthday']),
         salaries: ((j['actualSalaries'] as List?) ?? const [])
-            .map((e) => SalaryEntry.fromJson(Map<String, dynamic>.from(e as Map)))
+            .map((e) =>
+                SalaryEntry.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList(),
         experiences: ((j['personExperiences'] as List?) ?? const [])
-            .map((e) => ExperienceEntry.fromJson(Map<String, dynamic>.from(e as Map)))
+            .map((e) =>
+                ExperienceEntry.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList(),
       );
 
@@ -189,10 +193,12 @@ class PersonProfile {
         fileName: j['fileName'] as String?,
         birthday: _date(j['birthday']),
         salaries: ((j['salaries'] as List?) ?? const [])
-            .map((e) => SalaryEntry.fromCache(Map<String, dynamic>.from(e as Map)))
+            .map((e) =>
+                SalaryEntry.fromCache(Map<String, dynamic>.from(e as Map)))
             .toList(),
         experiences: ((j['experiences'] as List?) ?? const [])
-            .map((e) => ExperienceEntry.fromCache(Map<String, dynamic>.from(e as Map)))
+            .map((e) =>
+                ExperienceEntry.fromCache(Map<String, dynamic>.from(e as Map)))
             .toList(),
       );
 }

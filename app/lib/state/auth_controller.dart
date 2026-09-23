@@ -34,8 +34,8 @@ class AuthController extends ChangeNotifier {
       if (personId != null) {
         final cached = await _cache.get(_profileKey(personId!));
         if (cached != null && cached.data is Map) {
-          profile =
-              PersonProfile.fromCache(Map<String, dynamic>.from(cached.data as Map));
+          profile = PersonProfile.fromCache(
+              Map<String, dynamic>.from(cached.data as Map));
         }
       }
       status = AuthStatus.authenticated;

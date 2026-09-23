@@ -7,7 +7,8 @@ class Prefs {
   Prefs(this._p);
   final SharedPreferences _p;
 
-  static Future<Prefs> load() async => Prefs(await SharedPreferences.getInstance());
+  static Future<Prefs> load() async =>
+      Prefs(await SharedPreferences.getInstance());
 
   static const _kLogin = 'remembered_login';
   static const _kRemember = 'remember_login';
@@ -43,7 +44,12 @@ class Prefs {
   }
 
   Future<void> setThemeMode(ThemeMode m) async {
-    await _p.setString(_kTheme,
-        m == ThemeMode.light ? 'light' : m == ThemeMode.dark ? 'dark' : 'system');
+    await _p.setString(
+        _kTheme,
+        m == ThemeMode.light
+            ? 'light'
+            : m == ThemeMode.dark
+                ? 'dark'
+                : 'system');
   }
 }

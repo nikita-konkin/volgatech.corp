@@ -21,8 +21,8 @@ class VolgatechApi {
       data is String && data.isNotEmpty ? jsonDecode(data) : data;
 
   // Run a request, translating Dio network errors into a Russian ApiException.
-  Future<Response<dynamic>> _run(Future<Response<dynamic>> Function() call,
-      String fallback) async {
+  Future<Response<dynamic>> _run(
+      Future<Response<dynamic>> Function() call, String fallback) async {
     try {
       return await call();
     } on DioException catch (e) {
@@ -37,19 +37,22 @@ class VolgatechApi {
             data: jsonEncode({'login': login, 'password': password})),
         'Ошибка входа');
     if (r.statusCode == 200) {
-      return AuthTokens.fromJson(Map<String, dynamic>.from(_decode(r.data) as Map));
+      return AuthTokens.fromJson(
+          Map<String, dynamic>.from(_decode(r.data) as Map));
     }
     throw ApiException.fromResponse(r, fallback: 'Ошибка входа');
   }
 
   /// GET /api/Person/GetProfiles -> [ { personId, ... } ]  (identifies the user)
   Future<PersonProfile> getProfile() async {
-    final r = await _run(() => _dio.get(Api.profiles), 'Не удалось получить профиль');
+    final r =
+        await _run(() => _dio.get(Api.profiles), 'Не удалось получить профиль');
     if (r.statusCode == 200) {
       final data = _decode(r.data);
       final list = data is List ? data : [data];
       if (list.isEmpty) throw const ApiException('Профиль не найден');
-      return PersonProfile.fromProfiles(Map<String, dynamic>.from(list.first as Map));
+      return PersonProfile.fromProfiles(
+          Map<String, dynamic>.from(list.first as Map));
     }
     throw ApiException.fromResponse(r, fallback: 'Не удалось получить профиль');
   }
@@ -60,7 +63,9 @@ class VolgatechApi {
         'Не удалось получить профиль');
     if (r.statusCode == 200) {
       final data = _decode(r.data);
-      final map = data is List ? (data.isNotEmpty ? data.first : <String, dynamic>{}) : data;
+      final map = data is List
+          ? (data.isNotEmpty ? data.first : <String, dynamic>{})
+          : data;
       return PersonProfile.fromInfo(Map<String, dynamic>.from(map as Map),
           personId: personId);
     }
@@ -72,7 +77,8 @@ class VolgatechApi {
       int personId, DateTime start, DateTime end) async {
     final path =
         '${Api.calendar}/$personId/${_ymd.format(start)}/${_ymd.format(end)}/TimeTable,Event,Private';
-    final r = await _run(() => _dio.get(path), 'Не удалось загрузить расписание');
+    final r =
+        await _run(() => _dio.get(path), 'Не удалось загрузить расписание');
     if (r.statusCode == 200) {
       final data = _decode(r.data);
       final list = data is List ? data : const <dynamic>[];
@@ -80,7 +86,8 @@ class VolgatechApi {
           .map((e) => ScheduleDay.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
-    throw ApiException.fromResponse(r, fallback: 'Не удалось загрузить расписание');
+    throw ApiException.fromResponse(r,
+        fallback: 'Не удалось загрузить расписание');
   }
 
   /// GET /api/Exams/GetPersonStudyYears//{id}
@@ -96,7 +103,8 @@ class VolgatechApi {
           .map((e) => StudyYear.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
-    throw ApiException.fromResponse(r, fallback: 'Не удалось загрузить учебные годы');
+    throw ApiException.fromResponse(r,
+        fallback: 'Не удалось загрузить учебные годы');
   }
 
   /// GET /api/Exams/GetPersonExams/{id}/{year}
@@ -110,7 +118,8 @@ class VolgatechApi {
           .map((e) => Exam.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
-    throw ApiException.fromResponse(r, fallback: 'Не удалось загрузить экзамены');
+    throw ApiException.fromResponse(r,
+        fallback: 'Не удалось загрузить экзамены');
   }
 
   /// GET /api/files/GetPersonPhotoByName/{name} -> image bytes.
@@ -131,13 +140,15 @@ class ApiException implements Exception {
   final String message;
   const ApiException(this.message);
 
-  factory ApiException.fromResponse(Response<dynamic> r, {required String fallback}) {
+  factory ApiException.fromResponse(Response<dynamic> r,
+      {required String fallback}) {
     try {
       final data = r.data is String && (r.data as String).isNotEmpty
           ? jsonDecode(r.data as String)
           : r.data;
       if (data is Map) {
-        final m = data['Message'] ?? data['message'] ?? data['error_description'];
+        final m =
+            data['Message'] ?? data['message'] ?? data['error_description'];
         if (m is String && m.isNotEmpty) return ApiException(_ru(m));
       }
     } catch (_) {}

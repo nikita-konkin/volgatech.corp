@@ -68,7 +68,8 @@ class ExamsController extends ChangeNotifier {
     notifyListeners();
     try {
       exams = await _api.getExams(_personId, year.value);
-      await _cache.put(_examsKey(year.value), exams.map((e) => e.toJson()).toList());
+      await _cache.put(
+          _examsKey(year.value), exams.map((e) => e.toJson()).toList());
     } catch (e) {
       final cached = await _cache.get(_examsKey(year.value));
       if (cached != null && cached.data is List) {

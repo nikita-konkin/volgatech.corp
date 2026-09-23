@@ -64,7 +64,8 @@ class _ScheduleView extends StatelessWidget {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => ChangeNotifierProvider<ScheduleController>.value(
+                  builder: (_) =>
+                      ChangeNotifierProvider<ScheduleController>.value(
                     value: c,
                     child: const WeekSummaryPage(),
                   ),
@@ -114,8 +115,8 @@ class _ScheduleView extends StatelessWidget {
           if (weekType != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child:
-                  _WeekTypeChip(name: weekType, number: weekNumber, dot: accent),
+              child: _WeekTypeChip(
+                  name: weekType, number: weekNumber, dot: accent),
             ),
           const SizedBox(height: 8),
           Expanded(child: _body(context, c, accent)),
@@ -230,7 +231,8 @@ class _LessonCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border(left: BorderSide(color: accent, width: 5)),
         boxShadow: const [
-          BoxShadow(color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
+          BoxShadow(
+              color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),

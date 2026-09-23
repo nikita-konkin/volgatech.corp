@@ -45,7 +45,8 @@ class Brand {
   /// Accent colour for a week, resolved against the current brightness.
   /// Shades are tuned per brightness so white text stays legible on top.
   static Color weekAccent(int? weekNumber, BuildContext c) =>
-      weekAccentFor(weekNumber, dark: Theme.of(c).brightness == Brightness.dark);
+      weekAccentFor(weekNumber,
+          dark: Theme.of(c).brightness == Brightness.dark);
 }
 
 ThemeData buildLightTheme() => _base(Brightness.light);
@@ -86,8 +87,7 @@ ThemeData _base(Brightness b) {
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide.none,
       ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -95,10 +95,8 @@ ThemeData _base(Brightness b) {
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle:
-            const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     ),
   );

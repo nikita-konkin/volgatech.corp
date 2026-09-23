@@ -2,7 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:volgatech_pro/core/date_utils.dart';
 
 void main() {
-  group('apiWallClock / apiCalendarDate (TZ-independent — guards day-shift bug)', () {
+  group(
+      'apiWallClock / apiCalendarDate (TZ-independent — guards day-shift bug)',
+      () {
     test('keeps the calendar day regardless of the +03:00 offset', () {
       final d = apiCalendarDate('2026-09-21T00:00:00+03:00');
       expect(d.year, 2026);

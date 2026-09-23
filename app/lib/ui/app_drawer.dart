@@ -23,7 +23,8 @@ class AppDrawer extends StatelessWidget {
   void _openWeb(BuildContext context, String title, String url) {
     Navigator.pop(context);
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => WebViewScreen(title: title, url: url)),
+      MaterialPageRoute<void>(
+          builder: (_) => WebViewScreen(title: title, url: url)),
     );
   }
 
@@ -55,24 +56,24 @@ class AppDrawer extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 48, 16, 20),
               width: double.infinity,
               child: Column(
-              children: [
-                PersonAvatar(
-                  photoName: profile?.photoName,
-                  radius: 44,
-                  backgroundColor: Colors.white,
-                  iconColor: Brand.blue,
-                  iconSize: 48,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  (profile?.fullName ?? 'Профиль').toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold),
-                ),
-              ],
+                children: [
+                  PersonAvatar(
+                    photoName: profile?.photoName,
+                    radius: 44,
+                    backgroundColor: Colors.white,
+                    iconColor: Brand.blue,
+                    iconSize: 48,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    (profile?.fullName ?? 'Профиль').toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ),
           ),

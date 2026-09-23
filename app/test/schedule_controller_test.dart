@@ -32,7 +32,11 @@ void main() {
 
   test('shows the saved week at once, then replaces it with the fresh one',
       () async {
-    cache.seed(keyA, [day(wedA, [lesson('10:00', subject: 'Старое')]).toJson()],
+    cache.seed(
+        keyA,
+        [
+          day(wedA, [lesson('10:00', subject: 'Старое')]).toJson()
+        ],
         DateTime(2026, 9, 20));
     final network = Completer<List<ScheduleDay>>();
     api.onSchedule = (m) => m == monA ? network.future : Future.value([]);
@@ -43,7 +47,9 @@ void main() {
     expect(c.loading, isTrue);
     expect(c.fromCache, isFalse, reason: 'still loading, not offline');
 
-    network.complete([day(wedA, [lesson('10:00', subject: 'Новое')])]);
+    network.complete([
+      day(wedA, [lesson('10:00', subject: 'Новое')])
+    ]);
     await loading;
     expect(subjects(wedA), ['Новое']);
     expect(c.loading, isFalse);
@@ -55,7 +61,12 @@ void main() {
   test('a network failure falls back to the saved week and flags it offline',
       () async {
     final savedAt = DateTime(2026, 9, 20, 18, 30);
-    cache.seed(keyA, [day(wedA, [lesson('10:00')]).toJson()], savedAt);
+    cache.seed(
+        keyA,
+        [
+          day(wedA, [lesson('10:00')]).toJson()
+        ],
+        savedAt);
     api.onSchedule = (_) async => throw const ApiException('Нет соединения');
 
     await c.goToDay(wedA);
@@ -74,8 +85,7 @@ void main() {
     expect(c.eventsForSelected, isEmpty);
   });
 
-  test('prefetches one week ahead and never refetches a loaded week',
-      () async {
+  test('prefetches one week ahead and never refetches a loaded week', () async {
     await c.goToDay(wedA);
     await pumpEventQueue(); // let the background fetch of week B finish
     expect(api.scheduleCalls, [monA, monB]);
@@ -108,13 +118,17 @@ void main() {
     final toB = c.goToDay(sunB); // swiped on before week A answered
     await pumpEventQueue();
 
-    weekB.complete([day(monB, [lesson('08:00', week: 2)])]);
+    weekB.complete([
+      day(monB, [lesson('08:00', week: 2)])
+    ]);
     await toB;
     expect(c.loading, isFalse, reason: 'week B is done; A is not shown');
     // Sunday has no lessons: the accent comes from week B's Monday.
     expect(c.weekNumberForSelected, 2);
 
-    weekA.complete([day(wedA, [lesson('08:00', week: 1)])]);
+    weekA.complete([
+      day(wedA, [lesson('08:00', week: 1)])
+    ]);
     await pumpEventQueue();
     expect(c.weekNumberForSelected, 2);
     expect(c.loading, isFalse);

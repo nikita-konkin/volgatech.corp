@@ -7,9 +7,9 @@
 /// Sunday) and at the wrong time. Taking the literal Y-M-D-H-M-S keeps them stable
 /// on every device.
 DateTime apiWallClock(String s) {
-  final m = RegExp(
-          r'^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?')
-      .firstMatch(s);
+  final m =
+      RegExp(r'^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?')
+          .firstMatch(s);
   if (m != null) {
     int g(int i) => int.tryParse(m.group(i) ?? '') ?? 0;
     return DateTime(g(1), g(2), g(3), g(4), g(5), g(6));

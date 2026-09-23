@@ -20,11 +20,13 @@ class ScheduleController extends ChangeNotifier {
 
   DateTime selectedDay = _dateOnly(DateTime.now());
 
-  final Map<String, List<ScheduleEvent>> _byDay = {}; // yyyy-MM-dd -> sorted events
+  final Map<String, List<ScheduleEvent>> _byDay =
+      {}; // yyyy-MM-dd -> sorted events
 
   // Per-week state, keyed by the Monday's yyyy-MM-dd.
   final Set<String> _fresh = {}; // fetched from the network this session
-  final Map<String, DateTime> _onDisk = {}; // shown from disk -> when it was saved
+  final Map<String, DateTime> _onDisk =
+      {}; // shown from disk -> when it was saved
   final Map<String, DateTime> _stale = {}; // network failed, disk copy shown
   final Map<String, String> _errors = {}; // network failed, nothing to show
   final Map<String, Future<void>> _inFlight = {};
@@ -37,7 +39,8 @@ class ScheduleController extends ChangeNotifier {
   static String _key(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  String _weekCacheKey(DateTime monday) => 'schedule_${_personId}_${_key(monday)}';
+  String _weekCacheKey(DateTime monday) =>
+      'schedule_${_personId}_${_key(monday)}';
 
   /// Monday of the selected day's week.
   DateTime get weekStart => _mondayOf(selectedDay);
@@ -100,7 +103,8 @@ class ScheduleController extends ChangeNotifier {
 
   /// The selected week has data (fresh, or from disk after a failed fetch).
   bool get isCached => _isLoaded(_week);
-  bool _isLoaded(String week) => _fresh.contains(week) || _stale.containsKey(week);
+  bool _isLoaded(String week) =>
+      _fresh.contains(week) || _stale.containsKey(week);
 
   Future<void> ensureLoaded({bool force = false}) async {
     if (isCached && !force) return;

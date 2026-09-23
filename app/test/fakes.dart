@@ -63,8 +63,7 @@ class FakeApi implements VolgatechApi {
       throw const ApiException('offline');
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 ScheduleEvent lesson(String begin, {String subject = 'Физика', int? week}) =>

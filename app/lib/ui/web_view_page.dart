@@ -33,28 +33,28 @@ class _WebViewScreenState extends State<WebViewScreen> {
     unawaited(_controller.setJavaScriptMode(JavaScriptMode.unrestricted));
     unawaited(_controller.setBackgroundColor(Colors.white));
     unawaited(_controller.setNavigationDelegate(NavigationDelegate(
-        onProgress: (p) {
-          if (mounted) setState(() => _progress = p);
-        },
-        onPageStarted: (_) {
-          if (mounted) {
-            setState(() {
-              _loading = true;
-              _error = false;
-            });
-          }
-        },
-        onPageFinished: (_) {
-          if (mounted) setState(() => _loading = false);
-        },
-        onWebResourceError: (err) {
-          if (err.isForMainFrame == true && mounted) {
-            setState(() {
-              _error = true;
-              _loading = false;
-            });
-          }
-        },
+      onProgress: (p) {
+        if (mounted) setState(() => _progress = p);
+      },
+      onPageStarted: (_) {
+        if (mounted) {
+          setState(() {
+            _loading = true;
+            _error = false;
+          });
+        }
+      },
+      onPageFinished: (_) {
+        if (mounted) setState(() => _loading = false);
+      },
+      onWebResourceError: (err) {
+        if (err.isForMainFrame == true && mounted) {
+          setState(() {
+            _error = true;
+            _loading = false;
+          });
+        }
+      },
     )));
     unawaited(_controller.loadRequest(Uri.parse(widget.url)));
   }

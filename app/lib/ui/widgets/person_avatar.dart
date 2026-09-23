@@ -61,11 +61,11 @@ class _PersonAvatarState extends State<PersonAvatar> {
         return CircleAvatar(
           radius: widget.radius,
           backgroundColor: widget.backgroundColor,
-          backgroundImage: bytes == null
-              ? null
-              : ResizeImage(MemoryImage(bytes), width: px),
+          backgroundImage:
+              bytes == null ? null : ResizeImage(MemoryImage(bytes), width: px),
           child: bytes == null
-              ? Icon(Icons.person, size: widget.iconSize, color: widget.iconColor)
+              ? Icon(Icons.person,
+                  size: widget.iconSize, color: widget.iconColor)
               : null,
         );
       },

@@ -48,7 +48,8 @@ void main() {
   };
 
   test('PersonProfile.fromInfo parses the real GetInfo shape', () {
-    final p = PersonProfile.fromInfo(Map<String, dynamic>.from(info), personId: 1);
+    final p =
+        PersonProfile.fromInfo(Map<String, dynamic>.from(info), personId: 1);
     expect(p.fullName, 'Тестов Тест Тестович');
     expect(p.photoName, 'photo.jpg');
     // birthday parsed as a wall-clock date (tz offset ignored)
@@ -83,7 +84,8 @@ void main() {
   });
 
   test('cache round-trip keeps birthday + main-job flag', () {
-    final p = PersonProfile.fromInfo(Map<String, dynamic>.from(info), personId: 1);
+    final p =
+        PersonProfile.fromInfo(Map<String, dynamic>.from(info), personId: 1);
     final c = PersonProfile.fromCache(p.toJson());
     expect(c.birthday, DateTime(1990, 3, 15));
     final first = c.salariesMainFirst.first;

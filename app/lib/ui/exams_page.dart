@@ -69,7 +69,9 @@ class _ExamsView extends StatelessWidget {
               dropdownColor: Colors.white,
               iconEnabledColor: Colors.white,
               style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16),
               selectedItemBuilder: (_) => c.years
                   .map((y) => Align(
                         alignment: Alignment.centerLeft,
@@ -135,15 +137,12 @@ class _ExamsView extends StatelessWidget {
     }
 
     // Group by calendar date.
-    final sorted = [...c.exams]
-      ..sort((a, b) => (a.examDate ?? DateTime(2100))
-          .compareTo(b.examDate ?? DateTime(2100)));
+    final sorted = [...c.exams]..sort((a, b) =>
+        (a.examDate ?? DateTime(2100)).compareTo(b.examDate ?? DateTime(2100)));
     final groups = <String, List<Exam>>{};
     for (final e in sorted) {
       final d = e.examDate;
-      final key = d != null
-          ? '${d.year}-${d.month}-${d.day}'
-          : '—';
+      final key = d != null ? '${d.year}-${d.month}-${d.day}' : '—';
       groups.putIfAbsent(key, () => []).add(e);
     }
 
@@ -179,9 +178,8 @@ class _ExamCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final time = e.examDate != null
-        ? DateFormat('HH:mm').format(e.examDate!)
-        : '';
+    final time =
+        e.examDate != null ? DateFormat('HH:mm').format(e.examDate!) : '';
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -189,7 +187,8 @@ class _ExamCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: const Border(left: BorderSide(color: Brand.coral, width: 5)),
         boxShadow: const [
-          BoxShadow(color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
+          BoxShadow(
+              color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),

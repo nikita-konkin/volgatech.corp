@@ -90,8 +90,8 @@ class _AuthInterceptor extends QueuedInterceptor {
       Response<dynamic> response, ResponseInterceptorHandler handler) async {
     // Some backends signal an expired token as a non-2xx with body
     // {"Error":"invalid_token"} (see original univuz.service errorh).
-    final needsRefresh = (response.statusCode == 401) ||
-        _bodyHasInvalidToken(response.data);
+    final needsRefresh =
+        (response.statusCode == 401) || _bodyHasInvalidToken(response.data);
     if (needsRefresh && _canRecover(response.requestOptions)) {
       final replayed = await _recover(response.requestOptions);
       if (replayed != null) return handler.resolve(replayed);
@@ -100,7 +100,8 @@ class _AuthInterceptor extends QueuedInterceptor {
   }
 
   @override
-  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+      DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401 && _canRecover(err.requestOptions)) {
       final replayed = await _recover(err.requestOptions);
       if (replayed != null) return handler.resolve(replayed);
@@ -133,9 +134,8 @@ class _AuthInterceptor extends QueuedInterceptor {
   Future<Response<dynamic>?> _recover(RequestOptions req) async {
     final current = await _session.accessToken;
     final sentWith = req.headers['Authorization'];
-    final refreshedMeanwhile = current != null &&
-        current.isNotEmpty &&
-        sentWith != 'Bearer $current';
+    final refreshedMeanwhile =
+        current != null && current.isNotEmpty && sentWith != 'Bearer $current';
     if (!refreshedMeanwhile) {
       switch (await _refresh()) {
         case _Refresh.ok:

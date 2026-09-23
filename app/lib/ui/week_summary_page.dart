@@ -35,7 +35,9 @@ class WeekSummaryPage extends StatelessWidget {
     final accent = Brand.weekAccent(c.weekNumberForSelected, context);
     final weekType = c.weekTypeForSelected;
     // Merge parallel groups so a shared slot counts once, not per group.
-    final slotsByDay = [for (final d in days) groupParallelLessons(c.eventsOn(d))];
+    final slotsByDay = [
+      for (final d in days) groupParallelLessons(c.eventsOn(d))
+    ];
     final total = slotsByDay.fold<int>(0, (s, slots) => s + slots.length);
     final range =
         '${_dayMonth.format(days.first)} – ${_dayMonth.format(days.last)}';
@@ -172,8 +174,8 @@ class _DayCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Brand.card(context),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: isToday ? accent : Colors.transparent, width: 2),
+        border:
+            Border.all(color: isToday ? accent : Colors.transparent, width: 2),
         boxShadow: const [
           BoxShadow(
               color: Color(0x0F000000), blurRadius: 3, offset: Offset(0, 1)),
