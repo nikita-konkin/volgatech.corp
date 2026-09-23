@@ -126,7 +126,10 @@ class VolgatechApi {
   Future<Uint8List> getPhotoBytes(String photoName) async {
     final r = await _run(
         () => _dio.get<List<int>>('${Api.photo}/$photoName',
-            options: Options(responseType: ResponseType.bytes)),
+            options: Options(
+              responseType: ResponseType.bytes,
+              headers: {'Accept': 'image/*'},
+            )),
         'Не удалось загрузить фото');
     final data = r.data;
     if (r.statusCode == 200 && data is List<int> && data.isNotEmpty) {
