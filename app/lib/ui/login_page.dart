@@ -28,6 +28,16 @@ class _LoginPageState extends State<LoginPage> {
     if (_remember && prefs.rememberedLogin != null) {
       _login.text = prefs.rememberedLogin!;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && context.read<AuthController>().consumeSessionExpired()) {
+        // The session can end while Exams / Profile / … is open on top; those
+        // screens belong to the old session, so close them.
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Сессия истекла. Войдите снова.')),
+        );
+      }
+    });
   }
 
   @override

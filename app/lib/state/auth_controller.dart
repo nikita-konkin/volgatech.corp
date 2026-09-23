@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+
 import '../core/cache.dart';
 import '../core/login_utils.dart';
 import '../core/session.dart';
@@ -8,10 +11,14 @@ import '../models/profile.dart';
 enum AuthStatus { unknown, unauthenticated, authenticating, authenticated }
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._api, this._session, this._cache);
+  AuthController(this._api, this._session, this._cache) {
+    _expiredSub = _session.onExpired.listen((_) => _onSessionExpired());
+  }
   final VolgatechApi _api;
   final Session _session;
   final JsonCache _cache;
+  late final StreamSubscription<void> _expiredSub;
+  bool _sessionExpired = false;
 
   AuthStatus status = AuthStatus.unknown;
   PersonProfile? profile;
@@ -27,13 +34,13 @@ class AuthController extends ChangeNotifier {
       if (personId != null) {
         final cached = await _cache.get(_profileKey(personId!));
         if (cached != null && cached.data is Map) {
-          profile =
-              PersonProfile.fromCache(Map<String, dynamic>.from(cached.data));
+          profile = PersonProfile.fromCache(
+              Map<String, dynamic>.from(cached.data as Map));
         }
       }
       status = AuthStatus.authenticated;
       notifyListeners();
-      _refreshProfile(); // fire-and-forget
+      unawaited(_refreshProfile());
     } else {
       status = AuthStatus.unauthenticated;
       notifyListeners();
@@ -53,7 +60,8 @@ class AuthController extends ChangeNotifier {
       await _session.savePersonId(base.personId);
       status = AuthStatus.authenticated;
       notifyListeners();
-      _refreshProfile(); // pull full profile (name/photo/salary) in background
+      // Pull the full profile (name/photo/salary) in the background.
+      unawaited(_refreshProfile());
       return true;
     } catch (e) {
       error = e.toString();
@@ -84,5 +92,28 @@ class AuthController extends ChangeNotifier {
     personId = null;
     status = AuthStatus.unauthenticated;
     notifyListeners();
+  }
+
+  /// True once after the server ended the session; the login screen uses it
+  /// to explain why the user is back there.
+  bool consumeSessionExpired() {
+    final v = _sessionExpired;
+    _sessionExpired = false;
+    return v;
+  }
+
+  void _onSessionExpired() {
+    if (status != AuthStatus.authenticated) return;
+    profile = null;
+    personId = null;
+    _sessionExpired = true;
+    status = AuthStatus.unauthenticated;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    unawaited(_expiredSub.cancel());
+    super.dispose();
   }
 }

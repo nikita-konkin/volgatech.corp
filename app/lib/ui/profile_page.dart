@@ -3,10 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../core/ru_plural.dart';
-import '../data/volgatech_api.dart';
 import '../models/profile.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
+import 'widgets/person_avatar.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -26,7 +26,6 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
-    final api = context.read<VolgatechApi>();
     final p = auth.profile;
 
     return Scaffold(
@@ -39,17 +38,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: const EdgeInsets.all(20),
                 children: [
                   Center(
-                    child: CircleAvatar(
+                    child: PersonAvatar(
+                      photoName: p.fileName,
                       radius: 56,
                       backgroundColor: Brand.blue,
-                      backgroundImage:
-                          (p.fileName != null && p.fileName!.isNotEmpty)
-                              ? NetworkImage(api.photoUrl(p.fileName!))
-                              : null,
-                      child: (p.fileName == null || p.fileName!.isEmpty)
-                          ? const Icon(Icons.person,
-                              size: 56, color: Colors.white)
-                          : null,
+                      iconColor: Colors.white,
+                      iconSize: 56,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -74,8 +68,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           'Суммарная нагрузка: ${_num(p.rateTotalPercent)}%'
                           ' · ${_num(p.rateTotalPercent / 100)} ст.'
                           '${p.hasHourly ? ' + ≈${_num(p.hourlyHoursTotal.roundToDouble())} ч. почасовой' : ''}',
-                          style:
-                              TextStyle(fontSize: 13, color: Brand.muted(context)),
+                          style: TextStyle(
+                              fontSize: 13, color: Brand.muted(context)),
                         ),
                       ),
                     ...p.salariesMainFirst.map((s) => _row(
@@ -113,7 +107,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final parts = <String>[
       if (s.isHourly) ...[
         'Почасовая',
-        if ((s.hourlyHours ?? 0) >= 1) '≈${_num(s.hourlyHours!.roundToDouble())} ч.',
+        if ((s.hourlyHours ?? 0) >= 1)
+          '≈${_num(s.hourlyHours!.roundToDouble())} ч.',
       ] else if (s.salary != null)
         'Ставка ${_num(s.salary!)}%',
       if (s.dateBegin != null) 'с ${_dmy.format(s.dateBegin!)}',
@@ -129,9 +124,7 @@ class _ProfilePageState extends State<ProfilePage> {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(t,
             style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Brand.coral)),
+                fontSize: 16, fontWeight: FontWeight.bold, color: Brand.coral)),
       );
 
   Widget _row(BuildContext context, String title, String value,
@@ -158,7 +151,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (badge != null)
                   Container(
                     margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: Brand.coral.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -175,13 +169,15 @@ class _ProfilePageState extends State<ProfilePage> {
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(value,
-                    style: TextStyle(fontSize: 14, color: Brand.muted(context))),
+                    style:
+                        TextStyle(fontSize: 14, color: Brand.muted(context))),
               ),
             if (meta != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(meta,
-                    style: TextStyle(fontSize: 12, color: Brand.muted(context))),
+                    style:
+                        TextStyle(fontSize: 12, color: Brand.muted(context))),
               ),
           ],
         ),

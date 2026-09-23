@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -26,34 +28,35 @@ class _WebViewScreenState extends State<WebViewScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white)
-      ..setNavigationDelegate(NavigationDelegate(
-        onProgress: (p) {
-          if (mounted) setState(() => _progress = p);
-        },
-        onPageStarted: (_) {
-          if (mounted) {
-            setState(() {
-              _loading = true;
-              _error = false;
-            });
-          }
-        },
-        onPageFinished: (_) {
-          if (mounted) setState(() => _loading = false);
-        },
-        onWebResourceError: (err) {
-          if (err.isForMainFrame == true && mounted) {
-            setState(() {
-              _error = true;
-              _loading = false;
-            });
-          }
-        },
-      ))
-      ..loadRequest(Uri.parse(widget.url));
+    _controller = WebViewController();
+    // Platform-channel calls run in order; nothing needs their results.
+    unawaited(_controller.setJavaScriptMode(JavaScriptMode.unrestricted));
+    unawaited(_controller.setBackgroundColor(Colors.white));
+    unawaited(_controller.setNavigationDelegate(NavigationDelegate(
+      onProgress: (p) {
+        if (mounted) setState(() => _progress = p);
+      },
+      onPageStarted: (_) {
+        if (mounted) {
+          setState(() {
+            _loading = true;
+            _error = false;
+          });
+        }
+      },
+      onPageFinished: (_) {
+        if (mounted) setState(() => _loading = false);
+      },
+      onWebResourceError: (err) {
+        if (err.isForMainFrame == true && mounted) {
+          setState(() {
+            _error = true;
+            _loading = false;
+          });
+        }
+      },
+    )));
+    unawaited(_controller.loadRequest(Uri.parse(widget.url)));
   }
 
   Future<void> _reload() async {

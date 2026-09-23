@@ -16,7 +16,10 @@ class LessonSlot {
   bool get isShared => groups.length > 1;
 
   /// Distinct group labels in order, e.g. ["ИТС-21", "ИТС-22 (подгруппа 1)"].
-  List<String> get groups {
+  /// Computed once — the card reads it several times per build.
+  late final List<String> groups = _distinctGroups();
+
+  List<String> _distinctGroups() {
     final seen = <String>{};
     final out = <String>[];
     for (final e in events) {

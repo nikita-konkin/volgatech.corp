@@ -35,3 +35,6 @@ app/ios/**/*.env
 # and captured personal data. Kept local only. See IMPROVEMENTS.md for the
 # derived, publishable API contract knowledge that lives in the app code.
 reverse_engineering/
+
+# Local Claude Code MCP config (per-machine, not part of the app)
+.mcp.json

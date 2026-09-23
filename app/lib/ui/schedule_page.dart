@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +15,7 @@ import '../theme.dart';
 import 'app_drawer.dart';
 import 'offline_banner.dart';
 import 'week_summary_page.dart';
+import 'widgets/skeleton.dart';
 
 class SchedulePage extends StatelessWidget {
   const SchedulePage({super.key});
@@ -23,7 +26,11 @@ class SchedulePage extends StatelessWidget {
     final cache = context.read<JsonCache>();
     final personId = context.read<AuthController>().personId ?? 0;
     return ChangeNotifierProvider(
-      create: (_) => ScheduleController(api, personId, cache)..ensureLoaded(),
+      create: (_) {
+        final c = ScheduleController(api, personId, cache);
+        unawaited(c.ensureLoaded());
+        return c;
+      },
       child: const _ScheduleView(),
     );
   }
@@ -57,8 +64,9 @@ class _ScheduleView extends StatelessWidget {
             tooltip: 'Обзор недели',
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ChangeNotifierProvider<ScheduleController>.value(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      ChangeNotifierProvider<ScheduleController>.value(
                     value: c,
                     child: const WeekSummaryPage(),
                   ),
@@ -108,8 +116,8 @@ class _ScheduleView extends StatelessWidget {
           if (weekType != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child:
-                  _WeekTypeChip(name: weekType, number: weekNumber, dot: accent),
+              child: _WeekTypeChip(
+                  name: weekType, number: weekNumber, dot: accent),
             ),
           const SizedBox(height: 8),
           Expanded(child: _body(context, c, accent)),
@@ -126,9 +134,9 @@ class _ScheduleView extends StatelessWidget {
       onHorizontalDragEnd: (d) {
         final v = d.primaryVelocity ?? 0;
         if (v < -250) {
-          c.nextDay();
+          unawaited(c.nextDay());
         } else if (v > 250) {
-          c.prevDay();
+          unawaited(c.prevDay());
         }
       },
       child: _content(context, c, accent),
@@ -136,13 +144,13 @@ class _ScheduleView extends StatelessWidget {
   }
 
   Widget _content(BuildContext context, ScheduleController c, Color accent) {
-    if (c.loading && c.eventsForSelected.isEmpty) {
+    final events = c.eventsForSelected;
+    if (c.loading && events.isEmpty) {
       return const _ScheduleSkeleton();
     }
-    if (c.error != null && c.eventsForSelected.isEmpty) {
+    if (c.error != null && events.isEmpty) {
       return _ErrorState(message: c.error!, onRetry: c.refresh);
     }
-    final events = c.eventsForSelected;
     if (events.isEmpty) {
       return RefreshIndicator(
         onRefresh: c.refresh,
@@ -224,7 +232,8 @@ class _LessonCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border(left: BorderSide(color: accent, width: 5)),
         boxShadow: const [
-          BoxShadow(color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
+          BoxShadow(
+              color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -357,54 +366,21 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-/// Shimmering placeholder cards shown while the first week loads — calmer than a
-/// bare spinner and hints at the list shape. No plugin: a moving gradient.
-class _ScheduleSkeleton extends StatefulWidget {
+/// Placeholder cards shown while the first week loads — calmer than a bare
+/// spinner and hints at the list shape.
+class _ScheduleSkeleton extends StatelessWidget {
   const _ScheduleSkeleton();
 
   @override
-  State<_ScheduleSkeleton> createState() => _ScheduleSkeletonState();
-}
-
-class _ScheduleSkeletonState extends State<_ScheduleSkeleton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ac = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _ac.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final base = dark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E4);
-    final hi = dark ? const Color(0xFF3A3A3A) : const Color(0xFFF2F2F2);
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-      itemCount: 5,
-      itemBuilder: (_, __) => AnimatedBuilder(
-        animation: _ac,
-        builder: (context, _) {
-          final t = _ac.value;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            height: 92,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              gradient: LinearGradient(
-                begin: Alignment(-1 - 2 * (1 - t), 0),
-                end: Alignment(1 - 2 * (1 - t), 0),
-                colors: [base, hi, base],
-                stops: const [0.35, 0.5, 0.65],
-              ),
-            ),
-          );
-        },
+    return Shimmer(
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+        itemCount: 5,
+        itemBuilder: (_, __) => const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: SkeletonBox(height: 92),
+        ),
       ),
     );
   }

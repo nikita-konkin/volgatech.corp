@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:volgatech_pro/models/schedule.dart';
 import 'package:volgatech_pro/models/exams.dart';
 import 'package:volgatech_pro/models/profile.dart';
+import 'package:volgatech_pro/models/schedule.dart';
 
 void main() {
   test('ScheduleDay/ScheduleEvent parse and format', () {
@@ -39,7 +39,8 @@ void main() {
   });
 
   test('Exam / StudyYear parse', () {
-    final y = StudyYear.fromJson({'studyYearValue': 2025, 'studyYearName': '2025 / 2026'});
+    final y = StudyYear.fromJson(
+        {'studyYearValue': 2025, 'studyYearName': '2025 / 2026'});
     expect(y.value, 2025);
     expect(y.name, '2025 / 2026');
 

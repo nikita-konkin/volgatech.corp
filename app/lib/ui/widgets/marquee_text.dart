@@ -38,11 +38,11 @@ class _MarqueeTextState extends State<MarqueeText> {
     while (mounted && _sc.hasClients && _sc.position.maxScrollExtent > 0) {
       final extent = _sc.position.maxScrollExtent;
       final ms = (extent / 45 * 1000).clamp(1500, 12000).toInt(); // ~45 px/s
-      await Future.delayed(const Duration(milliseconds: 1200));
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
       if (!mounted || !_sc.hasClients) break;
       await _sc.animateTo(extent,
           duration: Duration(milliseconds: ms), curve: Curves.linear);
-      await Future.delayed(const Duration(milliseconds: 1200));
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
       if (!mounted || !_sc.hasClients) break;
       await _sc.animateTo(0,
           duration: Duration(milliseconds: ms), curve: Curves.linear);
@@ -58,12 +58,16 @@ class _MarqueeTextState extends State<MarqueeText> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      controller: _sc,
-      scrollDirection: Axis.horizontal,
-      physics: const NeverScrollableScrollPhysics(),
-      child: Text(widget.text,
-          maxLines: 1, softWrap: false, style: widget.style),
+    // Own layer: while the text scrolls only this line repaints, not the
+    // whole card / list around it.
+    return RepaintBoundary(
+      child: SingleChildScrollView(
+        controller: _sc,
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        child: Text(widget.text,
+            maxLines: 1, softWrap: false, style: widget.style),
+      ),
     );
   }
 }

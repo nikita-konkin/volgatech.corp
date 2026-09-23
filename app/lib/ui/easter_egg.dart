@@ -93,7 +93,7 @@ class _RtfCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Image.asset('assets/easter/rtf.png',
+              child: Image.asset('assets/easter/rtf.webp',
                   width: 240, height: 240, fit: BoxFit.cover),
             ),
             const SizedBox(height: 16),

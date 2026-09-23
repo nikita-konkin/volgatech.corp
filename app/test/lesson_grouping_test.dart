@@ -25,37 +25,62 @@ ScheduleEvent _e({
 void main() {
   const py = 'Основы программирования систем ИИ на языке Python';
 
-  test('two groups in the same room/time/subject merge into one shared slot', () {
+  test('two groups in the same room/time/subject merge into one shared slot',
+      () {
     final slots = groupParallelLessons([
-      _e(begin: '15:15:00', room: '333г', subject: py, group: 'ИТС-21', subGroup: 'подгруппа 2'),
-      _e(begin: '15:15:00', room: '333г', subject: py, group: 'ИТС-22', subGroup: 'подгруппа 2'),
+      _e(
+          begin: '15:15:00',
+          room: '333г',
+          subject: py,
+          group: 'ИТС-21',
+          subGroup: 'подгруппа 2'),
+      _e(
+          begin: '15:15:00',
+          room: '333г',
+          subject: py,
+          group: 'ИТС-22',
+          subGroup: 'подгруппа 2'),
     ]);
     expect(slots.length, 1);
     expect(slots.first.isShared, isTrue);
-    expect(slots.first.groups,
-        ['ИТС-21 (подгруппа 2)', 'ИТС-22 (подгруппа 2)']);
+    expect(
+        slots.first.groups, ['ИТС-21 (подгруппа 2)', 'ИТС-22 (подгруппа 2)']);
   });
 
   test('different time, room, or subject do NOT merge', () {
-    expect(groupParallelLessons([
-      _e(begin: '15:15:00', room: '333г', subject: py, group: 'ИТС-21'),
-      _e(begin: '17:00:00', room: '333г', subject: py, group: 'ИТС-21'),
-    ]).length, 2); // different time
+    expect(
+        groupParallelLessons([
+          _e(begin: '15:15:00', room: '333г', subject: py, group: 'ИТС-21'),
+          _e(begin: '17:00:00', room: '333г', subject: py, group: 'ИТС-21'),
+        ]).length,
+        2); // different time
 
-    expect(groupParallelLessons([
-      _e(begin: '15:15:00', room: '333г', subject: py, group: 'ИТС-21'),
-      _e(begin: '15:15:00', room: '414', subject: py, group: 'ИТС-22'),
-    ]).length, 2); // different room
+    expect(
+        groupParallelLessons([
+          _e(begin: '15:15:00', room: '333г', subject: py, group: 'ИТС-21'),
+          _e(begin: '15:15:00', room: '414', subject: py, group: 'ИТС-22'),
+        ]).length,
+        2); // different room
 
-    expect(groupParallelLessons([
-      _e(begin: '15:15:00', room: '333г', subject: py, group: 'ИТС-21'),
-      _e(begin: '15:15:00', room: '333г', subject: 'Другой предмет', group: 'ИТС-22'),
-    ]).length, 2); // different subject (real clash, not a merge)
+    expect(
+        groupParallelLessons([
+          _e(begin: '15:15:00', room: '333г', subject: py, group: 'ИТС-21'),
+          _e(
+              begin: '15:15:00',
+              room: '333г',
+              subject: 'Другой предмет',
+              group: 'ИТС-22'),
+        ]).length,
+        2); // different subject (real clash, not a merge)
   });
 
   test('single lesson is a non-shared slot; order preserved', () {
     final slots = groupParallelLessons([
-      _e(begin: '08:00:00', room: '438а', subject: 'Введение', group: 'ИСТ-110'),
+      _e(
+          begin: '08:00:00',
+          room: '438а',
+          subject: 'Введение',
+          group: 'ИСТ-110'),
       _e(begin: '09:45:00', room: '414', subject: 'МО', group: 'ИСТ-410'),
     ]);
     expect(slots.length, 2);
