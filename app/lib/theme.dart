@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 class Brand {
   static const blue = Color(0xFF34517B); // header / app bar (light)
   static const blueDark = Color(0xFF223A57); // app bar (dark)
+  // Buttons, checkboxes and switches on the dark theme: [blue] is too dark to
+  // read against the near-black background there.
+  static const blueOnDark = Color(0xFF7FA8E0);
+  static const inkOnBlueOnDark = Color(0xFF0E2340);
   static const coral = Color(0xFFEE6C6C); // date bar, primary button
   static const roomBlueLight = Color(0xFF2C5AA0);
-  static const roomBlueDark = Color(0xFF7FA8E0);
+  static const roomBlueDark = blueOnDark;
 
   static const bgLight = Color(0xFFECECEC);
   static const bgDark = Color(0xFF121212);
@@ -56,7 +60,8 @@ ThemeData _base(Brightness b) {
   final dark = b == Brightness.dark;
   final scheme = (dark
           ? const ColorScheme.dark(
-              primary: Brand.blue,
+              primary: Brand.blueOnDark,
+              onPrimary: Brand.inkOnBlueOnDark,
               secondary: Brand.coral,
               surface: Brand.surfaceDark,
             )
