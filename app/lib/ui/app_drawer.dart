@@ -6,6 +6,7 @@ import '../core/photo_store.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
 import 'exams_page.dart';
+import 'foreign_memo_page.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'web_view_page.dart';
@@ -99,6 +100,18 @@ class AppDrawer extends StatelessWidget {
               Navigator.pop(context);
               Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const ExamsPage()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.translate, color: Brand.blue),
+            title: const Text('Иностранные группы'),
+            subtitle: const Text('служебная записка за месяц'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                    builder: (_) => const ForeignMemoPage()),
               );
             },
           ),

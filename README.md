@@ -27,11 +27,30 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
 - **Профиль** — photo, birthday, and every appointment (main department first)
   with its **ставка / почасовая** load, department and start date, plus a
   combined-load line and work experience.
+- **Иностранные группы** — the monthly «служебная записка» about classes taught
+  to foreign students (groups with a 3-digit number, e.g. ИСТ-110), built from
+  your schedule and shared as a .docx in the portal's own template.
 - **Настройки** — theme (system / light / dark) and an optional
   fingerprint / PIN **app-lock**.
 - **Почта** and **Портал** — OWA mail and the corporate portal open **in-app**
   (WebView), keeping only the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.4.0
+
+- **Служебная записка по иностранным группам** — Menu → «Иностранные группы»
+  lists the month's classes with foreign-student groups (3-digit numbers such as
+  ИСТ-110…ИСТ-410), one row per class at 2 h, and shares the memo as a .docx
+  filled into the portal's template (total in the last cell, e.g. «2/78»).
+  Untick classes, add ones by hand, shorten subject names; the letterhead and
+  signature fields are filled once and remembered. During the first ten days the
+  previous month is preselected.
+- **Faster, works offline** — the schedule shows the saved copy instantly and
+  refreshes in the background; the next week is prefetched; loading
+  placeholders in the week overview; the profile photo is cached.
+- **Fewer surprise logouts** — a network hiccup while renewing the session no
+  longer signs you out; when the session really expires you get a notice and
+  land on the login screen.
 
 ## What's new — v0.3.2
 
