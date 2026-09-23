@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -42,6 +44,20 @@ class Prefs {
         return ThemeMode.system;
     }
   }
+
+  /// A small JSON document stored under [key] (null if absent or corrupt).
+  Object? readJson(String key) {
+    final raw = _p.getString(key);
+    if (raw == null) return null;
+    try {
+      return jsonDecode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> writeJson(String key, Object value) async =>
+      _p.setString(key, jsonEncode(value));
 
   Future<void> setThemeMode(ThemeMode m) async {
     await _p.setString(
