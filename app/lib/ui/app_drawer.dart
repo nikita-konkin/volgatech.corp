@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/cache.dart';
-import '../data/volgatech_api.dart';
+import '../core/photo_store.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
 import 'exams_page.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'web_view_page.dart';
+import 'widgets/person_avatar.dart';
 
 /// External services opened in-app via WebView (see API_CONTRACT §6 — we
 /// intentionally do NOT handle the corporate password; the WebView keeps only
@@ -22,7 +23,7 @@ class AppDrawer extends StatelessWidget {
   void _openWeb(BuildContext context, String title, String url) {
     Navigator.pop(context);
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => WebViewScreen(title: title, url: url)),
+      MaterialPageRoute<void>(builder: (_) => WebViewScreen(title: title, url: url)),
     );
   }
 
@@ -36,9 +37,7 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
-    final api = context.read<VolgatechApi>();
     final profile = auth.profile;
-    final photo = profile?.photoName;
 
     return Drawer(
       child: ListView(
@@ -48,7 +47,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ProfilePage()),
+                MaterialPageRoute<void>(builder: (_) => const ProfilePage()),
               );
             },
             child: Container(
@@ -57,15 +56,12 @@ class AppDrawer extends StatelessWidget {
               width: double.infinity,
               child: Column(
               children: [
-                CircleAvatar(
+                PersonAvatar(
+                  photoName: profile?.photoName,
                   radius: 44,
                   backgroundColor: Colors.white,
-                  backgroundImage: (photo != null && photo.isNotEmpty)
-                      ? NetworkImage(api.photoUrl(photo))
-                      : null,
-                  child: (photo == null || photo.isEmpty)
-                      ? const Icon(Icons.person, size: 48, color: Brand.blue)
-                      : null,
+                  iconColor: Brand.blue,
+                  iconSize: 48,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -86,7 +82,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ProfilePage()),
+                MaterialPageRoute<void>(builder: (_) => const ProfilePage()),
               );
             },
           ),
@@ -101,7 +97,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ExamsPage()),
+                MaterialPageRoute<void>(builder: (_) => const ExamsPage()),
               );
             },
           ),
@@ -130,7 +126,7 @@ class AppDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
+                MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
               );
             },
           ),
@@ -139,8 +135,10 @@ class AppDrawer extends StatelessWidget {
             title: const Text('Выход'),
             onTap: () async {
               final cache = context.read<JsonCache>();
+              final photos = context.read<PhotoStore>();
               final authCtl = context.read<AuthController>();
               Navigator.pop(context);
+              photos.clear();
               await cache.clear();
               await authCtl.logout();
             },

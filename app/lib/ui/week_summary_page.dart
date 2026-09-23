@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../core/lesson_grouping.dart';
 import '../core/week_summary.dart';
-import '../models/schedule.dart';
 import '../state/schedule_controller.dart';
 import '../theme.dart';
 import 'widgets/marquee_text.dart';
@@ -33,8 +34,9 @@ class WeekSummaryPage extends StatelessWidget {
     final days = c.weekDays;
     final accent = Brand.weekAccent(c.weekNumberForSelected, context);
     final weekType = c.weekTypeForSelected;
-    final total = days.fold<int>(
-        0, (s, d) => s + groupParallelLessons(c.eventsOn(d)).length);
+    // Merge parallel groups so a shared slot counts once, not per group.
+    final slotsByDay = [for (final d in days) groupParallelLessons(c.eventsOn(d))];
+    final total = slotsByDay.fold<int>(0, (s, slots) => s + slots.length);
     final range =
         '${_dayMonth.format(days.first)} – ${_dayMonth.format(days.last)}';
 
@@ -53,9 +55,9 @@ class WeekSummaryPage extends StatelessWidget {
         onHorizontalDragEnd: (d) {
           final v = d.primaryVelocity ?? 0;
           if (v < -250) {
-            c.nextWeek();
+            unawaited(c.nextWeek());
           } else if (v > 250) {
-            c.prevWeek();
+            unawaited(c.prevWeek());
           }
         },
         child: ListView(
@@ -64,15 +66,15 @@ class WeekSummaryPage extends StatelessWidget {
             _WeekHeader(
                 range: range, total: total, weekType: weekType, accent: accent),
             const SizedBox(height: 8),
-            for (final d in days)
+            for (final (i, d) in days.indexed)
               _DayCard(
-                events: c.eventsOn(d),
+                slots: slotsByDay[i],
                 accent: accent,
                 isToday: _isToday(d),
                 weekdayLabel: _cap(_weekday.format(d)),
                 dayNum: _day.format(d),
                 onTap: () {
-                  c.goToDay(d);
+                  unawaited(c.goToDay(d));
                   Navigator.of(context).pop();
                 },
               ),
@@ -141,7 +143,7 @@ class _WeekHeader extends StatelessWidget {
 
 class _DayCard extends StatelessWidget {
   const _DayCard({
-    required this.events,
+    required this.slots,
     required this.accent,
     required this.isToday,
     required this.weekdayLabel,
@@ -149,7 +151,7 @@ class _DayCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final List<ScheduleEvent> events;
+  final List<LessonSlot> slots;
   final Color accent;
   final bool isToday;
   final String weekdayLabel;
@@ -159,8 +161,6 @@ class _DayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final muted = Brand.muted(context);
-    // Merge parallel groups so a shared slot counts once, not per group.
-    final slots = groupParallelLessons(events);
     final stats = DayStats.from([for (final s in slots) s.lead]);
     final footer = [
       if (stats.span.isNotEmpty) stats.span,

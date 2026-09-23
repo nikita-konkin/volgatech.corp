@@ -40,7 +40,7 @@ class ExamsController extends ChangeNotifier {
       final cached = await _cache.get(_yearsKey);
       if (cached != null && cached.data is List) {
         years = (cached.data as List)
-            .map((y) => StudyYear.fromJson(Map<String, dynamic>.from(y)))
+            .map((y) => StudyYear.fromJson(Map<String, dynamic>.from(y as Map)))
             .toList();
       } else {
         error = e.toString();
@@ -73,7 +73,7 @@ class ExamsController extends ChangeNotifier {
       final cached = await _cache.get(_examsKey(year.value));
       if (cached != null && cached.data is List) {
         exams = (cached.data as List)
-            .map((e) => Exam.fromJson(Map<String, dynamic>.from(e)))
+            .map((e) => Exam.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList();
         fromCache = true;
         cacheSavedAt = cached.savedAt;

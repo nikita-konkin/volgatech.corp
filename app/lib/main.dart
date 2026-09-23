@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +8,7 @@ import 'app.dart';
 import 'core/api_client.dart';
 import 'core/app_lock.dart';
 import 'core/cache.dart';
+import 'core/photo_store.dart';
 import 'core/prefs.dart';
 import 'core/session.dart';
 import 'data/volgatech_api.dart';
@@ -28,6 +31,7 @@ Future<void> main() async {
         Provider<Session>.value(value: session),
         Provider<VolgatechApi>.value(value: api),
         Provider<JsonCache>.value(value: cache),
+        Provider<PhotoStore>.value(value: PhotoStore(api, cache)),
         Provider<Prefs>.value(value: prefs),
         ChangeNotifierProvider<ThemeController>(
           create: (_) => ThemeController(prefs),
@@ -36,7 +40,11 @@ Future<void> main() async {
           create: (_) => AppLock(prefs),
         ),
         ChangeNotifierProvider<AuthController>(
-          create: (_) => AuthController(api, session, cache)..bootstrap(),
+          create: (_) {
+            final auth = AuthController(api, session, cache);
+            unawaited(auth.bootstrap());
+            return auth;
+          },
         ),
       ],
       child: const VolgatechApp(),

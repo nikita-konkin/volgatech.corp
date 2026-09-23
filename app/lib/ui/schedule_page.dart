@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -23,7 +25,11 @@ class SchedulePage extends StatelessWidget {
     final cache = context.read<JsonCache>();
     final personId = context.read<AuthController>().personId ?? 0;
     return ChangeNotifierProvider(
-      create: (_) => ScheduleController(api, personId, cache)..ensureLoaded(),
+      create: (_) {
+        final c = ScheduleController(api, personId, cache);
+        unawaited(c.ensureLoaded());
+        return c;
+      },
       child: const _ScheduleView(),
     );
   }
@@ -57,7 +63,7 @@ class _ScheduleView extends StatelessWidget {
             tooltip: 'Обзор недели',
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
+                MaterialPageRoute<void>(
                   builder: (_) => ChangeNotifierProvider<ScheduleController>.value(
                     value: c,
                     child: const WeekSummaryPage(),
@@ -126,9 +132,9 @@ class _ScheduleView extends StatelessWidget {
       onHorizontalDragEnd: (d) {
         final v = d.primaryVelocity ?? 0;
         if (v < -250) {
-          c.nextDay();
+          unawaited(c.nextDay());
         } else if (v > 250) {
-          c.prevDay();
+          unawaited(c.prevDay());
         }
       },
       child: _content(context, c, accent),
@@ -136,13 +142,13 @@ class _ScheduleView extends StatelessWidget {
   }
 
   Widget _content(BuildContext context, ScheduleController c, Color accent) {
-    if (c.loading && c.eventsForSelected.isEmpty) {
+    final events = c.eventsForSelected;
+    if (c.loading && events.isEmpty) {
       return const _ScheduleSkeleton();
     }
-    if (c.error != null && c.eventsForSelected.isEmpty) {
+    if (c.error != null && events.isEmpty) {
       return _ErrorState(message: c.error!, onRetry: c.refresh);
     }
-    final events = c.eventsForSelected;
     if (events.isEmpty) {
       return RefreshIndicator(
         onRefresh: c.refresh,

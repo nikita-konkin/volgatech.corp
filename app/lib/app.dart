@@ -6,8 +6,8 @@ import 'core/app_lock.dart';
 import 'state/auth_controller.dart';
 import 'state/theme_controller.dart';
 import 'theme.dart';
-import 'ui/login_page.dart';
 import 'ui/lock_screen.dart';
+import 'ui/login_page.dart';
 import 'ui/schedule_page.dart';
 
 class VolgatechApp extends StatelessWidget {

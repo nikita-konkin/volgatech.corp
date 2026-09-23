@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/auth.dart';
 
@@ -57,6 +59,18 @@ class Session {
     _refreshCache = null;
     _personIdCache = null;
     await _s.deleteAll();
+  }
+
+  final _expired = StreamController<void>.broadcast();
+
+  /// Fires when the server rejects the refresh token, so the UI can go back
+  /// to the login screen instead of failing every request.
+  Stream<void> get onExpired => _expired.stream;
+
+  /// Drops the tokens because the server ended the session.
+  Future<void> expire() async {
+    await clear();
+    _expired.add(null);
   }
 
   // Helper for callers that need the raw map form.

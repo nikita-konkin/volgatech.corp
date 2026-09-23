@@ -3,10 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../core/ru_plural.dart';
-import '../data/volgatech_api.dart';
 import '../models/profile.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
+import 'widgets/person_avatar.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -26,7 +26,6 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
-    final api = context.read<VolgatechApi>();
     final p = auth.profile;
 
     return Scaffold(
@@ -39,17 +38,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: const EdgeInsets.all(20),
                 children: [
                   Center(
-                    child: CircleAvatar(
+                    child: PersonAvatar(
+                      photoName: p.fileName,
                       radius: 56,
                       backgroundColor: Brand.blue,
-                      backgroundImage:
-                          (p.fileName != null && p.fileName!.isNotEmpty)
-                              ? NetworkImage(api.photoUrl(p.fileName!))
-                              : null,
-                      child: (p.fileName == null || p.fileName!.isEmpty)
-                          ? const Icon(Icons.person,
-                              size: 56, color: Colors.white)
-                          : null,
+                      iconColor: Colors.white,
+                      iconSize: 56,
                     ),
                   ),
                   const SizedBox(height: 14),

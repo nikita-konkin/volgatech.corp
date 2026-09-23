@@ -1,11 +1,13 @@
 import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../core/api_client.dart';
 import '../models/auth.dart';
+import '../models/exams.dart';
 import '../models/profile.dart';
 import '../models/schedule.dart';
-import '../models/exams.dart';
 
 final _ymd = DateFormat('yyyy-MM-dd');
 
@@ -35,7 +37,7 @@ class VolgatechApi {
             data: jsonEncode({'login': login, 'password': password})),
         'Ошибка входа');
     if (r.statusCode == 200) {
-      return AuthTokens.fromJson(Map<String, dynamic>.from(_decode(r.data)));
+      return AuthTokens.fromJson(Map<String, dynamic>.from(_decode(r.data) as Map));
     }
     throw ApiException.fromResponse(r, fallback: 'Ошибка входа');
   }
@@ -47,7 +49,7 @@ class VolgatechApi {
       final data = _decode(r.data);
       final list = data is List ? data : [data];
       if (list.isEmpty) throw const ApiException('Профиль не найден');
-      return PersonProfile.fromProfiles(Map<String, dynamic>.from(list.first));
+      return PersonProfile.fromProfiles(Map<String, dynamic>.from(list.first as Map));
     }
     throw ApiException.fromResponse(r, fallback: 'Не удалось получить профиль');
   }
@@ -58,8 +60,8 @@ class VolgatechApi {
         'Не удалось получить профиль');
     if (r.statusCode == 200) {
       final data = _decode(r.data);
-      final map = data is List ? (data.isNotEmpty ? data.first : {}) : data;
-      return PersonProfile.fromInfo(Map<String, dynamic>.from(map),
+      final map = data is List ? (data.isNotEmpty ? data.first : <String, dynamic>{}) : data;
+      return PersonProfile.fromInfo(Map<String, dynamic>.from(map as Map),
           personId: personId);
     }
     throw ApiException.fromResponse(r, fallback: 'Не удалось получить профиль');
@@ -73,9 +75,9 @@ class VolgatechApi {
     final r = await _run(() => _dio.get(path), 'Не удалось загрузить расписание');
     if (r.statusCode == 200) {
       final data = _decode(r.data);
-      final list = data is List ? data : const [];
+      final list = data is List ? data : const <dynamic>[];
       return list
-          .map((e) => ScheduleDay.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => ScheduleDay.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
     throw ApiException.fromResponse(r, fallback: 'Не удалось загрузить расписание');
@@ -89,9 +91,9 @@ class VolgatechApi {
         'Не удалось загрузить учебные годы');
     if (r.statusCode == 200) {
       final data = _decode(r.data);
-      final list = data is List ? data : const [];
+      final list = data is List ? data : const <dynamic>[];
       return list
-          .map((e) => StudyYear.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => StudyYear.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
     throw ApiException.fromResponse(r, fallback: 'Не удалось загрузить учебные годы');
@@ -103,27 +105,36 @@ class VolgatechApi {
         'Не удалось загрузить экзамены');
     if (r.statusCode == 200) {
       final data = _decode(r.data);
-      final list = data is List ? data : const [];
+      final list = data is List ? data : const <dynamic>[];
       return list
-          .map((e) => Exam.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => Exam.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
     throw ApiException.fromResponse(r, fallback: 'Не удалось загрузить экзамены');
   }
 
-  /// Absolute URL for a person photo file name ("<guid>.jpg").
-  String photoUrl(String photoName) =>
-      '${_dio.options.baseUrl}${Api.photo}/$photoName';
+  /// GET /api/files/GetPersonPhotoByName/{name} -> image bytes.
+  Future<Uint8List> getPhotoBytes(String photoName) async {
+    final r = await _run(
+        () => _dio.get<List<int>>('${Api.photo}/$photoName',
+            options: Options(responseType: ResponseType.bytes)),
+        'Не удалось загрузить фото');
+    final data = r.data;
+    if (r.statusCode == 200 && data is List<int> && data.isNotEmpty) {
+      return data is Uint8List ? data : Uint8List.fromList(data);
+    }
+    throw const ApiException('Не удалось загрузить фото');
+  }
 }
 
 class ApiException implements Exception {
   final String message;
   const ApiException(this.message);
 
-  factory ApiException.fromResponse(Response r, {required String fallback}) {
+  factory ApiException.fromResponse(Response<dynamic> r, {required String fallback}) {
     try {
       final data = r.data is String && (r.data as String).isNotEmpty
-          ? jsonDecode(r.data)
+          ? jsonDecode(r.data as String)
           : r.data;
       if (data is Map) {
         final m = data['Message'] ?? data['message'] ?? data['error_description'];

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -19,7 +21,11 @@ class ExamsPage extends StatelessWidget {
     final cache = context.read<JsonCache>();
     final personId = context.read<AuthController>().personId ?? 0;
     return ChangeNotifierProvider(
-      create: (_) => ExamsController(api, personId, cache)..init(),
+      create: (_) {
+        final c = ExamsController(api, personId, cache);
+        unawaited(c.init());
+        return c;
+      },
       child: const _ExamsView(),
     );
   }
@@ -83,7 +89,7 @@ class _ExamsView extends StatelessWidget {
                   .toList(),
               onChanged: (v) {
                 final y = c.years.firstWhere((e) => e.value == v);
-                c.selectYear(y);
+                unawaited(c.selectYear(y));
               },
             ),
           ),

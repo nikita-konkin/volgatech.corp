@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+# A newer push to the same branch/PR makes the running check pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Analyze, test & build APK
@@ -20,6 +25,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - uses: subosito/flutter-action@v2
         with:
@@ -47,6 +53,9 @@ jobs:
 
   ios:
     name: Build iOS (unsigned)
+    # macOS runners bill ~10x Linux minutes: build iOS once a change lands on
+    # main, not on every PR push.
+    if: github.event_name == 'push'
     runs-on: macos-latest
     defaults:
       run:

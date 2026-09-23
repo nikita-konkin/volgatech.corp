@@ -25,7 +25,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.1
 
 # App icon generation: `dart run flutter_launcher_icons`
@@ -40,4 +40,4 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    - assets/easter/rtf.png
+    - assets/easter/rtf.webp

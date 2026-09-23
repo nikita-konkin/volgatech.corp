@@ -28,6 +28,13 @@ class _LoginPageState extends State<LoginPage> {
     if (_remember && prefs.rememberedLogin != null) {
       _login.text = prefs.rememberedLogin!;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && context.read<AuthController>().consumeSessionExpired()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Сессия истекла. Войдите снова.')),
+        );
+      }
+    });
   }
 
   @override

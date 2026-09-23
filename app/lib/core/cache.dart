@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:path_provider/path_provider.dart';
 
 /// One cached payload plus when it was stored.
@@ -9,7 +11,8 @@ class CachedEntry {
   const CachedEntry(this.savedAt, this.data);
 }
 
-/// Tiny on-disk JSON cache for offline resilience (schedule, exams, ...).
+/// Tiny on-disk cache for offline resilience: JSON payloads (schedule,
+/// exams, ...) plus raw bytes (the profile photo).
 /// Not for secrets — tokens live in [Session] (secure storage).
 class JsonCache {
   Directory? _dir;
@@ -24,8 +27,8 @@ class JsonCache {
 
   String _safe(String key) => key.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
 
-  Future<File> _file(String key) async =>
-      File('${(await _cacheDir()).path}/${_safe(key)}.json');
+  Future<File> _file(String key, [String ext = 'json']) async =>
+      File('${(await _cacheDir()).path}/${_safe(key)}.$ext');
 
   Future<void> put(String key, Object data) async {
     try {
@@ -45,6 +48,23 @@ class JsonCache {
       return CachedEntry(
           DateTime.tryParse(m['savedAt'] as String? ?? '') ?? DateTime.now(),
           m['data']);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> putBytes(String key, Uint8List bytes) async {
+    try {
+      await (await _file(key, 'bin')).writeAsBytes(bytes, flush: true);
+    } catch (_) {/* cache is best-effort */}
+  }
+
+  Future<Uint8List?> getBytes(String key) async {
+    try {
+      final f = await _file(key, 'bin');
+      if (!await f.exists()) return null;
+      final bytes = await f.readAsBytes();
+      return bytes.isEmpty ? null : bytes;
     } catch (_) {
       return null;
     }
