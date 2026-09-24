@@ -7,6 +7,13 @@ on:
 permissions:
   contents: write
 
+env:
+  # SHA-256 of the release signing certificate. Every published APK must carry
+  # it, or phones refuse the update ("package conflicts with an existing
+  # package"). Only change it together with the key, knowing that users will
+  # have to reinstall.
+  RELEASE_CERT_SHA256: cc953cb084d7f4ecb121a9e6c7cce5b7d121b10e1bf72ac8f319925d7c0c3403
+
 jobs:
   release:
     name: Build & publish APKs
@@ -16,6 +23,23 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up the release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Secrets ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD are not set."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/upload-keystore.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=upload"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
+          } > android/key.properties
 
       - uses: actions/setup-java@v4
         with:
@@ -31,6 +55,15 @@ jobs:
       - run: flutter pub get
       - run: flutter test
       - run: flutter build apk --release --split-per-abi
+
+      - name: Check every APK carries the release key
+        run: |
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
+          for apk in build/app/outputs/flutter-apk/*-release.apk; do
+            "$apksigner" verify --print-certs "$apk" \
+              | grep -q "certificate SHA-256 digest: $RELEASE_CERT_SHA256" \
+              || { echo "::error::$apk is not signed with the release key"; exit 1; }
+          done
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
