@@ -9,9 +9,14 @@ the existing `api.volgatech.net` backend and does not change it.
 
 The Flutter app lives in [`app/`](app/).
 
-| Расписание | Обзор недели | Иностранные группы | Профиль | Меню |
-|:-:|:-:|:-:|:-:|:-:|
-| <img src="docs/screenshots/schedule.webp" width="150" alt="Расписание"> | <img src="docs/screenshots/week.webp" width="150" alt="Обзор недели"> | <img src="docs/screenshots/memo.webp" width="150" alt="Иностранные группы"> | <img src="docs/screenshots/profile.webp" width="150" alt="Профиль"> | <img src="docs/screenshots/menu.webp" width="150" alt="Меню"> |
+<p align="center">
+  <img src="docs/screenshots/schedule.webp" width="18%" alt="Расписание">
+  <img src="docs/screenshots/week.webp" width="18%" alt="Обзор недели">
+  <img src="docs/screenshots/memo.webp" width="18%" alt="Иностранные группы">
+  <img src="docs/screenshots/profile.webp" width="18%" alt="Профиль">
+  <img src="docs/screenshots/menu.webp" width="18%" alt="Меню">
+  <br><sub>Расписание · Обзор недели · Иностранные группы · Профиль · Меню</sub>
+</p>
 
 ## 📥 Download
 
