@@ -52,6 +52,7 @@ Effort: **S** ≤½day · **M** ~1–2 days · **L** ≥3 days. Status as of sca
 | 4.6 | **Skeleton loaders** instead of spinners. | P2 | S | |
 | 4.7 | **Accessibility**: honor OS font scaling, adequate contrast/hit targets. | P1 | S | |
 | 4.8 | **Push notifications** for news/deadlines (original used Firebase). Needs a Firebase project from IT — can't reuse theirs. | P2 | L | needs IT |
+| 4.9 | **Month-end reminder for the foreign-groups memo** — a local notification near the end of the month (and on the 1st if the memo wasn't shared yet) that opens «Иностранные группы». `flutter_local_notifications` + the Android 13 notification permission; no server needed. | P2 | M | backlog |
 
 ## 5. Feature roadmap  *(build order)*
 
