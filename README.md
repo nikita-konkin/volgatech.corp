@@ -9,6 +9,15 @@ the existing `api.volgatech.net` backend and does not change it.
 
 The Flutter app lives in [`app/`](app/).
 
+<p align="center">
+  <img src="docs/screenshots/schedule.webp" width="18%" alt="Расписание">
+  <img src="docs/screenshots/week.webp" width="18%" alt="Обзор недели">
+  <img src="docs/screenshots/memo.webp" width="18%" alt="Иностранные группы">
+  <img src="docs/screenshots/profile.webp" width="18%" alt="Профиль">
+  <img src="docs/screenshots/menu.webp" width="18%" alt="Меню">
+  <br><sub>Расписание · Обзор недели · Иностранные группы · Профиль · Меню</sub>
+</p>
+
 ## 📥 Download
 
 Grab the latest signed-for-testing APK from the
@@ -35,6 +44,12 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
 - **Почта** and **Портал** — OWA mail and the corporate portal open **in-app**
   (WebView), keeping only the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.4.1
+
+- **Настройки** show the installed version (was stuck at v0.1.0).
+- **Dark theme** — buttons and checkboxes are a lighter blue, so «Сформировать
+  .docx» no longer looks disabled.
 
 ## What's new — v0.4.0
 

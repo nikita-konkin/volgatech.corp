@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Tappable footer for the Settings screen. Seven quick taps on the version
 /// line reveal the Радиотехнический факультет crest — a small nod to the RTF.
@@ -11,6 +12,8 @@ class EasterEggFooter extends StatefulWidget {
 
 class _EasterEggFooterState extends State<EasterEggFooter> {
   static const _needed = 7;
+  // Read from the installed package, so it always matches pubspec's version.
+  static final Future<PackageInfo> _info = PackageInfo.fromPlatform();
   int _taps = 0;
   DateTime _last = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -44,8 +47,15 @@ class _EasterEggFooterState extends State<EasterEggFooter> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: _onTap,
-          child: Text('Волгатех.Коллектив · v0.1.0',
-              style: TextStyle(color: muted, fontSize: 13)),
+          child: FutureBuilder<PackageInfo>(
+            future: _info,
+            builder: (context, snap) => Text(
+                [
+                  'Волгатех.Коллектив',
+                  if (snap.data case final info?) 'v${info.version}',
+                ].join(' · '),
+                style: TextStyle(color: muted, fontSize: 13)),
+          ),
         ),
       ),
     );
