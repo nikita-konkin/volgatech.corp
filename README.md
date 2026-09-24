@@ -24,6 +24,10 @@ Grab the latest signed-for-testing APK from the
 **[Releases page](https://github.com/nikita-konkin/volgatech.corp/releases/latest)**.
 For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
 
+> **Coming from v0.4.1 or older?** Uninstall the old app once before installing
+> v0.4.2 — earlier builds were signed with a different key each time. From v0.4.2
+> on, new versions install over the old one.
+
 ## Features
 
 - **Login** with JWT + auto-refresh; tokens in the OS keystore, the password is
@@ -44,6 +48,13 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
 - **Почта** and **Портал** — OWA mail and the corporate portal open **in-app**
   (WebView), keeping only the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.4.2
+
+- **Updates install in place** — releases are now signed with one permanent
+  key. Before, every build carried a new key and Android refused the update
+  («Приложение не установлено: конфликт пакетов»). One-time: uninstall the old
+  app first; you will need to sign in again and re-enter the memo header.
 
 ## What's new — v0.4.1
 
@@ -150,7 +161,10 @@ GitHub Actions (Flutter **stable** channel):
   macOS job builds the app for **iOS** (`--no-codesign`); both upload their output
   as workflow artifacts.
 - [`release.yml`](.github/workflows/release.yml) — on a `v*` tag: builds the
-  per-ABI release APKs and attaches them to a GitHub Release. (A signed iOS
+  per-ABI release APKs, signed with the release key from the repository
+  secrets `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` (it refuses to
+  publish without them, or if an APK carries another certificate), and attaches
+  them to a GitHub Release. (A signed iOS
   release needs an Apple Developer account — see [docs/IOS_RELEASE.md](docs/IOS_RELEASE.md).)
 
 Cut a release:
