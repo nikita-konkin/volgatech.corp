@@ -28,6 +28,12 @@ class FakeCache implements JsonCache {
   Future<Uint8List?> getBytes(String key) async => bytes[key];
 
   @override
+  Future<void> removePrefix(String prefix) async {
+    json.removeWhere((k, _) => k.startsWith(prefix));
+    bytes.removeWhere((k, _) => k.startsWith(prefix));
+  }
+
+  @override
   Future<void> clear() async {
     json.clear();
     bytes.clear();

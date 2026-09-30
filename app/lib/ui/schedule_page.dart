@@ -8,6 +8,7 @@ import '../core/cache.dart';
 import '../core/lesson_grouping.dart';
 import '../core/ru_plural.dart';
 import '../data/volgatech_api.dart';
+import '../mail/mail_config.dart';
 import '../models/schedule.dart';
 import '../state/auth_controller.dart';
 import '../state/schedule_controller.dart';
@@ -57,6 +58,7 @@ class _ScheduleView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: kNativeMail ? const MenuButtonWithMail() : null,
         title: const Text('Расписание занятий'),
         actions: [
           IconButton(

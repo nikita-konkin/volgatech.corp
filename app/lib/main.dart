@@ -12,6 +12,9 @@ import 'core/photo_store.dart';
 import 'core/prefs.dart';
 import 'core/session.dart';
 import 'data/volgatech_api.dart';
+import 'mail/mail_badge.dart';
+import 'mail/mail_config.dart';
+import 'mail/mail_credentials.dart';
 import 'state/auth_controller.dart';
 import 'state/theme_controller.dart';
 
@@ -24,6 +27,9 @@ Future<void> main() async {
   final api = VolgatechApi(client);
   final cache = JsonCache();
   final prefs = await Prefs.load();
+  // A build without the mail client never keeps the mail password, even one
+  // left behind by a MAIL build installed over before.
+  if (!kNativeMail) unawaited(MailCredentialStore().clear());
 
   runApp(
     MultiProvider(
@@ -39,6 +45,11 @@ Future<void> main() async {
         ChangeNotifierProvider<AppLock>(
           create: (_) => AppLock(prefs),
         ),
+        if (kNativeMail)
+          ChangeNotifierProvider<MailBadge>(
+            create: (_) =>
+                MailBadge(prefs: prefs, store: MailCredentialStore())..watch(),
+          ),
         ChangeNotifierProvider<AuthController>(
           create: (_) {
             final auth = AuthController(api, session, cache);

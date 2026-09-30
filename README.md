@@ -18,11 +18,29 @@ The Flutter app lives in [`app/`](app/).
   <br><sub>Расписание · Обзор недели · Иностранные группы · Профиль · Меню</sub>
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/mail-list.webp" width="18%" alt="Почта: Входящие">
+  <img src="docs/screenshots/mail-swipe.webp" width="18%" alt="Почта: удаление свайпом">
+  <img src="docs/screenshots/mail-compose.webp" width="18%" alt="Почта: новое письмо">
+  <img src="docs/screenshots/mail-size.webp" width="18%" alt="Почта: размер ящика">
+  <img src="docs/screenshots/mail-menu.webp" width="18%" alt="Почта: меню">
+  <br><sub>Почта: Входящие · Удаление свайпом · Новое письмо · Размер ящика · Меню
+  (example data)</sub>
+</p>
+
 ## 📥 Download
 
-Grab the latest signed-for-testing APK from the
+Grab the latest APK from the
 **[Releases page](https://github.com/nikita-konkin/volgatech.corp/releases/latest)**.
-For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
+Each release has two sets of the same app; for a 64-bit phone (most modern
+devices) pick the `arm64-v8a` one:
+
+| APK | «Почта» in the app |
+|---|---|
+| `app-mail-arm64-v8a-release.apk` | the **built-in mail client** (new in v0.5.0) |
+| `app-arm64-v8a-release.apk` | the web mail (OWA) in a WebView, as before |
+
+Both carry the same signature, so either installs over the other.
 
 > **Coming from v0.4.1 or older?** Uninstall the old app once before installing
 > v0.4.2 — earlier builds were signed with a different key each time. From v0.4.2
@@ -45,9 +63,42 @@ For a 64-bit phone (most modern devices) pick `app-arm64-v8a-release.apk`.
   your schedule and shared as a .docx in the portal's own template.
 - **Настройки** — theme (system / light / dark) and an optional
   fingerprint / PIN **app-lock**.
-- **Почта** and **Портал** — OWA mail and the corporate portal open **in-app**
-  (WebView), keeping only the site session cookie, never the password.
+- **Почта** — in the `app-mail-*` APKs, a **built-in client** for the
+  university's Exchange mailbox (EWS): folders, search, pinned messages,
+  attachments, replies with a signature, address-book suggestions,
+  «Автоответ», mailbox size and an unread badge. The mail password is kept
+  in the OS keystore and deleted on «Выйти из почты». In the plain APKs,
+  OWA opens in-app (WebView) as before.
+- **Портал** — the corporate portal opens **in-app** (WebView), keeping only
+  the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.0
+
+- **Built-in mail client** — in the new `app-mail-*` APKs, «Почта» shows your
+  university mailbox natively instead of the web page. Sign in once with the
+  mail password (kept in the OS keystore).
+  - **The list** — Outlook-style headings («Сегодня», «Вчера», «На этой
+    неделе»…), unread dots, messages pinned in Outlook on top in a folding
+    «Закреплённые» group, the size of every message, and rows **tinted by
+    size**: yellow from 100 KB, orange at 1 MB, red from 10 MB. Pull to
+    refresh; search; the folder picker shows unread counts.
+  - **Swipe** left to delete (with «Отменить» for a few seconds), right to
+    mark read / unread.
+  - **Reading** — HTML mail with remote images blocked; attachments open,
+    save to the phone or share; tap the sender line for everyone on the
+    message; move a message to another folder.
+  - **Writing** — reply and forward; suggestions from the university
+    address book in «Кому» / «Копия»; attachments up to 18 MB; a signature
+    (imported once from the web mail); 5 seconds to cancel sending; text left
+    unsent is kept as a draft.
+  - **Автоответ** — out-of-office replies, set on the mail server like in
+    Outlook, so they work with the phone off.
+  - **Размер ящика** — space used, per folder, with a fill bar next to
+    «Входящие». The server doesn't tell the app the limit, so it can be typed
+    in once from the web mail («…достигнет 512.00 МБ»).
+  - **Unread badge** on «Почта» and on the ☰ button.
+- The plain APKs keep opening the web mail, as before.
 
 ## What's new — v0.4.2
 
@@ -138,6 +189,7 @@ flutter pub get
 flutter analyze
 flutter test
 flutter build apk --release --split-per-abi   # Android: per-ABI APKs (arm64 ≈ 20 MB)
+flutter build apk --release --split-per-abi --dart-define=MAIL=true   # …with the built-in mail client
 flutter build ios --release --no-codesign      # iOS: unsigned build (needs macOS + Xcode)
 ```
 
@@ -161,7 +213,8 @@ GitHub Actions (Flutter **stable** channel):
   macOS job builds the app for **iOS** (`--no-codesign`); both upload their output
   as workflow artifacts.
 - [`release.yml`](.github/workflows/release.yml) — on a `v*` tag: builds the
-  per-ABI release APKs, signed with the release key from the repository
+  per-ABI release APKs twice (`app-mail-*` with `--dart-define=MAIL=true`,
+  and the plain `app-*`), signed with the release key from the repository
   secrets `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` (it refuses to
   publish without them, or if an APK carries another certificate), and attaches
   them to a GitHub Release. (A signed iOS
