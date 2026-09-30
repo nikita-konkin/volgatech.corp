@@ -1,10 +1,17 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Required for network access. Flutter only adds this to the debug/profile
          manifests by default, so release builds have no internet without it. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Optional "lock on open" (local_auth). USE_BIOMETRIC covers Android 9+;
          the framework falls back to device PIN/pattern when no sensor. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- open_filex asks for these to open files anywhere on the device; mail
+         attachments are opened from the app's own cache, which needs none. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove"/>
     <application
         android:label="Волгатех.Коллектив"
         android:name="${applicationName}"

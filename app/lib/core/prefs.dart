@@ -16,6 +16,15 @@ class Prefs {
   static const _kRemember = 'remember_login';
   static const _kTheme = 'theme_mode';
   static const _kAppLock = 'app_lock_enabled';
+  static const _kPinsFolded = 'mail_pins_folded';
+  static const _kPinnedFirst = 'mail_pinned_first';
+  static const _kSizeColors = 'mail_size_colors';
+  static const _kQuota = 'mail_quota';
+  static const _kSignature = 'mail_signature';
+  static const _kUnread = 'mail_unread';
+  static const _kDraft = 'mail_draft';
+  static const _kSignNew = 'mail_signature_new';
+  static const _kSignReplies = 'mail_signature_replies';
 
   String? get rememberedLogin => _p.getString(_kLogin);
   bool get rememberLogin => _p.getBool(_kRemember) ?? true;
@@ -33,6 +42,48 @@ class Prefs {
   /// Require a fingerprint / PIN when the app opens. Off by default.
   bool get appLockEnabled => _p.getBool(_kAppLock) ?? false;
   Future<void> setAppLockEnabled(bool v) async => _p.setBool(_kAppLock, v);
+
+  /// Messages pinned in Outlook shown above the rest of the mail list.
+  bool get mailPinnedFirst => _p.getBool(_kPinnedFirst) ?? true;
+  Future<void> setMailPinnedFirst(bool v) async => _p.setBool(_kPinnedFirst, v);
+
+  /// Mail list rows coloured by message size, yellow to red.
+  bool get mailSizeColors => _p.getBool(_kSizeColors) ?? true;
+  Future<void> setMailSizeColors(bool v) async => _p.setBool(_kSizeColors, v);
+
+  /// The mailbox limit in bytes as typed in, for a server that doesn't
+  /// tell it.
+  int? get mailQuota => _p.getInt(_kQuota);
+  Future<void> setMailQuota(int? v) async =>
+      v == null ? _p.remove(_kQuota) : _p.setInt(_kQuota, v);
+
+  /// The mail signature; null until one is saved (or imported from the
+  /// web mail).
+  String? get mailSignature => _p.getString(_kSignature);
+  Future<void> setMailSignature(String v) async => _p.setString(_kSignature, v);
+
+  /// Where the signature goes: new messages, and replies and forwards.
+  bool get mailSignNew => _p.getBool(_kSignNew) ?? true;
+  Future<void> setMailSignNew(bool v) async => _p.setBool(_kSignNew, v);
+  bool get mailSignReplies => _p.getBool(_kSignReplies) ?? true;
+  Future<void> setMailSignReplies(bool v) async => _p.setBool(_kSignReplies, v);
+
+  /// The signature for a new message, or for a reply or forward.
+  String signatureFor({required bool reply}) =>
+      (reply ? mailSignReplies : mailSignNew) ? mailSignature ?? '' : '';
+
+  /// The last known unread count in «Входящие», for the badge at start-up.
+  int get mailUnread => _p.getInt(_kUnread) ?? 0;
+  Future<void> setMailUnread(int n) async => _p.setInt(_kUnread, n);
+
+  /// The message last left unsent (see `ComposeDraft.toJson`), if any.
+  Object? get mailDraft => readJson(_kDraft);
+  Future<void> setMailDraft(Object? json) async =>
+      json == null ? _p.remove(_kDraft) : writeJson(_kDraft, json);
+
+  /// «Закреплённые» folded away at the top of the mail list.
+  bool get mailPinsFolded => _p.getBool(_kPinsFolded) ?? false;
+  Future<void> setMailPinsFolded(bool v) async => _p.setBool(_kPinsFolded, v);
 
   ThemeMode get themeMode {
     switch (_p.getString(_kTheme)) {

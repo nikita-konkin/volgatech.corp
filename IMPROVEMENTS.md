@@ -121,7 +121,7 @@ Tests now **18 passing** (added week-accent mapping ×4, app-lock start-state/di
 
 ### Backlog
 - **Обращения / Requests** — full CRUD + dictionaries + comments + attachments (models in `IAppeal.ts`). *Deferred by request.*
-- **Native mail inbox** — *backlogged.* The university mail is **on-prem Exchange (not Microsoft 365)**, so there is **no OAuth/Graph** — a native client would need **Basic auth with the domain password** (EWS or IMAP). If built: **opt-in, single-user only**, password in Keystore + app-lock, never default; confirm IMAP is enabled first. Superseded for now by the in-app OWA WebView tab. *(Server/forest specifics kept in internal notes.)*
+- **Native mail inbox** — ✅ **shipped in v0.5.0** as a separate, opt-in APK set (`app-mail-*`, built with `--dart-define=MAIL=true`). On-prem Exchange (not Microsoft 365), so no OAuth/Graph: it talks **EWS** with the user's mail password, kept in the OS keystore and removed on «Выйти из почты». Next: new-mail notifications, pin/unpin from the app. *(Server/forest specifics kept in internal notes.)*
 - iOS **signing** pass (7.6 — unsigned build already in CI), week/agenda "Сегодня" jump (4.3).
 - **Group level badge (бакалавр / магистр / аспирант)** — *backlogged (user).* Not an API field. The **level appears to be encoded in the group-name suffix** (e.g. «ИТСм» → магистр), so it is *potentially* derivable client-side by parsing `fullDescription`/`groupName` — but the suffix set is unconfirmed (аспирант letter unknown, and non-suffixed groups must safely default to бакалавр). Deferred until the naming convention is confirmed; ships as a pure helper + unit tests when picked up.
 - **Group mode of study / форма обучения (очная / заочная / очно-заочная)** — *backlogged (user).* **Not present in any captured response** and **not derivable** from the group names we have ("ИСТ-110", "ИСТ-41", "ИТСм"). Needs either the distinguishing naming convention (a letter/prefix for заочная/очно-заочная groups) or a fresh live capture exposing the field. Cannot be built reliably until then.
@@ -159,7 +159,7 @@ Tests now **18 passing** (added week-accent mapping ×4, app-lock start-state/di
 
 ### C. Bigger features
 - **C1. Обращения / Requests** — full CRUD + dictionaries + comments + attachments (models in `IAppeal.ts`). Largest remaining feature; buildable without new capture.
-- **C2. Native mail inbox** — backlogged (on-prem Exchange, not M365 → Basic auth only). Opt-in/single-user/Keystore+app-lock if ever built; confirm IMAP first.
+- **C2. Native mail inbox** — ✅ shipped in v0.5.0 (EWS, opt-in `app-mail-*` APKs). Next: new-mail notifications, pin/unpin from the app.
 
 ### D. Engineering
 - **D1. iOS pass** — *unsigned build DONE (CI, Sprint 6).* Remaining: **signing** (Apple Developer account) → device install / TestFlight / App Store, then optional signed-IPA CI automation. See [`docs/IOS_RELEASE.md`](docs/IOS_RELEASE.md).

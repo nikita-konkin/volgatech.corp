@@ -3,6 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../core/cache.dart';
 import '../core/photo_store.dart';
+import '../mail/attachments.dart';
+import '../mail/mail_badge.dart';
+import '../mail/mail_config.dart';
+import '../mail/mail_credentials.dart';
+import '../mail/ui/mail_page.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
 import 'exams_page.dart';
@@ -14,8 +19,8 @@ import 'widgets/person_avatar.dart';
 
 /// External services opened in-app via WebView (see API_CONTRACT §6 — we
 /// intentionally do NOT handle the corporate password; the WebView keeps only
-/// the site's session cookie).
-const _mailUrl = 'https://mail.volgatech.net/owa/';
+/// the site's session cookie). The exception is the built-in mail client of
+/// the MAIL build ([kNativeMail]), which has to keep the mail password.
 const _portalUrl = 'https://portal.volgatech.net/';
 
 class AppDrawer extends StatelessWidget {
@@ -125,7 +130,14 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.email, color: Brand.coral),
             title: const Text('Почта'),
             subtitle: const Text('mail.volgatech.net'),
-            onTap: () => _openWeb(context, 'Почта', _mailUrl),
+            trailing: kNativeMail ? const _UnreadCount() : null,
+            onTap: kNativeMail
+                ? () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => const MailPage()));
+                  }
+                : () => _openWeb(context, 'Почта', kWebMailUrl),
           ),
           ListTile(
             leading: const Icon(Icons.public, color: Brand.coral),
@@ -154,11 +166,52 @@ class AppDrawer extends StatelessWidget {
               Navigator.pop(context);
               photos.clear();
               await cache.clear();
+              await MailCredentialStore().clear();
+              if (kNativeMail && context.mounted) {
+                context.read<MailBadge>().set(0);
+              }
+              await clearAttachmentFiles();
               await authCtl.logout();
             },
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Unread mail next to «Почта».
+class _UnreadCount extends StatelessWidget {
+  const _UnreadCount();
+
+  @override
+  Widget build(BuildContext context) {
+    final n = context.watch<MailBadge>().unread;
+    if (n == 0) return const SizedBox.shrink();
+    return Badge(
+      label: Text(n > 99 ? '99+' : '$n'),
+      backgroundColor: Brand.coral,
+      textColor: Colors.white,
+    );
+  }
+}
+
+/// The menu button, with a dot while there is unread mail.
+class MenuButtonWithMail extends StatelessWidget {
+  const MenuButtonWithMail({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final unread = kNativeMail && context.watch<MailBadge>().unread > 0;
+    return IconButton(
+      tooltip: 'Меню',
+      icon: Badge(
+        isLabelVisible: unread,
+        smallSize: 9,
+        backgroundColor: Brand.coral,
+        child: const Icon(Icons.menu),
+      ),
+      onPressed: () => Scaffold.of(context).openDrawer(),
     );
   }
 }

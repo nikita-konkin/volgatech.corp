@@ -70,6 +70,19 @@ class JsonCache {
     }
   }
 
+  /// Drops every entry whose key starts with [prefix].
+  Future<void> removePrefix(String prefix) async {
+    try {
+      final d = await _cacheDir();
+      final start = _safe(prefix);
+      await for (final f in d.list()) {
+        if (f is File && f.uri.pathSegments.last.startsWith(start)) {
+          await f.delete();
+        }
+      }
+    } catch (_) {/* cache is best-effort */}
+  }
+
   Future<void> clear() async {
     try {
       final d = await _cacheDir();

@@ -57,26 +57,26 @@ void main() {
   });
 
   String text(XmlElement e) =>
-      e.findAllElements('t', namespaceUri: _w).map((t) => t.innerText).join();
+      e.findAllElements('t', namespace: _w).map((t) => t.innerText).join();
 
   List<List<String>> classTable() {
     final table = doc
-        .findAllElements('tbl', namespaceUri: _w)
+        .findAllElements('tbl', namespace: _w)
         .firstWhere((t) => text(t).contains('Преподаватель'));
     return [
-      for (final tr in table.findElements('tr', namespaceUri: _w))
-        [for (final tc in tr.findElements('tc', namespaceUri: _w)) text(tc)],
+      for (final tr in table.findElements('tr', namespace: _w))
+        [for (final tc in tr.findElements('tc', namespace: _w)) text(tc)],
     ];
   }
 
   String sdt(String tag) {
-    final e = doc.findAllElements('sdt', namespaceUri: _w).firstWhere((s) =>
+    final e = doc.findAllElements('sdt', namespace: _w).firstWhere((s) =>
         s
-            .findAllElements('tag', namespaceUri: _w)
+            .findAllElements('tag', namespace: _w)
             .first
-            .getAttribute('val', namespaceUri: _w) ==
+            .getAttribute('val', namespace: _w) ==
         tag);
-    return text(e.findElements('sdtContent', namespaceUri: _w).first);
+    return text(e.findElements('sdtContent', namespace: _w).first);
   }
 
   test('one table row per class, the last one carrying the total', () {
@@ -118,39 +118,39 @@ void main() {
 
   test('the teacher cell spans every row (vertical merge)', () {
     final table = doc
-        .findAllElements('tbl', namespaceUri: _w)
+        .findAllElements('tbl', namespace: _w)
         .firstWhere((t) => text(t).contains('Преподаватель'));
     final merges = [
-      for (final tr in table.findElements('tr', namespaceUri: _w).skip(1))
+      for (final tr in table.findElements('tr', namespace: _w).skip(1))
         tr
-            .findElements('tc', namespaceUri: _w)
+            .findElements('tc', namespace: _w)
             .first
-            .findAllElements('vMerge', namespaceUri: _w)
+            .findAllElements('vMerge', namespace: _w)
             .first
-            .getAttribute('val', namespaceUri: _w),
+            .getAttribute('val', namespace: _w),
     ];
     expect(merges, ['restart', null, null]); // null = continue the merge
   });
 
   test('the column headings repeat on every page', () {
     final table = doc
-        .findAllElements('tbl', namespaceUri: _w)
+        .findAllElements('tbl', namespace: _w)
         .firstWhere((t) => text(t).contains('Преподаватель'));
-    final rows = table.findElements('tr', namespaceUri: _w).toList();
+    final rows = table.findElements('tr', namespace: _w).toList();
     bool repeats(XmlElement tr) =>
-        tr.findAllElements('tblHeader', namespaceUri: _w).isNotEmpty;
+        tr.findAllElements('tblHeader', namespace: _w).isNotEmpty;
     expect(repeats(rows.first), isTrue);
     expect(rows.skip(1).where(repeats), isEmpty);
   });
 
   test('a class row is never split across a page break', () {
     final table = doc
-        .findAllElements('tbl', namespaceUri: _w)
+        .findAllElements('tbl', namespace: _w)
         .firstWhere((t) => text(t).contains('Преподаватель'));
-    final rows = table.findElements('tr', namespaceUri: _w).skip(1).toList();
+    final rows = table.findElements('tr', namespace: _w).skip(1).toList();
     expect(rows, hasLength(3));
     for (final tr in rows) {
-      expect(tr.findAllElements('cantSplit', namespaceUri: _w), isNotEmpty);
+      expect(tr.findAllElements('cantSplit', namespace: _w), isNotEmpty);
     }
   });
 
