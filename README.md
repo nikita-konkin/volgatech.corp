@@ -277,7 +277,8 @@ GitHub Actions (Flutter **stable** channel):
   `owner/repo` and secret `GITVERSE_TOKEN`: the built site is pushed to that
   GitVerse repository together with
   [its workflow](deploy/gitverse/.gitverse/workflows/pages.yml), which publishes
-  it there; turn on Settings → Pages → Source: Workflow in that repository).
+  it there; in that repository turn on Settings → Pages → Source: Workflow,
+  which GitVerse allows once the repository has any file in it).
 
 Cut a release:
 

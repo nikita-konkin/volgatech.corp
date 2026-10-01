@@ -4,7 +4,8 @@ name: Pages
 
 on:
   push:
-    branches: [ "master" ]
+    # Whichever the repository's default branch is.
+    branches: [ "master", "main" ]
   workflow_dispatch:
 
 jobs:

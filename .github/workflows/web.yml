@@ -3,6 +3,7 @@ name: Web
 # The iPhone version: the app built for the browser, published as a site
 # whenever main changes. Each host is used once it is set up (README → iPhone):
 #   GitVerse Pages: variable GITVERSE_REPO ("owner/repo") + secret GITVERSE_TOKEN
+#                   (a token that can write to that repository)
 #   GitHub Pages:   variable DEPLOY_GITHUB_PAGES = true
 on:
   push:
@@ -60,11 +61,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: web
-          path: out/site
+          path: build
 
-      # GitVerse builds Pages from its own repository: the site goes there as
-      # a single commit (no history of 30 MB builds), with the workflow that
-      # publishes it.
+      # GitVerse builds Pages from its own repository: its default branch
+      # gets the site (site/) and the workflow that publishes it, in place of
+      # whatever was there.
       - name: Push to GitVerse
         env:
           TOKEN: ${{ secrets.GITVERSE_TOKEN }}
@@ -74,13 +75,19 @@ jobs:
             echo "::error::Secret GITVERSE_TOKEN is not set."
             exit 1
           fi
-          cp -r deploy/gitverse/. out/
-          cd out
-          git init -q -b master
+          git clone -q --depth 1 "https://${TOKEN}@gitverse.ru/${REPO}.git" repo
+          find repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r deploy/gitverse/. repo/
+          cp -r build repo/site
+          cd repo
           git add -A
+          if git diff --cached --quiet; then
+            echo "The site is up to date."
+            exit 0
+          fi
           git -c user.name='github-actions' -c user.email='actions@github.com' \
             commit -qm "Site from ${GITHUB_SHA::7}"
-          git push -q --force "https://${TOKEN}@gitverse.ru/${REPO}.git" master
+          git push -q origin HEAD
 
   github-pages:
     name: GitHub Pages
