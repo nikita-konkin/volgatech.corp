@@ -54,7 +54,7 @@ from v0.5.0 or older, install v0.5.1 by hand once.
 There is no App Store build (that takes a paid Apple Developer account), but the
 same app runs in Safari and installs on the home screen like any other:
 
-1. Open **https://nikita-konkin.github.io/volgatech.corp/** in Safari.
+1. Open **https://nikita-konkin.gitverse.site/volgatech.corp/** in Safari.
 2. Tap **Поделиться** → **На экран «Домой»** → **Добавить**.
 3. Start «Волгатех» from the home screen and sign in there: the home-screen app
    keeps its own data, apart from Safari's.

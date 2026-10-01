@@ -1,8 +1,15 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <script>
+    // Opened as /volgatech.corp, without the slash, every relative path below
+    // would point at the site's root instead: open the folder itself.
+    if (!/(\/|\.html?)$/.test(location.pathname)) {
+      location.replace(location.pathname + '/' + location.search + location.hash);
+    }
+  </script>
   <!-- Relative, so one build works wherever it is published: GitHub Pages
-       (/volgatech.corp/), GitVerse Pages (/<repo>/) or a domain's root. -->
+       (/volgatech.corp/), GitVerse Pages (/volgatech.corp/) or a domain's root. -->
   <base href="./">
 
   <meta charset="UTF-8">
