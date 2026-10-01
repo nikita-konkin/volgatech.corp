@@ -66,7 +66,9 @@ elif [ "$CODE" = 404 ]; then
   if [ "$CODE" = 200 ]; then
     branch=$(jq -r '.default_branch // "master"' <<< "$BODY")
   fi
-  jq -n --arg tag "$TAG" --arg name "$(jq -r '.name // .tag_name' "$work/release.json")" \
+  # Compact and without a final newline: GitVerse takes a body that ends in
+  # a newline for an empty one ("Request body must not be empty").
+  jq -ncj --arg tag "$TAG" --arg name "$(jq -r '.name // .tag_name' "$work/release.json")" \
     --arg branch "$branch" --arg body "$body" \
     --argjson pre "$(jq .prerelease "$work/release.json")" \
     '{tag_name: $tag, name: $name, target_commitish: $branch, body: $body,
