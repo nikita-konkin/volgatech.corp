@@ -17,6 +17,7 @@ import 'mail/mail_config.dart';
 import 'mail/mail_credentials.dart';
 import 'state/auth_controller.dart';
 import 'state/theme_controller.dart';
+import 'state/updater.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +46,7 @@ Future<void> main() async {
         ChangeNotifierProvider<AppLock>(
           create: (_) => AppLock(prefs),
         ),
+        ChangeNotifierProvider<Updater>(create: (_) => Updater(prefs: prefs)),
         if (kNativeMail)
           ChangeNotifierProvider<MailBadge>(
             create: (_) =>

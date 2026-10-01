@@ -40,7 +40,9 @@ devices) pick the `arm64-v8a` one:
 | `app-mail-arm64-v8a-release.apk` | the **built-in mail client** (new in v0.5.0) |
 | `app-arm64-v8a-release.apk` | the web mail (OWA) in a WebView, as before |
 
-Both carry the same signature, so either installs over the other.
+Both carry the same signature, so either installs over the other. From
+v0.5.1 on, the app finds new releases itself and installs them (see below);
+from v0.5.0 or older, install v0.5.1 by hand once.
 
 > **Coming from v0.4.1 or older?** Uninstall the old app once before installing
 > v0.4.2 — earlier builds were signed with a different key each time. From v0.4.2
@@ -63,6 +65,9 @@ Both carry the same signature, so either installs over the other.
   your schedule and shared as a .docx in the portal's own template.
 - **Настройки** — theme (system / light / dark) and an optional
   fingerprint / PIN **app-lock**.
+- **Обновления** — a new release on GitHub shows up as a banner in the app;
+  «Обновить» downloads the right APK for the phone, checks it and opens the
+  Android installer.
 - **Почта** — in the `app-mail-*` APKs, a **built-in client** for the
   university's Exchange mailbox (EWS): folders, search, pinned messages,
   attachments, replies with a signature, address-book suggestions,
@@ -72,6 +77,24 @@ Both carry the same signature, so either installs over the other.
 - **Портал** — the corporate portal opens **in-app** (WebView), keeping only
   the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.1
+
+<img src="docs/screenshots/update.webp" width="30%" align="right" alt="Обновление">
+
+- **Updates from inside the app** — when a new release appears on GitHub, a
+  banner says «Доступна версия X · N МБ» over whatever screen is open (checked
+  when the app opens or comes back, at most every 6 hours). «Обновить»
+  downloads the APK for this phone — with or without the mail client, for its
+  CPU type — checks it against the size and SHA-256 GitHub publishes, and
+  opens the Android installer. The first time, Android asks to allow installs
+  from Волгатех.Коллектив.
+- «Позже» hides the banner for that version; **Настройки → Обновления** still
+  offers it, checks on demand and links to the release notes.
+- Android installs it only if it carries the app's own signing key, so the
+  update can't be swapped for someone else's file.
+
+<br clear="right">
 
 ## What's new — v0.5.0
 

@@ -20,6 +20,7 @@ class Prefs {
   static const _kPinnedFirst = 'mail_pinned_first';
   static const _kSizeColors = 'mail_size_colors';
   static const _kQuota = 'mail_quota';
+  static const _kUpdateDismissed = 'update_dismissed';
   static const _kSignature = 'mail_signature';
   static const _kUnread = 'mail_unread';
   static const _kDraft = 'mail_draft';
@@ -80,6 +81,12 @@ class Prefs {
   Object? get mailDraft => readJson(_kDraft);
   Future<void> setMailDraft(Object? json) async =>
       json == null ? _p.remove(_kDraft) : writeJson(_kDraft, json);
+
+  /// The new version put off with «Позже», not offered again by the banner.
+  String? get updateDismissed => _p.getString(_kUpdateDismissed);
+  Future<void> setUpdateDismissed(String? v) async => v == null
+      ? _p.remove(_kUpdateDismissed)
+      : _p.setString(_kUpdateDismissed, v);
 
   /// «Закреплённые» folded away at the top of the mail list.
   bool get mailPinsFolded => _p.getBool(_kPinsFolded) ?? false;
