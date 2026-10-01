@@ -54,7 +54,8 @@ from v0.5.0 or older, install v0.5.1 by hand once.
 There is no App Store build (that takes a paid Apple Developer account), but the
 same app runs in Safari and installs on the home screen like any other:
 
-1. Open **https://nikita-konkin.gitverse.site/volgatech.corp/** in Safari.
+1. Open **https://nikita-konkin.gitverse.site/volgatech.corp/** in Safari
+   (or the copy at https://konkin-nikita.ru/volgatech.corp/).
 2. Tap **Поделиться** → **На экран «Домой»** → **Добавить**.
 3. Start «Волгатех» from the home screen and sign in there: the home-screen app
    keeps its own data, apart from Safari's.
@@ -271,14 +272,15 @@ GitHub Actions (Flutter **stable** channel):
   release needs an Apple Developer account — see [docs/IOS_RELEASE.md](docs/IOS_RELEASE.md).)
 
 - [`web.yml`](.github/workflows/web.yml) — when `main` changes: builds the web
-  version and publishes it to every host that is set up — **GitHub Pages**
-  (repository variable `DEPLOY_GITHUB_PAGES` = `true`, and Settings → Pages →
-  Source: GitHub Actions) and **GitVerse Pages** (variable `GITVERSE_REPO` =
-  `owner/repo` and secret `GITVERSE_TOKEN`: the built site is pushed to that
-  GitVerse repository together with
-  [its workflow](deploy/gitverse/.gitverse/workflows/pages.yml), which publishes
-  it there; in that repository turn on Settings → Pages → Source: Workflow,
-  which GitVerse allows once the repository has any file in it).
+  version and publishes it twice:
+  - **GitHub Pages** (Settings → Pages → Source: GitHub Actions), served as
+    https://konkin-nikita.ru/volgatech.corp/;
+  - **GitVerse Pages**: with the variable `GITVERSE_REPO` = `owner/repo` and the
+    secret `GITVERSE_TOKEN` set, the site and a
+    [Russian README](deploy/gitverse/README.md) replace the files on that
+    repository's default branch, and GitVerse publishes the branch's root
+    (its Settings → Pages: on, from the branch — allowed once the repository
+    has any file in it).
 
 Cut a release:
 

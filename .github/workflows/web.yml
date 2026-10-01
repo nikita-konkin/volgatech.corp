@@ -1,10 +1,11 @@
 name: Web
 
 # The iPhone version: the app built for the browser, published as a site
-# whenever main changes. Each host is used once it is set up (README → iPhone):
+# whenever main changes (README → CI/CD):
+#   GitHub Pages:   Settings → Pages → Source: GitHub Actions
 #   GitVerse Pages: variable GITVERSE_REPO ("owner/repo") + secret GITVERSE_TOKEN
-#                   (a token that can write to that repository)
-#   GitHub Pages:   variable DEPLOY_GITHUB_PAGES = true
+#                   (a token that can write to that repository); there,
+#                   Pages from the default branch, its root
 on:
   push:
     branches: [ main ]
@@ -63,9 +64,9 @@ jobs:
           name: web
           path: build
 
-      # GitVerse builds Pages from its own repository: its default branch
-      # gets the site (site/) and the workflow that publishes it, in place of
-      # whatever was there.
+      # GitVerse builds Pages from a branch of its own repository: the site
+      # and a README go to the root of its default branch, in place of
+      # whatever was there, and GitVerse publishes them itself.
       - name: Push to GitVerse
         env:
           TOKEN: ${{ secrets.GITVERSE_TOKEN }}
@@ -77,8 +78,8 @@ jobs:
           fi
           git clone -q --depth 1 "https://${TOKEN}@gitverse.ru/${REPO}.git" repo
           find repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r build/. repo/
           cp -r deploy/gitverse/. repo/
-          cp -r build repo/site
           cd repo
           git add -A
           if git diff --cached --quiet; then
@@ -92,7 +93,6 @@ jobs:
   github-pages:
     name: GitHub Pages
     needs: build
-    if: vars.DEPLOY_GITHUB_PAGES == 'true'
     runs-on: ubuntu-latest
     permissions:
       pages: write
