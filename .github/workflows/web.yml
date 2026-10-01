@@ -11,7 +11,8 @@ on:
     branches: [ main ]
     paths:
       - 'app/**'
-      - 'deploy/**'
+      - 'README.ru.md'
+      - 'docs/screenshots/**'
       - '.github/workflows/web.yml'
   workflow_dispatch:
 
@@ -55,18 +56,20 @@ jobs:
     if: vars.GITVERSE_REPO != ''
     runs-on: ubuntu-latest
     steps:
+      # The files at the root (README.ru.md) come with it.
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: deploy/gitverse
+          sparse-checkout: docs/screenshots
 
       - uses: actions/download-artifact@v4
         with:
           name: web
           path: build
 
-      # GitVerse builds Pages from a branch of its own repository: the site
-      # and a README go to the root of its default branch, in place of
-      # whatever was there, and GitVerse publishes them itself.
+      # GitVerse builds Pages from a branch of its own repository: the site,
+      # README.ru.md as its README and the screenshots it shows go to the root
+      # of its default branch, in place of whatever was there, and GitVerse
+      # publishes them itself.
       - name: Push to GitVerse
         env:
           TOKEN: ${{ secrets.GITVERSE_TOKEN }}
@@ -79,7 +82,9 @@ jobs:
           git clone -q --depth 1 "https://${TOKEN}@gitverse.ru/${REPO}.git" repo
           find repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -r build/. repo/
-          cp -r deploy/gitverse/. repo/
+          cp README.ru.md repo/README.md
+          mkdir -p repo/docs
+          cp -r docs/screenshots repo/docs/
           cd repo
           git add -A
           if git diff --cached --quiet; then

@@ -85,3 +85,12 @@ jobs:
         with:
           files: app/build/release-apks/*.apk
           generate_release_notes: true
+
+  # The same release on GitVerse, when it is set up.
+  gitverse:
+    name: GitVerse release
+    needs: release
+    uses: ./.github/workflows/gitverse-release.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit

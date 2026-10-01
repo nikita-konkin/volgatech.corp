@@ -1,0 +1,44 @@
+name: GitVerse release
+
+# Copies a GitHub Release to the releases of the GitVerse repository
+# (variable GITVERSE_REPO, secret GITVERSE_TOKEN): its APKs, and that
+# version's «Что нового» from README.ru.md. release.yml runs it after each
+# release; by hand it copies any tag, the latest when none is given, and it
+# also runs when this file changes, so the latest release is there from the
+# start. Running it again only adds what is missing.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag, e.g. v0.5.1 (empty: the latest release)'
+        required: false
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/gitverse-release.yml'
+      - '.github/scripts/gitverse-release.sh'
+
+jobs:
+  copy:
+    name: Copy to GitVerse
+    if: vars.GITVERSE_REPO != ''
+    runs-on: ubuntu-latest
+    # One copy at a time, so two runs never upload the same file.
+    concurrency:
+      group: gitverse-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.GITVERSE_TOKEN }}
+          REPO: ${{ vars.GITVERSE_REPO }}
+          TAG: ${{ inputs.tag }}
+        run: .github/scripts/gitverse-release.sh
