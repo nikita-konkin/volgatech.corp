@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -79,14 +80,21 @@ class _LoginPageState extends State<LoginPage> {
         (a) => a.status == AuthStatus.authenticating);
 
     return Scaffold(
+      // In a browser on an iPhone the banner goes up behind the clock, whose
+      // text is white there (a native app keeps its status bar apart).
       body: SafeArea(
+        top: !kIsWeb,
         child: Column(
           children: [
             // Brand banner
             Container(
               width: double.infinity,
               color: Brand.blue,
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+              padding: EdgeInsets.fromLTRB(
+                  20,
+                  18 + (kIsWeb ? MediaQuery.paddingOf(context).top : 0),
+                  20,
+                  18),
               child: const Row(
                 children: [
                   CircleAvatar(

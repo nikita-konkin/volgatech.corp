@@ -10,6 +10,7 @@ import 'ui/lock_screen.dart';
 import 'ui/login_page.dart';
 import 'ui/schedule_page.dart';
 import 'ui/update_banner.dart';
+import 'web/insets.dart';
 
 class VolgatechApp extends StatelessWidget {
   const VolgatechApp({super.key});
@@ -32,8 +33,9 @@ class VolgatechApp extends StatelessWidget {
       ],
       // Wrap the whole Navigator so the lock covers pushed routes too
       // (Settings, Profile), not just the home screen.
-      builder: (context, child) => _LockGate(
-          child: UpdateWatcher(child: child ?? const SizedBox.shrink())),
+      builder: (context, child) => BrowserInsets(
+          child: _LockGate(
+              child: UpdateWatcher(child: child ?? const SizedBox.shrink()))),
       home: const _AuthGate(),
     );
   }

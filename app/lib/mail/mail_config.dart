@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart';
+
 /// Build switch for the built-in mail client:
 ///
 ///     flutter build apk --dart-define=MAIL=true
 ///
 /// Without it «Почта» stays OWA in a WebView and the app never stores the
-/// corporate password (see [MailCredentialStore.clear] at startup).
-const kNativeMail = bool.fromEnvironment('MAIL');
+/// corporate password (see [MailCredentialStore.clear] at startup). Never in
+/// a browser: the mail server takes no requests from other sites.
+const kNativeMail = bool.fromEnvironment('MAIL') && !kIsWeb;
 
 const kMailHost = 'mail.volgatech.net';
 const kImapPort = 993;

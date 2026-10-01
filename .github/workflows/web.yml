@@ -1,0 +1,114 @@
+name: Web
+
+# The iPhone version: the app built for the browser, published as a site
+# whenever main changes. Each host is used once it is set up (README → iPhone):
+#   GitVerse Pages: variable GITVERSE_REPO ("owner/repo") + secret GITVERSE_TOKEN
+#                   (a token that can write to that repository)
+#   GitHub Pages:   variable DEPLOY_GITHUB_PAGES = true
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+      - 'deploy/**'
+      - '.github/workflows/web.yml'
+  workflow_dispatch:
+
+# One publication at a time, the newest last.
+concurrency:
+  group: web
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build for the browser
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # The engine and fonts come from the site itself, not Google's CDN.
+      - run: flutter build web --release --no-web-resources-cdn
+
+      # Debug symbols for crash reports nobody collects: 8 MB less to host.
+      - run: find build/web -name '*.symbols' -delete
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: app/build/web
+          if-no-files-found: error
+
+  gitverse:
+    name: GitVerse Pages
+    needs: build
+    if: vars.GITVERSE_REPO != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: deploy/gitverse
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: build
+
+      # GitVerse builds Pages from its own repository: its default branch
+      # gets the site (site/) and the workflow that publishes it, in place of
+      # whatever was there.
+      - name: Push to GitVerse
+        env:
+          TOKEN: ${{ secrets.GITVERSE_TOKEN }}
+          REPO: ${{ vars.GITVERSE_REPO }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Secret GITVERSE_TOKEN is not set."
+            exit 1
+          fi
+          git clone -q --depth 1 "https://${TOKEN}@gitverse.ru/${REPO}.git" repo
+          find repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r deploy/gitverse/. repo/
+          cp -r build repo/site
+          cd repo
+          git add -A
+          if git diff --cached --quiet; then
+            echo "The site is up to date."
+            exit 0
+          fi
+          git -c user.name='github-actions' -c user.email='actions@github.com' \
+            commit -qm "Site from ${GITHUB_SHA::7}"
+          git push -q origin HEAD
+
+  github-pages:
+    name: GitHub Pages
+    needs: build
+    if: vars.DEPLOY_GITHUB_PAGES == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

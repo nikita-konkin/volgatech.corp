@@ -47,6 +47,11 @@ jobs:
       - name: Build release APKs (per ABI)
         run: flutter build apk --release --split-per-abi
 
+      # The iPhone version (web.yml publishes it): code that only compiles
+      # on a phone fails here, not after the merge.
+      - name: Build for the browser
+        run: flutter build web --release --no-web-resources-cdn
+
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:

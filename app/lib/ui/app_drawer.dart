@@ -1,5 +1,9 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/cache.dart';
 import '../core/photo_store.dart';
@@ -28,6 +32,11 @@ class AppDrawer extends StatelessWidget {
 
   void _openWeb(BuildContext context, String title, String url) {
     Navigator.pop(context);
+    if (kIsWeb) {
+      // Already in a browser: the site in its own tab, signed in there.
+      unawaited(launchUrl(Uri.parse(url), webOnlyWindowName: '_blank'));
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
           builder: (_) => WebViewScreen(title: title, url: url)),

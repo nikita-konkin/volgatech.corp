@@ -30,6 +30,7 @@ dependencies:
   xml: ^6.5.0
   file_picker: ^11.0.3
   open_filex: ^4.7.0
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:
@@ -51,3 +52,14 @@ flutter:
   assets:
     - assets/easter/rtf.webp
     - assets/memo/foreign_language_memo.docx
+  # Bundled so the web build never fetches Roboto from Google at start-up
+  # (without it there would be no text at all where Google is unreachable).
+  # The same face Android uses (Apache 2.0, see assets/fonts/).
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700

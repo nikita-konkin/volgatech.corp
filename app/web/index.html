@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <script>
+    // Opened as /volgatech.corp, without the slash, every relative path below
+    // would point at the site's root instead: open the folder itself.
+    if (!/(\/|\.html?)$/.test(location.pathname)) {
+      location.replace(location.pathname + '/' + location.search + location.hash);
+    }
+  </script>
+  <!-- Relative, so one build works wherever it is published: GitHub Pages
+       (/volgatech.corp/), GitVerse Pages (/volgatech.corp/) or a domain's root. -->
+  <base href="./">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Расписание, экзамены, профиль и служебные записки сотрудника ПГТУ (Волгатех).">
+
+  <!-- On iPhone, «На экран „Домой“» makes it a full-screen app with the
+       app's own blue bar under the clock (the status bar text is white). -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Волгатех">
+  <meta name="theme-color" content="#34517B">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="manifest" href="manifest.json">
+
+  <title>Волгатех.Коллектив</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #34517B;
+    }
+    /* Until the first frame: the logo on the app's blue. */
+    #splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #34517B;
+      transition: opacity 0.25s;
+    }
+    #splash img {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+    }
+    /* Measured by the app (lib/web/insets_web.dart): Flutter's web engine
+       leaves the notch / Dynamic Island and the home indicator out. */
+    #safe-area-probe {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      visibility: hidden;
+      pointer-events: none;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+  </style>
+
+  <script>
+    // Flutter replaces the viewport tag with its own, which lacks
+    // viewport-fit=cover; without it Safari reports no safe-area insets.
+    (function () {
+      function fit(meta) {
+        if (meta.name === 'viewport' && !/viewport-fit/.test(meta.content)) {
+          meta.content += ', viewport-fit=cover';
+        }
+      }
+      new MutationObserver(function (records) {
+        records.forEach(function (r) {
+          r.addedNodes.forEach(function (n) {
+            if (n.tagName === 'META') fit(n);
+          });
+        });
+      }).observe(document.head, { childList: true });
+    })();
+  </script>
+</head>
+<body>
+  <div id="safe-area-probe"></div>
+  <div id="splash"><img src="icons/Icon-192.png" alt=""></div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('splash');
+      if (!splash) return;
+      splash.style.opacity = '0';
+      setTimeout(function () { splash.remove(); }, 300);
+    });
+    // The app's own files, for opening without a connection (sw.js).
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js');
+      });
+    }
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
