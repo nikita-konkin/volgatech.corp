@@ -8,7 +8,7 @@ A fast, native rewrite of the ПГТУ / VolgaTech staff cabinet app («Личн
 version). Client-only — it talks to the existing `api.volgatech.net` backend and
 does not change it.
 
-The Flutter app lives in [`app/`](app/).
+The Flutter app lives in [`app/`](app/). По-русски: [README.ru.md](README.ru.md).
 
 <p align="center">
   <img src="docs/screenshots/schedule.webp" width="18%" alt="Расписание">
@@ -32,7 +32,8 @@ The Flutter app lives in [`app/`](app/).
 ## 📥 Download
 
 Grab the latest APK from the
-**[Releases page](https://github.com/nikita-konkin/volgatech.corp/releases/latest)**.
+**[Releases page](https://github.com/nikita-konkin/volgatech.corp/releases/latest)**
+(or its copy on [GitVerse](https://gitverse.ru/nikita-konkin/volgatech.corp/releases)).
 Each release has two sets of the same app; for a 64-bit phone (most modern
 devices) pick the `arm64-v8a` one:
 
@@ -54,7 +55,7 @@ from v0.5.0 or older, install v0.5.1 by hand once.
 There is no App Store build (that takes a paid Apple Developer account), but the
 same app runs in Safari and installs on the home screen like any other:
 
-1. Open **https://nikita-konkin.gitverse.site/volgatech.corp/** in Safari
+1. Open **https://nikita-konkin.gitverse.site/volgatech-corp/** in Safari
    (or the copy at https://konkin-nikita.ru/volgatech.corp/).
 2. Tap **Поделиться** → **На экран «Домой»** → **Добавить**.
 3. Start «Волгатех» from the home screen and sign in there: the home-screen app
@@ -260,9 +261,9 @@ cd app && dart run flutter_launcher_icons
 GitHub Actions (Flutter **stable** channel):
 
 - [`ci.yml`](.github/workflows/ci.yml) — on every push/PR to `main`: a Linux job
-  runs `flutter analyze` + `flutter test` and builds the release APKs, and a
-  macOS job builds the app for **iOS** (`--no-codesign`); both upload their output
-  as workflow artifacts.
+  runs `flutter analyze` + `flutter test` and builds the release APKs and the
+  web version, and a macOS job builds the app for **iOS** (`--no-codesign`);
+  both upload their output as workflow artifacts.
 - [`release.yml`](.github/workflows/release.yml) — on a `v*` tag: builds the
   per-ABI release APKs twice (`app-mail-*` with `--dart-define=MAIL=true`,
   and the plain `app-*`), signed with the release key from the repository
@@ -276,11 +277,17 @@ GitHub Actions (Flutter **stable** channel):
   - **GitHub Pages** (Settings → Pages → Source: GitHub Actions), served as
     https://konkin-nikita.ru/volgatech.corp/;
   - **GitVerse Pages**: with the variable `GITVERSE_REPO` = `owner/repo` and the
-    secret `GITVERSE_TOKEN` set, the site and a
-    [Russian README](deploy/gitverse/README.md) replace the files on that
-    repository's default branch, and GitVerse publishes the branch's root
-    (its Settings → Pages: on, from the branch — allowed once the repository
-    has any file in it).
+    secret `GITVERSE_TOKEN` set, the site, [README.ru.md](README.ru.md) (as its
+    README) and the screenshots replace the files on that repository's default
+    branch, and GitVerse publishes the branch's root as
+    https://nikita-konkin.gitverse.site/volgatech-corp/ (its Settings → Pages:
+    on, from the branch — allowed once the repository has any file in it).
+- [`gitverse-release.yml`](.github/workflows/gitverse-release.yml) — copies a
+  GitHub Release to the GitVerse repository's releases: its APKs and the
+  «Что нового» of that version from README.ru.md. `release.yml` runs it after
+  every release; by hand (Actions → GitVerse release → Run workflow) it copies
+  any tag, the latest when none is given. Running it again only adds what's
+  missing.
 
 Cut a release:
 
