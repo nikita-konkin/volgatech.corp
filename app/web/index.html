@@ -2,11 +2,21 @@
 <html lang="ru">
 <head>
   <script>
-    // Opened as /volgatech.corp, without the slash, every relative path below
-    // would point at the site's root instead: open the folder itself.
-    if (!/(\/|\.html?)$/.test(location.pathname)) {
-      location.replace(location.pathname + '/' + location.search + location.hash);
-    }
+    (function () {
+      var path = location.pathname;
+      // Opened as /volgatech.corp, without the slash, every relative path
+      // below would point at the site's root instead: open the folder itself.
+      if (!/(\/|\.html?)$/.test(path)) path += '/';
+      // A plain-http link (konkin-nikita.ru answers both): the app needs
+      // https, without which Safari withholds the crypto that keeps the
+      // session. Not for a computer or phone on the local network.
+      var local = /^(localhost|127\.|\[::1\]|10\.|192\.168\.)/.test(location.hostname);
+      var http = location.protocol === 'http:' && !local;
+      if (http || path !== location.pathname) {
+        location.replace((http ? 'https://' + location.host : '') +
+            path + location.search + location.hash);
+      }
+    })();
   </script>
   <!-- Relative, so one build works wherever it is published: GitHub Pages
        (/volgatech.corp/), GitVerse Pages (/volgatech.corp/) or a domain's root. -->
