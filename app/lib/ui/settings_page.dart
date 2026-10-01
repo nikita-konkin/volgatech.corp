@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_lock.dart';
 import '../state/theme_controller.dart';
+import '../state/updater.dart';
 import 'easter_egg.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -70,9 +74,71 @@ class SettingsPage extends StatelessWidget {
             value: lock.enabled,
             onChanged: (v) => _toggleLock(context, v),
           ),
+          if (context.read<Updater>().enabled) ...[
+            const Divider(height: 1),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text('Обновления',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            const _UpdateTile(),
+          ],
           const EasterEggFooter(),
         ],
       ),
+    );
+  }
+}
+
+/// The installed version and, when there is one, the newer release.
+class _UpdateTile extends StatelessWidget {
+  const _UpdateTile();
+
+  Future<void> _tap(BuildContext context, Updater u) async {
+    switch (u.stage) {
+      case UpdateStage.available || UpdateStage.failed:
+        await u.download();
+      case UpdateStage.ready:
+        await u.install();
+      case UpdateStage.downloading:
+        break;
+      case UpdateStage.none:
+        final messenger = ScaffoldMessenger.of(context);
+        final ok = await u.check(force: true);
+        if (u.release != null) return; // the banner tells
+        messenger.showSnackBar(SnackBar(
+            content: Text(ok
+                ? 'Установлена последняя версия'
+                : 'Не удалось проверить: нет связи с GitHub')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final u = context.watch<Updater>();
+    final r = u.release;
+    final title = switch (u.stage) {
+      _ when u.checking => 'Проверка…',
+      UpdateStage.available => 'Доступна версия ${r?.version}',
+      UpdateStage.downloading =>
+        'Загрузка версии ${r?.version}… ${(u.progress * 100).round()} %',
+      UpdateStage.ready => 'Версия ${r?.version} загружена — установить',
+      UpdateStage.failed => 'Не удалось загрузить — повторить',
+      UpdateStage.none => 'Проверить обновления',
+    };
+    return ListTile(
+      leading: const Icon(Icons.system_update_outlined),
+      title: Text(title),
+      subtitle: Text('Установлена версия ${u.installedVersion ?? '…'}'),
+      trailing: r == null
+          ? null
+          : IconButton(
+              tooltip: 'Что нового',
+              icon: const Icon(Icons.open_in_new),
+              onPressed: () => unawaited(launchUrl(Uri.parse(r.pageUrl),
+                  mode: LaunchMode.externalApplication)),
+            ),
+      onTap: u.checking ? null : () => unawaited(_tap(context, u)),
     );
   }
 }
