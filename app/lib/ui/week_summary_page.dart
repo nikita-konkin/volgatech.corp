@@ -8,6 +8,7 @@ import '../core/lesson_grouping.dart';
 import '../core/week_summary.dart';
 import '../state/schedule_controller.dart';
 import '../theme.dart';
+import 'layout.dart';
 import 'widgets/marquee_text.dart';
 import 'widgets/skeleton.dart';
 
@@ -23,6 +24,12 @@ class WeekSummaryPage extends StatelessWidget {
 
   static String _cap(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  /// On a wide screen the days stand side by side, each column at least
+  /// this wide, and the whole week at most [_maxWidth].
+  static const _minColumn = 340.0;
+  static const _maxWidth = 1200.0;
+  static const _gap = 10.0;
 
   static bool _isToday(DateTime d) {
     final n = DateTime.now();
@@ -48,6 +55,11 @@ class WeekSummaryPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Обзор недели'),
+        actions: [
+          if (desktopBrowser)
+            RefreshButton(
+                onPressed: c.loading ? null : () => unawaited(c.refresh())),
+        ],
         bottom: c.loading
             ? const PreferredSize(
                 preferredSize: Size.fromHeight(2),
@@ -55,41 +67,81 @@ class WeekSummaryPage extends StatelessWidget {
               )
             : null,
       ),
-      // Swipe left → next week, right → previous week (like the day view).
-      body: GestureDetector(
-        onHorizontalDragEnd: (d) {
-          final v = d.primaryVelocity ?? 0;
-          if (v < -250) {
-            unawaited(c.nextWeek());
-          } else if (v > 250) {
-            unawaited(c.prevWeek());
-          }
-        },
-        child: _maybeShimmer(
-          placeholders,
-          ListView(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
-            children: [
-              _WeekHeader(
-                  range: range,
-                  total: placeholders ? null : total,
-                  weekType: weekType,
-                  accent: accent),
-              const SizedBox(height: 8),
-              for (final (i, d) in days.indexed)
-                _DayCard(
-                  slots: slotsByDay[i],
-                  loading: placeholders,
-                  accent: accent,
-                  isToday: _isToday(d),
-                  weekdayLabel: _cap(_weekday.format(d)),
-                  dayNum: _day.format(d),
-                  onTap: () {
-                    unawaited(c.goToDay(d));
-                    Navigator.of(context).pop();
-                  },
-                ),
-            ],
+      // Swipe left → next week, right → previous week (like the day view);
+      // ← and → on a keyboard.
+      body: ArrowKeys(
+        onPrevious: () => unawaited(c.prevWeek()),
+        onNext: () => unawaited(c.nextWeek()),
+        child: GestureDetector(
+          onHorizontalDragEnd: (d) {
+            final v = d.primaryVelocity ?? 0;
+            if (v < -250) {
+              unawaited(c.nextWeek());
+            } else if (v > 250) {
+              unawaited(c.prevWeek());
+            }
+          },
+          child: _maybeShimmer(
+            placeholders,
+            LayoutBuilder(builder: (context, box) {
+              final padding = readable(
+                  context, const EdgeInsets.fromLTRB(12, 8, 12, 20),
+                  max: _maxWidth);
+              final columns = ((box.maxWidth - padding.horizontal + _gap) /
+                      (_minColumn + _gap))
+                  .floor()
+                  .clamp(1, 3);
+              final cards = [
+                for (final (i, d) in days.indexed)
+                  _DayCard(
+                    slots: slotsByDay[i],
+                    loading: placeholders,
+                    accent: accent,
+                    isToday: _isToday(d),
+                    weekdayLabel: _cap(_weekday.format(d)),
+                    dayNum: _day.format(d),
+                    onTap: () {
+                      unawaited(c.goToDay(d));
+                      Navigator.of(context).pop();
+                    },
+                  ),
+              ];
+              return ListView(
+                padding: padding,
+                children: [
+                  _WeekHeader(
+                      range: range,
+                      total: placeholders ? null : total,
+                      weekType: weekType,
+                      accent: accent,
+                      // Swiping takes a finger.
+                      onPrevious:
+                          desktopBrowser ? () => unawaited(c.prevWeek()) : null,
+                      onNext: desktopBrowser
+                          ? () => unawaited(c.nextWeek())
+                          : null),
+                  const SizedBox(height: 8),
+                  if (columns == 1)
+                    ...cards
+                  else
+                    // A week row by row, like a calendar.
+                    for (var row = 0; row < cards.length; row += columns)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var col = 0; col < columns; col++) ...[
+                            if (col > 0) const SizedBox(width: _gap),
+                            Expanded(
+                              child: row + col < cards.length
+                                  ? cards[row + col]
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
+                        ],
+                      ),
+                ],
+              );
+            }),
           ),
         ),
       ),
@@ -106,8 +158,14 @@ class _WeekHeader extends StatelessWidget {
       {required this.range,
       required this.total,
       required this.weekType,
-      required this.accent});
+      required this.accent,
+      this.onPrevious,
+      this.onNext});
   final String range;
+
+  /// The week before and after; no arrows when null.
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
 
   /// Lesson count; null while the week is still loading.
   final int? total;
@@ -125,6 +183,15 @@ class _WeekHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
+          if (onPrevious != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                tooltip: 'Предыдущая неделя',
+                icon: const Icon(Icons.chevron_left),
+                onPressed: onPrevious,
+              ),
+            ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,6 +223,15 @@ class _WeekHeader extends StatelessWidget {
             Text(russianPairs(total!),
                 style: TextStyle(
                     color: accent, fontSize: 16, fontWeight: FontWeight.bold)),
+          if (onNext != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: IconButton(
+                tooltip: 'Следующая неделя',
+                icon: const Icon(Icons.chevron_right),
+                onPressed: onNext,
+              ),
+            ),
         ],
       ),
     );

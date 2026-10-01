@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/memo_docx.dart';
 import '../state/memo_controller.dart';
 import '../theme.dart';
+import 'layout.dart';
 
 /// Letterhead, signature and teacher fields of the memo. Filled once and
 /// remembered; the preview flags anything required that is still empty.
@@ -84,7 +85,7 @@ class _MemoHeaderPageState extends State<MemoHeaderPage> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: readable(context, const EdgeInsets.fromLTRB(16, 8, 16, 24)),
         children: [
           const _Section('Подразделение'),
           _Field(_department, 'В шапке', hint: 'Кафедра …'),

@@ -6,9 +6,9 @@ import 'core/app_lock.dart';
 import 'state/auth_controller.dart';
 import 'state/theme_controller.dart';
 import 'theme.dart';
+import 'ui/home_shell.dart';
 import 'ui/lock_screen.dart';
 import 'ui/login_page.dart';
-import 'ui/schedule_page.dart';
 import 'ui/update_banner.dart';
 import 'web/insets.dart';
 
@@ -93,7 +93,7 @@ class _AuthGate extends StatelessWidget {
     final status = context.watch<AuthController>().status;
     switch (status) {
       case AuthStatus.authenticated:
-        return const SchedulePage();
+        return const HomeShell();
       case AuthStatus.unauthenticated:
       case AuthStatus.authenticating:
         return const LoginPage();

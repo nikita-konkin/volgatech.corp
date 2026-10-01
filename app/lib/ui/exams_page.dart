@@ -10,6 +10,7 @@ import '../models/exams.dart';
 import '../state/auth_controller.dart';
 import '../state/exams_controller.dart';
 import '../theme.dart';
+import 'layout.dart';
 import 'offline_banner.dart';
 
 class ExamsPage extends StatelessWidget {
@@ -42,7 +43,16 @@ class _ExamsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.watch<ExamsController>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Расписание экзаменов')),
+      appBar: AppBar(
+        title: const Text('Расписание экзаменов'),
+        actions: [
+          if (desktopBrowser)
+            RefreshButton(
+                onPressed: c.loadingYears || c.loadingExams
+                    ? null
+                    : () => unawaited(c.refresh())),
+        ],
+      ),
       body: Column(
         children: [
           if (c.fromCache) OfflineBanner(savedAt: c.cacheSavedAt),
@@ -63,38 +73,42 @@ class _ExamsView extends StatelessWidget {
         fontSize: 16);
     return Container(
       color: Brand.coral,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Row(
-        children: [
-          const Text('Учебный год:',
-              style: TextStyle(color: Colors.white, fontSize: 15)),
-          const SizedBox(width: 12),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<int>(
-              value: c.selectedYear?.value,
-              dropdownColor: Colors.white,
-              iconEnabledColor: Colors.white,
-              style: year,
-              selectedItemBuilder: (_) => c.years
-                  .map((y) => Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(y.name, style: year),
-                      ))
-                  .toList(),
-              items: c.years
-                  .map((y) => DropdownMenuItem(
-                        value: y.value,
-                        child: Text(y.name,
-                            style: const TextStyle(color: Colors.black87)),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                final y = c.years.firstWhere((e) => e.value == v);
-                unawaited(c.selectYear(y));
-              },
-            ),
+      child: ReadableWidth(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            children: [
+              const Text('Учебный год:',
+                  style: TextStyle(color: Colors.white, fontSize: 15)),
+              const SizedBox(width: 12),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: c.selectedYear?.value,
+                  dropdownColor: Colors.white,
+                  iconEnabledColor: Colors.white,
+                  style: year,
+                  selectedItemBuilder: (_) => c.years
+                      .map((y) => Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(y.name, style: year),
+                          ))
+                      .toList(),
+                  items: c.years
+                      .map((y) => DropdownMenuItem(
+                            value: y.value,
+                            child: Text(y.name,
+                                style: const TextStyle(color: Colors.black87)),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    final y = c.years.firstWhere((e) => e.value == v);
+                    unawaited(c.selectYear(y));
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -148,7 +162,7 @@ class _ExamsView extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: c.refresh,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+        padding: readable(context, const EdgeInsets.fromLTRB(12, 8, 12, 16)),
         children: [
           for (final entry in groups.entries) ...[
             Padding(

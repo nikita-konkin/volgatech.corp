@@ -6,6 +6,7 @@ import '../core/ru_plural.dart';
 import '../models/profile.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
+import 'layout.dart';
 import 'widgets/person_avatar.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -35,7 +36,7 @@ class _ProfilePageState extends State<ProfilePage> {
           : RefreshIndicator(
               onRefresh: () => context.read<AuthController>().refreshProfile(),
               child: ListView(
-                padding: const EdgeInsets.all(20),
+                padding: readable(context, const EdgeInsets.all(20)),
                 children: [
                   Center(
                     child: PersonAvatar(
