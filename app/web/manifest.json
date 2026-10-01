@@ -1,0 +1,36 @@
+{
+    "name": "Волгатех.Коллектив",
+    "short_name": "Волгатех",
+    "description": "Расписание, экзамены, профиль и служебные записки сотрудника ПГТУ (Волгатех).",
+    "lang": "ru",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#34517B",
+    "theme_color": "#34517B",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

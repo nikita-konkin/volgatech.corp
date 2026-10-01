@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -61,19 +62,22 @@ class SettingsPage extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Безопасность',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          SwitchListTile(
-            title: const Text('Блокировка при входе'),
-            subtitle: const Text(
-                'Спрашивать отпечаток, Face ID или PIN при открытии приложения'),
-            value: lock.enabled,
-            onChanged: (v) => _toggleLock(context, v),
-          ),
+          // A browser can't ask for a fingerprint or Face ID.
+          if (!kIsWeb) ...[
+            const Divider(height: 1),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text('Безопасность',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            SwitchListTile(
+              title: const Text('Блокировка при входе'),
+              subtitle: const Text(
+                  'Спрашивать отпечаток, Face ID или PIN при открытии приложения'),
+              value: lock.enabled,
+              onChanged: (v) => _toggleLock(context, v),
+            ),
+          ],
           if (context.read<Updater>().enabled) ...[
             const Divider(height: 1),
             const Padding(

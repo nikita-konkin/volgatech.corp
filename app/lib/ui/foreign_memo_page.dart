@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -99,7 +100,10 @@ class _MemoView extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   icon: const Icon(Icons.description_outlined),
-                  label: const Text('Сформировать .docx'),
+                  // Smaller on a 320-pt screen rather than split mid-word.
+                  label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Сформировать .docx', maxLines: 1)),
                   onPressed: c.loading || c.memoRows.isEmpty
                       ? null
                       : () => unawaited(_share(context, c)),
@@ -168,11 +172,20 @@ class _MemoView extends StatelessWidget {
     }
     try {
       final bytes = await c.buildDocx();
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/${c.fileName}');
-      await file.writeAsBytes(bytes, flush: true);
+      final XFile doc;
+      if (kIsWeb) {
+        // No files in a browser: Safari's share sheet takes it from memory,
+        // other browsers download it.
+        doc = XFile.fromData(bytes, name: c.fileName, mimeType: _docxMime);
+      } else {
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/${c.fileName}');
+        await file.writeAsBytes(bytes, flush: true);
+        doc = XFile(file.path, mimeType: _docxMime);
+      }
       await SharePlus.instance.share(ShareParams(
-        files: [XFile(file.path, mimeType: _docxMime)],
+        files: [doc],
+        fileNameOverrides: [c.fileName],
         subject: 'Служебная записка: занятия на иностранном языке, '
             '${c.monthLabel}',
       ));

@@ -4,8 +4,9 @@
 [![Release](https://img.shields.io/github/v/release/nikita-konkin/volgatech.corp?label=release)](https://github.com/nikita-konkin/volgatech.corp/releases/latest)
 
 A fast, native rewrite of the ПГТУ / VolgaTech staff cabinet app («Личный кабинет
-работника»), built with **Flutter** for Android and iOS. Client-only — it talks to
-the existing `api.volgatech.net` backend and does not change it.
+работника»), built with **Flutter** for Android, iOS and the browser (the iPhone
+version). Client-only — it talks to the existing `api.volgatech.net` backend and
+does not change it.
 
 The Flutter app lives in [`app/`](app/).
 
@@ -47,6 +48,26 @@ from v0.5.0 or older, install v0.5.1 by hand once.
 > **Coming from v0.4.1 or older?** Uninstall the old app once before installing
 > v0.4.2 — earlier builds were signed with a different key each time. From v0.4.2
 > on, new versions install over the old one.
+
+## 📱 iPhone
+
+There is no App Store build (that takes a paid Apple Developer account), but the
+same app runs in Safari and installs on the home screen like any other:
+
+1. Open **https://nikita-konkin.github.io/volgatech.corp/** in Safari.
+2. Tap **Поделиться** → **На экран «Домой»** → **Добавить**.
+3. Start «Волгатех» from the home screen and sign in there: the home-screen app
+   keeps its own data, apart from Safari's.
+
+Schedule, week overview, exams, profile and the foreign-groups memo all work,
+laid out for every iPhone from the first SE to the 17 Pro Max, upright or turned
+sideways. Unlike on Android:
+
+- «Почта» opens the web mail in a new tab: the mail server doesn't let a web page
+  talk to it, so there is no built-in mail client;
+- there is no lock with Face ID or a PIN;
+- updates need nothing: the site is rebuilt whenever the app changes, and the
+  app loads the new version the next time it starts.
 
 ## Features
 
@@ -214,7 +235,13 @@ flutter test
 flutter build apk --release --split-per-abi   # Android: per-ABI APKs (arm64 ≈ 20 MB)
 flutter build apk --release --split-per-abi --dart-define=MAIL=true   # …with the built-in mail client
 flutter build ios --release --no-codesign      # iOS: unsigned build (needs macOS + Xcode)
+flutter build web --release --no-web-resources-cdn   # the iPhone version, in build/web
 ```
+
+To see the web build as an iPhone shows it, serve `build/web` and open it with the
+phone's safe-area insets (top, right, bottom, left) in the address, e.g.
+`http://localhost:8099/?insets=59,0,34,0` for an iPhone 15 in a 393×852 window;
+`test/iphone_layout_test.dart` checks every screen at each iPhone's size.
 
 Requirements: Flutter **stable**, JDK 17, Android SDK (compileSdk 36). minSdk is
 24 (Android 7.0). For iOS: macOS with **full Xcode** + CocoaPods; deployment
@@ -242,6 +269,15 @@ GitHub Actions (Flutter **stable** channel):
   publish without them, or if an APK carries another certificate), and attaches
   them to a GitHub Release. (A signed iOS
   release needs an Apple Developer account — see [docs/IOS_RELEASE.md](docs/IOS_RELEASE.md).)
+
+- [`web.yml`](.github/workflows/web.yml) — when `main` changes: builds the web
+  version and publishes it to every host that is set up — **GitHub Pages**
+  (repository variable `DEPLOY_GITHUB_PAGES` = `true`, and Settings → Pages →
+  Source: GitHub Actions) and **GitVerse Pages** (variable `GITVERSE_REPO` =
+  `owner/repo` and secret `GITVERSE_TOKEN`: the built site is pushed to that
+  GitVerse repository together with
+  [its workflow](deploy/gitverse/.gitverse/workflows/pages.yml), which publishes
+  it there; turn on Settings → Pages → Source: Workflow in that repository).
 
 Cut a release:
 

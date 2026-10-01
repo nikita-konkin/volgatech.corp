@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Brand palette approximated from the original Volgatech PRO screens.
@@ -53,11 +54,24 @@ class Brand {
           dark: Theme.of(c).brightness == Brightness.dark);
 }
 
-ThemeData buildLightTheme() => _base(Brightness.light);
-ThemeData buildDarkTheme() => _base(Brightness.dark);
+/// [browser]: the web build, which brings its own font (see pubspec.yaml).
+ThemeData buildLightTheme({bool browser = kIsWeb}) =>
+    _base(Brightness.light, browser);
+ThemeData buildDarkTheme({bool browser = kIsWeb}) =>
+    _base(Brightness.dark, browser);
 
-ThemeData _base(Brightness b) {
+ThemeData _base(Brightness b, bool browser) {
   final dark = b == Brightness.dark;
+  // In a browser on an iPhone the platform is iOS, whose system fonts the
+  // web engine doesn't have: the Roboto bundled for it (pubspec.yaml). On
+  // Android that copy would shadow the phone's own Roboto, which Material asks
+  // for by name — and it lacks the 600 weight the app uses — so there the
+  // system face is asked for by its generic name.
+  final font = browser
+      ? 'Roboto'
+      : defaultTargetPlatform == TargetPlatform.android
+          ? 'sans-serif'
+          : null;
   final scheme = (dark
           ? const ColorScheme.dark(
               primary: Brand.blueOnDark,
@@ -77,6 +91,7 @@ ThemeData _base(Brightness b) {
   return ThemeData(
     useMaterial3: true,
     brightness: b,
+    fontFamily: font,
     colorScheme: scheme,
     scaffoldBackgroundColor: dark ? Brand.bgDark : Brand.bgLight,
     appBarTheme: AppBarTheme(
@@ -101,7 +116,9 @@ ThemeData _base(Brightness b) {
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        // Replaces the theme's text style rather than adding to it.
+        textStyle: TextStyle(
+            fontFamily: font, fontSize: 16, fontWeight: FontWeight.bold),
       ),
     ),
   );

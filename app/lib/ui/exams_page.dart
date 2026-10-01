@@ -55,6 +55,12 @@ class _ExamsView extends StatelessWidget {
 
   Widget _yearPicker(BuildContext context, ExamsController c) {
     if (c.years.isEmpty) return const SizedBox.shrink();
+    // The button's style replaces the inherited one, font family included.
+    final year = TextStyle(
+        fontFamily: Theme.of(context).textTheme.titleMedium?.fontFamily,
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+        fontSize: 16);
     return Container(
       color: Brand.coral,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -68,18 +74,11 @@ class _ExamsView extends StatelessWidget {
               value: c.selectedYear?.value,
               dropdownColor: Colors.white,
               iconEnabledColor: Colors.white,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16),
+              style: year,
               selectedItemBuilder: (_) => c.years
                   .map((y) => Align(
                         alignment: Alignment.centerLeft,
-                        child: Text(y.name,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
+                        child: Text(y.name, style: year),
                       ))
                   .toList(),
               items: c.years
