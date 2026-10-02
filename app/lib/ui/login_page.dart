@@ -7,6 +7,7 @@ import '../core/login_utils.dart';
 import '../core/prefs.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
+import 'layout.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -74,6 +75,9 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  /// No wider than this on a computer.
+  static const _formWidth = 440.0;
+
   @override
   Widget build(BuildContext context) {
     final authenticating = context.select<AuthController, bool>(
@@ -95,34 +99,39 @@ class _LoginPageState extends State<LoginPage> {
                   18 + (kIsWeb ? MediaQuery.paddingOf(context).top : 0),
                   20,
                   18),
-              child: const Row(
-                children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: Colors.white,
-                    child: Text('ПГТУ',
-                        style: TextStyle(
-                            color: Brand.blue,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12)),
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      'ЛИЧНЫЙ КАБИНЕТ\nРАБОТНИКА ПГТУ',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          height: 1.2),
+              // In line with the form below it.
+              child: const ReadableWidth(
+                max: _formWidth,
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: Colors.white,
+                      child: Text('ПГТУ',
+                          style: TextStyle(
+                              color: Brand.blue,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
                     ),
-                  ),
-                ],
+                    SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        'ЛИЧНЫЙ КАБИНЕТ\nРАБОТНИКА ПГТУ',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            height: 1.2),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: readable(context, const EdgeInsets.all(20),
+                    max: _formWidth + 40),
                 child: Form(
                   key: _formKey,
                   child: AutofillGroup(

@@ -17,6 +17,7 @@ import '../data/volgatech_api.dart';
 import '../state/auth_controller.dart';
 import '../state/memo_controller.dart';
 import '../theme.dart';
+import 'layout.dart';
 import 'memo_header_page.dart';
 
 const _docxMime =
@@ -61,6 +62,9 @@ class _MemoView extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Иностранные группы'),
         actions: [
+          if (desktopBrowser)
+            RefreshButton(
+                onPressed: c.loading ? null : () => unawaited(c.load())),
           IconButton(
             icon: const Icon(Icons.edit_note),
             tooltip: 'Шапка и подписи',
@@ -74,42 +78,51 @@ class _MemoView extends StatelessWidget {
               )
             : null,
       ),
-      body: Column(
-        children: [
-          _MonthBar(
-            label: _cap(c.monthLabel).toUpperCase(),
-            onPrev: () => unawaited(c.prevMonth()),
-            onNext: () => unawaited(c.nextMonth()),
-          ),
-          _Summary(controller: c, onEditHeader: () => _editHeader(context, c)),
-          Expanded(child: _list(context, c)),
-        ],
+      body: ArrowKeys(
+        onPrevious: () => unawaited(c.prevMonth()),
+        onNext: () => unawaited(c.nextMonth()),
+        child: Column(
+          children: [
+            _MonthBar(
+              label: _cap(c.monthLabel).toUpperCase(),
+              onPrev: () => unawaited(c.prevMonth()),
+              onNext: () => unawaited(c.nextMonth()),
+            ),
+            ReadableWidth(
+                child: _Summary(
+                    controller: c,
+                    onEditHeader: () => _editHeader(context, c))),
+            Expanded(child: _list(context, c)),
+          ],
+        ),
       ),
       bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-          child: Row(
-            children: [
-              OutlinedButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text('Занятие'),
-                onPressed:
-                    c.loading ? null : () => unawaited(_addRow(context, c)),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.description_outlined),
-                  // Smaller on a 320-pt screen rather than split mid-word.
-                  label: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('Сформировать .docx', maxLines: 1)),
-                  onPressed: c.loading || c.memoRows.isEmpty
-                      ? null
-                      : () => unawaited(_share(context, c)),
+        child: ReadableWidth(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+            child: Row(
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Занятие'),
+                  onPressed:
+                      c.loading ? null : () => unawaited(_addRow(context, c)),
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.description_outlined),
+                    // Smaller on a 320-pt screen rather than split mid-word.
+                    label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Сформировать .docx', maxLines: 1)),
+                    onPressed: c.loading || c.memoRows.isEmpty
+                        ? null
+                        : () => unawaited(_share(context, c)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -140,7 +153,7 @@ class _MemoView extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: c.load,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+        padding: readable(context, const EdgeInsets.fromLTRB(12, 4, 12, 16)),
         itemCount: entries.length,
         itemBuilder: (context, i) => _EntryTile(
           entry: entries[i],
@@ -255,29 +268,31 @@ class _MonthBar extends StatelessWidget {
       },
       child: Container(
         color: Brand.blue,
-        child: Row(
-          children: [
-            IconButton(
-              icon:
-                  const Icon(Icons.chevron_left, color: Colors.white, size: 30),
-              tooltip: 'Предыдущий месяц',
-              onPressed: onPrev,
-            ),
-            Expanded(
-              child: Text(label,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold)),
-            ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right,
-                  color: Colors.white, size: 30),
-              tooltip: 'Следующий месяц',
-              onPressed: onNext,
-            ),
-          ],
+        child: ReadableWidth(
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left,
+                    color: Colors.white, size: 30),
+                tooltip: 'Предыдущий месяц',
+                onPressed: onPrev,
+              ),
+              Expanded(
+                child: Text(label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right,
+                    color: Colors.white, size: 30),
+                tooltip: 'Следующий месяц',
+                onPressed: onNext,
+              ),
+            ],
+          ),
         ),
       ),
     );

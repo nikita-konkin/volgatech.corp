@@ -9,6 +9,7 @@ import '../core/app_lock.dart';
 import '../state/theme_controller.dart';
 import '../state/updater.dart';
 import 'easter_egg.dart';
+import 'layout.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -33,9 +34,15 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeController>();
     final lock = context.watch<AppLock>();
+    final sides = readable(context, EdgeInsets.zero);
     return Scaffold(
       appBar: AppBar(title: const Text('Настройки')),
       body: ListView(
+        // On a phone the list keeps its own padding, clear of the home
+        // indicator.
+        padding: sides.horizontal == 0
+            ? null
+            : sides.copyWith(bottom: MediaQuery.paddingOf(context).bottom),
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 4),

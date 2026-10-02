@@ -14,6 +14,8 @@ import '../state/auth_controller.dart';
 import '../state/schedule_controller.dart';
 import '../theme.dart';
 import 'app_drawer.dart';
+import 'home_shell.dart';
+import 'layout.dart';
 import 'offline_banner.dart';
 import 'week_summary_page.dart';
 import 'widgets/skeleton.dart';
@@ -55,12 +57,17 @@ class _ScheduleView extends StatelessWidget {
     final weekNumber = c.weekNumberForSelected;
     // The week's colour (red = week 1, blue = week 2, grey when unknown).
     final accent = Brand.weekAccent(weekNumber, context);
+    // Beside the menu (home_shell.dart) there is no drawer to open.
+    final inShell = NavShell.maybeOf(context) != null;
 
     return Scaffold(
       appBar: AppBar(
-        leading: kNativeMail ? const MenuButtonWithMail() : null,
+        leading: kNativeMail && !inShell ? const MenuButtonWithMail() : null,
         title: const Text('Расписание занятий'),
         actions: [
+          if (desktopBrowser)
+            RefreshButton(
+                onPressed: c.loading ? null : () => unawaited(c.refresh())),
           IconButton(
             icon: const Icon(Icons.calendar_view_week),
             tooltip: 'Обзор недели',
@@ -78,52 +85,58 @@ class _ScheduleView extends StatelessWidget {
           ),
         ],
       ),
-      drawer: const AppDrawer(),
-      body: Column(
-        children: [
-          if (c.fromCache) OfflineBanner(savedAt: c.cacheSavedAt),
-          Container(
-            color: accent,
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left,
-                      color: Colors.white, size: 30),
-                  onPressed: c.prevDay,
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      _dayMonth.format(c.selectedDay).toUpperCase(),
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold),
+      drawer: inShell ? null : const AppDrawer(),
+      body: ArrowKeys(
+        onPrevious: () => unawaited(c.prevDay()),
+        onNext: () => unawaited(c.nextDay()),
+        child: Column(
+          children: [
+            if (c.fromCache) OfflineBanner(savedAt: c.cacheSavedAt),
+            Container(
+              color: accent,
+              child: ReadableWidth(
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left,
+                          color: Colors.white, size: 30),
+                      onPressed: c.prevDay,
                     ),
-                  ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          _dayMonth.format(c.selectedDay).toUpperCase(),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right,
+                          color: Colors.white, size: 30),
+                      onPressed: c.nextDay,
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right,
-                      color: Colors.white, size: 30),
-                  onPressed: c.nextDay,
-                ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '${_full.format(c.selectedDay)} - ${_cap(_weekday.format(c.selectedDay))}',
-            style: TextStyle(color: Brand.muted(context), fontSize: 15),
-          ),
-          if (weekType != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: _WeekTypeChip(
-                  name: weekType, number: weekNumber, dot: accent),
+            const SizedBox(height: 12),
+            Text(
+              '${_full.format(c.selectedDay)} - ${_cap(_weekday.format(c.selectedDay))}',
+              style: TextStyle(color: Brand.muted(context), fontSize: 15),
             ),
-          const SizedBox(height: 8),
-          Expanded(child: _body(context, c, accent)),
-        ],
+            if (weekType != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: _WeekTypeChip(
+                    name: weekType, number: weekNumber, dot: accent),
+              ),
+            const SizedBox(height: 8),
+            Expanded(child: _body(context, c, accent)),
+          ],
+        ),
       ),
     );
   }
@@ -172,7 +185,7 @@ class _ScheduleView extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: c.refresh,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+        padding: readable(context, const EdgeInsets.fromLTRB(12, 4, 12, 16)),
         itemCount: slots.length,
         itemBuilder: (_, i) => _LessonCard(slots[i], accent: accent),
       ),
@@ -377,7 +390,7 @@ class _ScheduleSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Shimmer(
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+        padding: readable(context, const EdgeInsets.fromLTRB(12, 4, 12, 16)),
         itemCount: 5,
         itemBuilder: (_, __) => const Padding(
           padding: EdgeInsets.only(bottom: 12),
