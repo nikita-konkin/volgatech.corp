@@ -4,15 +4,16 @@
 [![Release](https://img.shields.io/github/v/release/nikita-konkin/volgatech.corp?label=release)](https://github.com/nikita-konkin/volgatech.corp/releases/latest)
 
 Быстрое нативное приложение «Личный кабинет работника» ПГТУ / Волгатех, заново
-написанное на **Flutter** для Android, iOS и браузера (версия для iPhone).
+написанное на **Flutter** для Android, iOS и браузера (на iPhone или
+компьютере).
 Только клиент: работает с уже существующим сервером `api.volgatech.net` и ничего
 в нём не меняет.
 
 Исходный код — на [GitHub](https://github.com/nikita-konkin/volgatech.corp)
 (приложение — в папке
 [`app/`](https://github.com/nikita-konkin/volgatech.corp/tree/main/app)); на
-[GitVerse](https://gitverse.ru/nikita-konkin/volgatech.corp) — собранная версия
-для iPhone и копии релизов. In English:
+[GitVerse](https://gitverse.ru/nikita-konkin/volgatech.corp) — собранная
+веб-версия и копии релизов. In English:
 [README.md](https://github.com/nikita-konkin/volgatech.corp/blob/main/README.md).
 
 <p align="center">
@@ -55,24 +56,50 @@
 > приложение: прежние сборки каждый раз подписывались новым ключом. Начиная с
 > v0.4.2 новые версии ставятся поверх старой.
 
-## 📱 iPhone
+## 🌐 В браузере: iPhone и компьютер
 
-Версии в App Store нет (для неё нужен платный аккаунт Apple Developer), но то же
-приложение работает в Safari и ставится на экран «Домой», как любое другое:
+То же приложение работает в браузере — на iPhone, для которого нет версии в App
+Store (для неё нужен платный аккаунт Apple Developer), и на любом компьютере:
 
-1. Откройте в Safari **https://nikita-konkin.gitverse.site/volgatech-corp/**
-   (или копию: https://konkin-nikita.ru/volgatech.corp/).
+**https://nikita-konkin.gitverse.site/volgatech-corp/**
+(или копия: https://konkin-nikita.ru/volgatech.corp/)
+
+### На iPhone
+
+1. Откройте ссылку в Safari.
 2. Нажмите **Поделиться** → **На экран «Домой»** → **Добавить**.
 3. Запустите «Волгатех» с экрана «Домой» и войдите в нём: у приложения на
    экране «Домой» свои данные, отдельно от Safari.
 
+Каждый экран подогнан под любой iPhone — от первого SE до 17 Pro Max,
+вертикально и горизонтально.
+
+### На компьютере
+
+<img src="docs/screenshots/desktop.webp" width="100%" alt="Обзор недели в браузере на компьютере">
+
+Откройте ссылку в Chrome, Edge, Firefox, Safari или Яндекс Браузере и войдите.
+Chrome и Edge могут ещё установить его отдельным приложением (значок установки
+справа в адресной строке). В окне шириной от 1000 пикселей:
+
+- меню всегда открыто слева, а каждый экран остаётся таким, каким вы его
+  оставили, — день, месяц, открытый обзор недели;
+- занятия, экзамены и записка не растягиваются на всю ширину, а в обзоре
+  недели дни стоят рядом;
+- **←** и **→** листают день, неделю или месяц; в обзоре недели есть кнопки
+  ‹ › для недели, а в расписании, экзаменах и записке — кнопка ⟳: потянуть
+  список вниз, чтобы обновить, можно только пальцем.
+
+В окне поуже — то же, что на телефоне, с меню за кнопкой ☰.
+
+### В отличие от Android
+
 Расписание, обзор недели, экзамены, профиль и записка по иностранным группам
-работают на любом iPhone — от первого SE до 17 Pro Max, вертикально и
-горизонтально. В отличие от Android:
+работают, но:
 
 - «Почта» открывает веб-почту в новой вкладке: почтовый сервер не принимает
   запросы с веб-страниц, поэтому встроенного клиента нет;
-- нет блокировки по Face ID или PIN-коду;
+- нет блокировки по Face ID, отпечатку или PIN-коду;
 - обновлять ничего не нужно: сайт пересобирается при каждом изменении
   приложения, а новая версия загружается при следующем запуске.
 
@@ -250,14 +277,15 @@ flutter test
 flutter build apk --release --split-per-abi   # Android: APK под каждый тип процессора (arm64 ≈ 20 МБ)
 flutter build apk --release --split-per-abi --dart-define=MAIL=true   # …со встроенным почтовым клиентом
 flutter build ios --release --no-codesign      # iOS: сборка без подписи (нужны macOS и Xcode)
-flutter build web --release --no-web-resources-cdn   # версия для iPhone, в build/web
+flutter build web --release --no-web-resources-cdn   # версия для браузера, в build/web
 ```
 
 Чтобы увидеть веб-сборку так, как её показывает iPhone, раздайте `build/web` и
 откройте её с отступами безопасной зоны телефона (сверху, справа, снизу, слева)
 в адресе, например `http://localhost:8099/?insets=59,0,34,0` для iPhone 15 в
 окне 393×852; `test/iphone_layout_test.dart` проверяет каждый экран на размерах
-всех iPhone.
+всех iPhone, а `test/desktop_layout_test.dart` — вид на компьютере в окнах от
+800×600 до 1920×1080.
 
 Требования: Flutter **stable**, JDK 17, Android SDK (compileSdk 36). minSdk —
 24 (Android 7.0). Для iOS: macOS с **полным Xcode** и CocoaPods; минимальная

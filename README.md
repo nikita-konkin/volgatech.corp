@@ -4,8 +4,8 @@
 [![Release](https://img.shields.io/github/v/release/nikita-konkin/volgatech.corp?label=release)](https://github.com/nikita-konkin/volgatech.corp/releases/latest)
 
 A fast, native rewrite of the ПГТУ / VolgaTech staff cabinet app («Личный кабинет
-работника»), built with **Flutter** for Android, iOS and the browser (the iPhone
-version). Client-only — it talks to the existing `api.volgatech.net` backend and
+работника»), built with **Flutter** for Android, iOS and the browser (on an iPhone or a
+computer). Client-only — it talks to the existing `api.volgatech.net` backend and
 does not change it.
 
 The Flutter app lives in [`app/`](app/). По-русски: [README.ru.md](README.ru.md).
@@ -50,24 +50,50 @@ from v0.5.0 or older, install v0.5.1 by hand once.
 > v0.4.2 — earlier builds were signed with a different key each time. From v0.4.2
 > on, new versions install over the old one.
 
-## 📱 iPhone
+## 🌐 In the browser: iPhone and computer
 
-There is no App Store build (that takes a paid Apple Developer account), but the
-same app runs in Safari and installs on the home screen like any other:
+The same app runs in a browser — on an iPhone, which has no App Store build
+(that takes a paid Apple Developer account), and on any computer:
 
-1. Open **https://nikita-konkin.gitverse.site/volgatech-corp/** in Safari
-   (or the copy at https://konkin-nikita.ru/volgatech.corp/).
+**https://nikita-konkin.gitverse.site/volgatech-corp/**
+(or the copy at https://konkin-nikita.ru/volgatech.corp/)
+
+### On an iPhone
+
+1. Open the link in Safari.
 2. Tap **Поделиться** → **На экран «Домой»** → **Добавить**.
 3. Start «Волгатех» from the home screen and sign in there: the home-screen app
    keeps its own data, apart from Safari's.
 
+Every screen is laid out for every iPhone from the first SE to the 17 Pro Max,
+upright or turned sideways.
+
+### On a computer
+
+<img src="docs/screenshots/desktop.webp" width="100%" alt="Обзор недели в браузере на компьютере">
+
+Open the link in Chrome, Edge, Firefox, Safari or Yandex Browser and sign in.
+Chrome and Edge can also install it as an app of its own (the install icon at
+the right of the address bar). In a window 1000 px wide or more:
+
+- the menu stays open on the left, and each screen stays as you left it — the
+  day, the month, an open week overview;
+- lessons, exams and the memo keep to a readable width, and the week overview
+  shows the days side by side;
+- **←** and **→** change the day, the week or the month; the week overview has
+  ‹ › for the week, and the schedule, exams and memo have a ⟳ button, since
+  pulling a list down to refresh takes a finger.
+
+A narrower window gets the phone layout, with the menu behind ☰.
+
+### Unlike on Android
+
 Schedule, week overview, exams, profile and the foreign-groups memo all work,
-laid out for every iPhone from the first SE to the 17 Pro Max, upright or turned
-sideways. Unlike on Android:
+but:
 
 - «Почта» opens the web mail in a new tab: the mail server doesn't let a web page
   talk to it, so there is no built-in mail client;
-- there is no lock with Face ID or a PIN;
+- there is no lock with Face ID, a fingerprint or a PIN;
 - updates need nothing: the site is rebuilt whenever the app changes, and the
   app loads the new version the next time it starts.
 
@@ -237,13 +263,15 @@ flutter test
 flutter build apk --release --split-per-abi   # Android: per-ABI APKs (arm64 ≈ 20 MB)
 flutter build apk --release --split-per-abi --dart-define=MAIL=true   # …with the built-in mail client
 flutter build ios --release --no-codesign      # iOS: unsigned build (needs macOS + Xcode)
-flutter build web --release --no-web-resources-cdn   # the iPhone version, in build/web
+flutter build web --release --no-web-resources-cdn   # the browser version, in build/web
 ```
 
 To see the web build as an iPhone shows it, serve `build/web` and open it with the
 phone's safe-area insets (top, right, bottom, left) in the address, e.g.
 `http://localhost:8099/?insets=59,0,34,0` for an iPhone 15 in a 393×852 window;
-`test/iphone_layout_test.dart` checks every screen at each iPhone's size.
+`test/iphone_layout_test.dart` checks every screen at each iPhone's size, and
+`test/desktop_layout_test.dart` the computer layout in windows from 800×600 to
+1920×1080.
 
 Requirements: Flutter **stable**, JDK 17, Android SDK (compileSdk 36). minSdk is
 24 (Android 7.0). For iOS: macOS with **full Xcode** + CocoaPods; deployment
