@@ -65,6 +65,9 @@ class MailController extends ChangeNotifier {
   MailFolder? folderWith(FolderRole role) =>
       folders.where((f) => f.role == role).firstOrNull;
 
+  /// Where «В архив» files messages; null until the mailbox has one.
+  MailFolder? get archiveFolder => folderWith(FolderRole.archive);
+
   Future<void> start() async {
     _credentials = await _store.read();
     if (_credentials == null) {
@@ -176,7 +179,13 @@ class MailController extends ChangeNotifier {
       final page = await _service.headers(f,
           before: headers.last.seq, pinnedFirst: pinnedFirst);
       if (f != folder) return;
-      headers = [...headers, ...page.headers];
+      // A message pinned or unpinned meanwhile may come round again.
+      final have = {for (final h in headers) h.id};
+      headers = [
+        ...headers,
+        for (final h in page.headers)
+          if (!have.contains(h.id)) h
+      ];
       hasMore = page.hasMore;
     });
     loadingMore = false;
@@ -241,6 +250,62 @@ class MailController extends ChangeNotifier {
     _notify();
     await _guard(() => _service.move(f, h.id, to));
     unawaited(_saveCache(f));
+  }
+
+  /// Files [h] into [archiveFolder] (see [createArchive] for when there is
+  /// none yet).
+  Future<void> archive(MailHeader h) async {
+    final to = archiveFolder;
+    if (to == null) throw StateError('no archive folder');
+    await move(h, to);
+  }
+
+  /// Makes «Архив» at the top of the mailbox, for [archive].
+  Future<MailFolder> createArchive() async {
+    final made = await _retrying(() => _service.createFolder('Архив'));
+    final f = made.role == FolderRole.archive
+        ? made
+        : MailFolder(
+            name: made.name, path: made.path, role: FolderRole.archive);
+    folders = _sorted([...folders, f]);
+    _notify();
+    return f;
+  }
+
+  /// Pins [h] above the rest, or puts it back among them by date; on the
+  /// list at once, then on the server. Throws, and puts it back as it was,
+  /// when the server refuses.
+  Future<void> setPinned(MailHeader h, bool pinned) async {
+    final f = folder;
+    final before = headers;
+    headers = _placed(h.copyWith(pinned: pinned));
+    _notify();
+    try {
+      await _guard(
+          () => _service.setPinned(f, h.id, pinned: pinned, received: h.date));
+    } on Object {
+      if (f == folder) headers = before;
+      _notify();
+      rethrow;
+    }
+    unawaited(_saveCache(f));
+  }
+
+  /// The list with [h] where it now belongs: with the pinned ones first, a
+  /// newly pinned one tops them and an unpinned one goes back by date;
+  /// otherwise it stays put. A message not on the list stays off it.
+  List<MailHeader> _placed(MailHeader h) {
+    final i = headers.indexWhere((x) => x.id == h.id);
+    if (i < 0) return headers;
+    final rest = [...headers]..removeAt(i);
+    if (!pinnedFirst) return rest..insert(i, h);
+    if (h.pinned) return rest..insert(0, h);
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    final at = rest.indexWhere(
+        (x) => !x.pinned && (x.date ?? epoch).isBefore(h.date ?? epoch));
+    // Older than all loaded: at the end, unless more are still to come.
+    if (at < 0 && hasMore) return rest;
+    return rest..insert(at < 0 ? rest.length : at, h);
   }
 
   /// Swipe to delete: off the list at once, off the server after [delay]
@@ -422,11 +487,7 @@ class MailController extends ChangeNotifier {
   }
 
   Future<void> _loadFolders() async {
-    final list = await _service.folders();
-    list.sort((a, b) {
-      final r = a.role.index.compareTo(b.role.index);
-      return r != 0 ? r : a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
+    final list = _sorted(await _service.folders());
     folders = list.isEmpty ? const [_inbox] : list;
     folder = folders.firstWhere((f) => f == folder, orElse: () => folders[0]);
     _reportUnread();
@@ -496,6 +557,13 @@ class MailController extends ChangeNotifier {
       _set(MailStatus.offline);
     }
   }
+
+  /// System folders first, then by name.
+  static List<MailFolder> _sorted(List<MailFolder> list) => list
+    ..sort((a, b) {
+      final r = a.role.index.compareTo(b.role.index);
+      return r != 0 ? r : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
 
   void _replace(MailHeader h) {
     headers = [for (final x in headers) x.id == h.id ? h : x];

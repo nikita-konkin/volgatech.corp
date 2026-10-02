@@ -10,6 +10,9 @@ import 'mail_models.dart';
 abstract class MailService {
   /// Signs in; throws [MailAuthException] or [MailNetworkException].
   Future<void> connect(MailCredentials credentials);
+
+  /// Mail folders; the one Outlook on the web archives to (or else one named
+  /// «Архив») has [FolderRole.archive].
   Future<List<MailFolder>> folders();
 
   /// Unread messages in «Входящие», for the badge in the menu.
@@ -32,6 +35,14 @@ abstract class MailService {
 
   /// Moves to the trash, or deletes for good when already there.
   Future<void> delete(MailFolder folder, String id);
+
+  /// Pins message [id] above the rest of [folder], the way Outlook on the
+  /// web does, or unpins it back to its place by [received].
+  Future<void> setPinned(MailFolder folder, String id,
+      {required bool pinned, DateTime? received});
+
+  /// Makes a mail folder [name] at the top of the mailbox.
+  Future<MailFolder> createFolder(String name);
 
   /// Sends an RFC 822 message and keeps a copy in «Отправленные».
   Future<void> send(Uint8List mime);

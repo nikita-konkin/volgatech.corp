@@ -18,6 +18,7 @@ import '../mail_controller.dart';
 import '../mail_html.dart';
 import '../mail_models.dart';
 import 'compose_page.dart';
+import 'mail_actions.dart';
 import 'recipient_field.dart' show initials;
 
 /// One message: sender, recipients, attachments and the body.
@@ -35,6 +36,9 @@ class _MessagePageState extends State<MessagePage> {
   Future<MimeMessage> _load() =>
       context.read<MailController>().open(widget.header);
 
+  /// Pinned, as far as this page knows: it changes here.
+  late bool _pinned = widget.header.pinned;
+
   Future<void> _delete() async {
     final c = context.read<MailController>();
     Navigator.pop(context);
@@ -42,33 +46,23 @@ class _MessagePageState extends State<MessagePage> {
   }
 
   Future<void> _move() async {
-    final c = context.read<MailController>();
-    final to = await showModalBottomSheet<MailFolder>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: ListView(shrinkWrap: true, children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text('Переместить в папку',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          ),
-          for (final f in c.folders)
-            if (f != c.folder)
-              ListTile(
-                leading: const Icon(Icons.folder_outlined),
-                title: Text(f.title),
-                onTap: () => Navigator.pop(context, f),
-              ),
-        ]),
-      ),
-    );
+    final to = await pickFolder(context, context.read<MailController>());
     if (to == null || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+    moveMessage(context, widget.header, to);
     Navigator.pop(context);
-    messenger.showSnackBar(
-        SnackBar(content: Text('Письмо перемещено в «${to.title}»')));
-    await c.move(widget.header, to);
+  }
+
+  Future<void> _archive() async {
+    if (await archiveMessage(context, widget.header) && mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _togglePin() async {
+    if (await togglePin(context, widget.header.copyWith(pinned: _pinned)) &&
+        mounted) {
+      setState(() => _pinned = !_pinned);
+    }
   }
 
   Future<void> _markUnread() async {
@@ -82,15 +76,26 @@ class _MessagePageState extends State<MessagePage> {
     return Scaffold(
       appBar: AppBar(
         actions: [
+          if (context.read<MailController>().folder.role != FolderRole.archive)
+            IconButton(
+              tooltip: 'В архив',
+              icon: const Icon(Icons.archive_outlined),
+              onPressed: () => unawaited(_archive()),
+            ),
+          IconButton(
+            tooltip: 'Удалить',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => unawaited(_delete()),
+          ),
           IconButton(
             tooltip: 'Переместить',
             icon: const Icon(Icons.drive_file_move_outline),
             onPressed: () => unawaited(_move()),
           ),
           IconButton(
-            tooltip: 'Удалить',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => unawaited(_delete()),
+            tooltip: _pinned ? 'Открепить' : 'Закрепить',
+            icon: Icon(_pinned ? Icons.push_pin : Icons.push_pin_outlined),
+            onPressed: () => unawaited(_togglePin()),
           ),
           IconButton(
             tooltip: 'Отметить непрочитанным',

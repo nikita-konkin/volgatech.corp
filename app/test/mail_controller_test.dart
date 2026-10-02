@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -69,10 +70,40 @@ class FakeMailService implements MailService {
     if (down || !connected) throw const MailNetworkException('down');
   }
 
+  /// Folders made with [createFolder], or given (an archive, say).
+  List<MailFolder> extraFolders = [];
+  final created = <String>[];
+
   @override
   Future<List<MailFolder>> folders() async {
     _check();
-    return [_inbox.withUnseen(await inboxUnread()), _trash];
+    return [_inbox.withUnseen(await inboxUnread()), _trash, ...extraFolders];
+  }
+
+  @override
+  Future<MailFolder> createFolder(String name) async {
+    _check();
+    created.add(name);
+    final f = MailFolder(
+        name: name, path: 'id-$name', role: folderRole(path: '', name: name));
+    extraFolders.add(f);
+    return f;
+  }
+
+  final pinnedOnServer = <String, bool>{};
+  final pinReceived = <String, DateTime?>{};
+  bool rejectPin = false;
+
+  @override
+  Future<void> setPinned(MailFolder f, String id,
+      {required bool pinned, DateTime? received}) async {
+    _check();
+    if (rejectPin) throw const EwsException('Access is denied');
+    pinnedOnServer[id] = pinned;
+    pinReceived[id] = received;
+    inbox = [
+      for (final h in inbox) h.id == id ? h.copyWith(pinned: pinned) : h
+    ];
   }
 
   @override
@@ -100,9 +131,14 @@ class FakeMailService implements MailService {
     return MailPage(list, hasMore: false);
   }
 
+  /// Holds messages back while set: the open message shows only its top
+  /// (its body is a WebView, which tests have none of).
+  Completer<MimeMessage>? hold;
+
   @override
   Future<MimeMessage> message(MailFolder f, String id) async {
     _check();
+    if (hold case final h?) return h.future;
     return MessageBuilder.buildSimpleTextMessage(
         const MailAddress('Отправитель', 'a@volgatech.net'),
         const [MailAddress('Я', 'me@volgatech.net')],
@@ -560,6 +596,104 @@ void main() {
     expect(server.deleted, isEmpty);
   });
 
+  testWidgets('a long press: pin, and «В архив» making the folder first',
+      (tester) async {
+    await initializeDateFormatting('ru_RU');
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await Prefs.load();
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+    await tester.pumpWidget(Provider<Prefs>.value(
+      value: prefs,
+      child: MaterialApp(home: ui.MailPage(create: (_) => controller())),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('Письмо 3'));
+    await tester.pumpAndSettle();
+    for (final action in [
+      'Закрепить',
+      'В архив',
+      'Переместить',
+      'Отметить прочитанным',
+      'Удалить'
+    ]) {
+      expect(find.text(action), findsOneWidget, reason: action);
+    }
+    await tester.tap(find.text('Закрепить'));
+    await tester.pumpAndSettle();
+    expect(find.text('Закреплённые · 1'), findsOneWidget);
+    expect(find.text('Письмо закреплено'), findsOneWidget);
+    expect(server.pinnedOnServer, {'msg3': true});
+
+    // Pinned now: the same menu unpins.
+    await tester.longPress(find.text('Письмо 3'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Открепить'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Закреплённые ·'), findsNothing);
+    expect(server.pinnedOnServer, {'msg3': false});
+
+    // No archive folder yet: offered first; declined, nothing happens.
+    Future<void> archive(String subject) async {
+      await tester.longPress(find.text(subject));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('В архив'));
+      await tester.pumpAndSettle();
+    }
+
+    await archive('Письмо 2');
+    expect(find.text('Создать папку «Архив»?'), findsOneWidget);
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(find.text('Письмо 2'), findsOneWidget);
+    expect(server.created, isEmpty);
+
+    // Made, and the message goes there.
+    await archive('Письмо 2');
+    await tester.tap(find.text('Создать'));
+    await tester.pumpAndSettle();
+    expect(find.text('Письмо 2'), findsNothing);
+    expect(find.text('Письмо перемещено в «Архив»'), findsOneWidget);
+    expect(server.moved, {'msg2': 'id-Архив'});
+
+    // From then on, straight there.
+    await archive('Письмо 4');
+    expect(find.text('Создать папку «Архив»?'), findsNothing);
+    expect(server.moved['msg4'], 'id-Архив');
+  });
+
+  testWidgets('the open message: pin it, then «В архив»', (tester) async {
+    await initializeDateFormatting('ru_RU');
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await Prefs.load();
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+    server.extraFolders = [
+      const MailFolder(name: 'Архив', path: 'id-arch', role: FolderRole.archive)
+    ];
+    await tester.pumpWidget(Provider<Prefs>.value(
+      value: prefs,
+      child: MaterialApp(home: ui.MailPage(create: (_) => controller())),
+    ));
+    await tester.pumpAndSettle();
+    server.hold = Completer();
+
+    await tester.tap(find.text('Письмо 3'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byTooltip('Закрепить'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byTooltip('Открепить'), findsOneWidget);
+    expect(server.pinnedOnServer, {'msg3': true});
+
+    await tester.tap(find.byTooltip('В архив'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byTooltip('Открепить'), findsNothing); // back on the list
+    expect(find.text('Письмо 3'), findsNothing);
+    expect(server.moved, {'msg3': 'id-arch'});
+  });
+
   test('back in the app: reloads only a list that is not fresh', () async {
     await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
     final c = controller();
@@ -794,6 +928,71 @@ void main() {
     expect(c.headers.map((x) => x.id), isNot(contains(h.id)));
     expect(c.folderWith(FolderRole.inbox)!.unseen, 4);
     expect(c.folderWith(FolderRole.trash)!.unseen, 1);
+  });
+
+  test('pin: tops the pinned at once and on the server; unpin, by date',
+      () async {
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+    final c = controller();
+    await c.start();
+    List<String> ids() => [for (final h in c.headers) h.id];
+    expect(ids(), ['msg5', 'msg4', 'msg3', 'msg2', 'msg1']);
+
+    await c.setPinned(c.headers[2], true);
+    expect(ids(), ['msg3', 'msg5', 'msg4', 'msg2', 'msg1']);
+    expect(c.headers.first.pinned, isTrue);
+    expect(server.pinnedOnServer, {'msg3': true});
+    await c.setPinned(c.headers[3], true); // msg2: tops the pinned
+    expect(ids(), ['msg2', 'msg3', 'msg5', 'msg4', 'msg1']);
+
+    // Back among the rest by its date, which the server is told too.
+    await c.setPinned(c.headers[1], false);
+    expect(ids(), ['msg2', 'msg5', 'msg4', 'msg3', 'msg1']);
+    expect(server.pinnedOnServer['msg3'], isFalse);
+    expect(server.pinReceived['msg3'], DateTime(2026, 9, 3));
+
+    // Refused: as it was, and the caller hears why.
+    server.rejectPin = true;
+    await expectLater(
+        c.setPinned(c.headers[4], true), throwsA(isA<EwsException>()));
+    expect(ids(), ['msg2', 'msg5', 'msg4', 'msg3', 'msg1']);
+    expect(c.headers.last.pinned, isFalse);
+  });
+
+  test('pin with «Закреплённые сверху» off: the message stays put', () async {
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+    final c = MailController(
+        service: server, store: store, cache: cache, pinnedFirst: false);
+    await c.start();
+    await c.setPinned(c.headers[2], true);
+    expect([for (final h in c.headers) h.id],
+        ['msg5', 'msg4', 'msg3', 'msg2', 'msg1']);
+    expect(c.headers[2].pinned, isTrue);
+  });
+
+  test('archive: into the archive folder, or «Архив» made for it', () async {
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+    final c = controller();
+    await c.start();
+    expect(c.archiveFolder, isNull);
+    final made = await c.createArchive();
+    expect(server.created, ['Архив']);
+    expect(c.archiveFolder, made);
+    expect(c.folders.map((f) => f.title), ['Входящие', 'Удалённые', 'Архив']);
+
+    final h = c.headers.first;
+    await c.archive(h);
+    expect(server.moved, {h.id: 'id-Архив'});
+    expect(c.headers.map((x) => x.id), isNot(contains(h.id)));
+
+    // One the server already has is used as it is.
+    server.extraFolders = [
+      const MailFolder(name: 'Старое', path: 'id-old', role: FolderRole.archive)
+    ];
+    final c2 = controller();
+    await c2.start();
+    expect(c2.archiveFolder?.path, 'id-old');
+    c2.dispose();
   });
 
   testWidgets('«Размер ящика»: used, folders, and the limit when known',

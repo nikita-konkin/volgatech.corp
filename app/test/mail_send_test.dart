@@ -180,6 +180,23 @@ void main() {
       ]);
     });
 
+    test('web archive folder: the one Outlook on the web set, if any', () {
+      String? archive(String entries) => parseWebArchiveFolder(XmlDocument
+          .parse(_env('<m:GetUserConfigurationResponse><m:ResponseMessages>'
+              '<m:GetUserConfigurationResponseMessage ResponseClass="Success">'
+              '<m:UserConfiguration><t:Dictionary>$entries</t:Dictionary>'
+              '</m:UserConfiguration></m:GetUserConfigurationResponseMessage>'
+              '</m:ResponseMessages></m:GetUserConfigurationResponse>')));
+      String entry(String k, String v) => '<t:DictionaryEntry>'
+          '<t:DictionaryKey><t:Type>String</t:Type><t:Value>$k</t:Value></t:DictionaryKey>'
+          '<t:DictionaryValue><t:Type>String</t:Type><t:Value>$v</t:Value></t:DictionaryValue>'
+          '</t:DictionaryEntry>';
+      expect(archive(entry('ArchiveFolderId', 'AAMkADRi=')), 'AAMkADRi=');
+      expect(archive(entry('archivefolderid', ' AAMkX ')), 'AAMkX');
+      expect(archive(entry('signaturetext', 'x')), isNull);
+      expect(archive(entry('ArchiveFolderId', '')), isNull);
+    });
+
     test('web signature: the text one, else the HTML one made readable', () {
       String? sig(String entries) => parseWebSignature(XmlDocument.parse(
           _env('<m:GetUserConfigurationResponse><m:ResponseMessages>'
@@ -325,6 +342,60 @@ void main() {
       expect(list.first.unseen, 3);
     });
 
+    test('folders: the web mail\'s archive, else one named «Архив»', () {
+      final doc = XmlDocument.parse(_env(
+          '<m:FindFolderResponse><m:ResponseMessages>'
+          '<m:FindFolderResponseMessage ResponseClass="Success"><m:RootFolder><t:Folders>'
+          '<t:Folder><t:FolderId Id="F-a"/><t:DisplayName>Архив</t:DisplayName><t:FolderClass>IPF.Note</t:FolderClass></t:Folder>'
+          '<t:Folder><t:FolderId Id="F-old"/><t:DisplayName>Старое</t:DisplayName><t:FolderClass>IPF.Note</t:FolderClass></t:Folder>'
+          '</t:Folders></m:RootFolder></m:FindFolderResponseMessage></m:ResponseMessages></m:FindFolderResponse>'));
+      Map<String, FolderRole> roles(Map<String, FolderRole> known) =>
+          {for (final f in parseFolders(doc, known)) f.path: f.role};
+      expect(roles({}), {'F-a': FolderRole.archive, 'F-old': FolderRole.other});
+      expect(roles({'F-old': FolderRole.archive}),
+          {'F-a': FolderRole.other, 'F-old': FolderRole.archive});
+      // The web mail's one isn't among them (gone, or another id form).
+      expect(roles({'F-gone': FolderRole.archive})['F-a'], FolderRole.archive);
+      expect(roles({})['F-old'], FolderRole.other);
+      final named = parseFolders(doc, {}).first;
+      expect(named.title, 'Архив');
+    });
+
+    test('pin and unpin: the two times Outlook on the web sets', () {
+      final pin = setPinnedSoap('I1', pinned: true);
+      XmlDocument.parse(_env(pin)); // well-formed
+      expect('PropertyTag="0x0F01"'.allMatches(pin), hasLength(2));
+      expect('PropertyTag="0x0F02"'.allMatches(pin), hasLength(2));
+      expect('<t:Value>4500-09-01T00:00:00.000Z</t:Value>'.allMatches(pin),
+          hasLength(2));
+      expect(pin, contains('<t:Message><t:ExtendedProperty>'));
+      expect(pin, contains('ConflictResolution="AlwaysOverwrite"'));
+
+      final unpin = setPinnedSoap('I1',
+          pinned: false, received: DateTime.utc(2026, 9, 28, 7, 15));
+      XmlDocument.parse(_env(unpin));
+      expect(unpin, isNot(contains('4500')));
+      expect(unpin, contains('<t:Value>2026-09-28T07:15:00.000Z</t:Value>'));
+      expect(
+          unpin,
+          contains('<t:DeleteItemField><t:ExtendedFieldURI '
+              'PropertyTag="0x0F02" PropertyType="SystemTime"/>'));
+
+      final item = setPinnedSoap('I2', pinned: true, kind: 'Item');
+      expect(item, contains('<t:Item><t:ExtendedProperty>'));
+      expect(item, isNot(contains('<t:Message>')));
+    });
+
+    test('a new folder: a mail folder, the name escaped', () {
+      final soap = createFolderSoap('A & B');
+      XmlDocument.parse(_env(soap));
+      expect(
+          soap,
+          contains('<t:FolderClass>IPF.Note</t:FolderClass>'
+              '<t:DisplayName>A &amp; B</t:DisplayName>'));
+      expect(soap, contains('<t:DistinguishedFolderId Id="msgfolderroot"/>'));
+    });
+
     test('items: sender, read state, replies, attachments, paging', () {
       final page = parseItems(XmlDocument.parse(_env(_itemsXml)), offset: 40);
       expect(page.hasMore, isTrue);
@@ -399,6 +470,7 @@ void main() {
     late List<String> versions;
     late bool rejectRestriction;
     late bool noSearchIndex;
+    late bool rejectMessagePin;
     setUp(() async {
       log = [];
       authed = {};
@@ -406,6 +478,7 @@ void main() {
       versions = [];
       rejectRestriction = false;
       noSearchIndex = false;
+      rejectMessagePin = false;
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((req) async {
         final auth = req.headers.value('authorization') ?? '';
@@ -440,7 +513,9 @@ void main() {
         } else if (authed.contains(port) &&
             (unknownVersions.contains(version) ||
                 rejectRestriction && body.contains('<t:IsGreaterThan>') ||
-                noSearchIndex && body.contains('<m:QueryString>'))) {
+                noSearchIndex && body.contains('<m:QueryString>') ||
+                rejectMessagePin &&
+                    body.contains('<t:Message><t:ExtendedProperty>'))) {
           log.add('call');
           res
             ..statusCode = 500
@@ -473,9 +548,51 @@ void main() {
       expect(msg.decodeSubject(), 'Проверка');
       await s.send(Uint8List.fromList(utf8.encode('Subject: hi\r\n\r\nhello')));
       await s.disconnect();
-      // GetFolder, FindFolder, FindItem, the pinned ids, GetItem, CreateItem.
-      expect(
-          log, ['negotiate', 'auth', 'call', 'call', 'call', 'call', 'call']);
+      // GetFolder, the web mail's settings, FindFolder, FindItem, the pinned
+      // ids, GetItem, CreateItem.
+      expect(log, [
+        'negotiate',
+        'auth',
+        'call',
+        'call',
+        'call',
+        'call',
+        'call',
+        'call'
+      ]);
+    });
+
+    test('folders: the web mail\'s archive folder, asked once', () async {
+      final s = service();
+      await s.connect(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+      final list = await s.folders();
+      expect(list.singleWhere((f) => f.role == FolderRole.archive).path, 'F-p');
+      await s.folders();
+      // GetFolder; then the settings and FindFolder; then FindFolder only.
+      expect(log, ['negotiate', 'auth', 'call', 'call', 'call']);
+    });
+
+    test('pin: as a message, or as any item when that is refused', () async {
+      final s = service();
+      await s.connect(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+      final inbox = (await s.folders()).first;
+      log.clear();
+      await s.setPinned(inbox, 'I1', pinned: true);
+      expect(log, ['call']);
+
+      rejectMessagePin = true;
+      log.clear();
+      await s.setPinned(inbox, 'I2',
+          pinned: false, received: DateTime.utc(2026, 9, 27));
+      expect(log, ['call', 'call']);
+    });
+
+    test('a new folder: made at the top, with the id Exchange gave', () async {
+      final s = service();
+      await s.connect(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+      final f = await s.createFolder('Архив');
+      expect(f.path, 'F-new');
+      expect(f.role, FolderRole.archive);
     });
 
     test('pins: the first schema the server knows is kept', () async {
@@ -652,6 +769,24 @@ String _answer(String request) {
             '<m:ResponseCode>ErrorNameResolutionNoResults</m:ResponseCode>'
             '</m:ResolveNamesResponseMessage></m:ResponseMessages></m:ResolveNamesResponse>');
   }
+  if (request.contains('<m:GetUserConfiguration>')) {
+    return _env('<m:GetUserConfigurationResponse><m:ResponseMessages>'
+        '<m:GetUserConfigurationResponseMessage ResponseClass="Success">'
+        '<m:UserConfiguration><t:Dictionary><t:DictionaryEntry>'
+        '<t:DictionaryKey><t:Type>String</t:Type><t:Value>ArchiveFolderId</t:Value></t:DictionaryKey>'
+        '<t:DictionaryValue><t:Type>String</t:Type><t:Value>F-p</t:Value></t:DictionaryValue>'
+        '</t:DictionaryEntry></t:Dictionary></m:UserConfiguration>'
+        '</m:GetUserConfigurationResponseMessage></m:ResponseMessages>'
+        '</m:GetUserConfigurationResponse>');
+  }
+  if (request.contains('<m:CreateFolder>')) {
+    return _env('<m:CreateFolderResponse><m:ResponseMessages>'
+        '<m:CreateFolderResponseMessage ResponseClass="Success"><m:Folders>'
+        '<t:Folder><t:FolderId Id="F-new" ChangeKey="k"/></t:Folder>'
+        '</m:Folders></m:CreateFolderResponseMessage></m:ResponseMessages>'
+        '</m:CreateFolderResponse>');
+  }
+  if (request.contains('<m:UpdateItem')) return _successXml;
   if (request.contains('<m:FindItem')) return _env(_itemsXml);
   if (request.contains('<m:GetItem>')) {
     final mime = base64Encode(utf8

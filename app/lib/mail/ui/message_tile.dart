@@ -8,30 +8,15 @@ import 'package:provider/provider.dart';
 import '../../theme.dart';
 import '../mail_controller.dart';
 import '../mail_models.dart';
+import 'mail_actions.dart';
 import 'message_page.dart';
 
 /// A message in the folder list: swipe left to delete it (with a moment to
-/// take that back), right to mark it read or unread.
+/// take that back), right to mark it read or unread; a long press for the
+/// rest (pin, archive, move).
 class SwipeableMessage extends StatelessWidget {
   const SwipeableMessage(this.h, {super.key});
   final MailHeader h;
-
-  void _deleted(BuildContext context) {
-    final c = context.read<MailController>();
-    final forever = c.folder.role == FolderRole.trash;
-    c.deleteSoon(h);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(forever
-            ? 'Письмо удалено навсегда'
-            : 'Письмо перемещено в «Удалённые»'),
-        duration: const Duration(seconds: 4),
-        // Goes after its duration (with an action Flutter would keep it).
-        persist: false,
-        action: SnackBarAction(label: 'Отменить', onPressed: c.undoDelete),
-      ));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,8 +41,9 @@ class SwipeableMessage extends StatelessWidget {
         unawaited(context.read<MailController>().toggleSeen(h));
         return false;
       },
-      onDismissed: (_) => _deleted(context),
-      child: MessageTile(h),
+      onDismissed: (_) => deleteWithUndo(context, h),
+      child: MessageTile(h,
+          onLongPress: () => unawaited(showMessageActions(context, h))),
     );
   }
 }
@@ -102,6 +88,7 @@ IconData folderIcon(FolderRole role) => switch (role) {
       FolderRole.drafts => Icons.drafts,
       FolderRole.trash => Icons.delete_outline,
       FolderRole.junk => Icons.report_outlined,
+      FolderRole.archive => Icons.archive_outlined,
       FolderRole.other => Icons.folder_outlined,
     };
 
@@ -138,11 +125,12 @@ Color sizeTintAt(double t, {required bool dark}) {
 
 /// One line of a message list: sender, date, subject and marks.
 class MessageTile extends StatelessWidget {
-  const MessageTile(this.h, {super.key, this.onOpened});
+  const MessageTile(this.h, {super.key, this.onOpened, this.onLongPress});
   final MailHeader h;
 
   /// After the message was opened (it is read now).
   final VoidCallback? onOpened;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -167,6 +155,7 @@ class MessageTile extends StatelessWidget {
           ));
           onOpened?.call();
         },
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
           child: Row(

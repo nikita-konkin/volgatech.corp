@@ -26,6 +26,11 @@ class EwsMailService implements MailService {
   /// Pinned message ids per folder, learnt with each folder's first page.
   final _pinnedIds = <String, Set<String>>{};
 
+  /// The folder Outlook on the web's Archive button files into, asked once
+  /// per sign-in; null when it was never set there.
+  String? _webArchive;
+  bool _webArchiveAsked = false;
+
   EwsSession get _s =>
       _session ?? (throw const MailNetworkException('not connected'));
 
@@ -41,11 +46,24 @@ class EwsMailService implements MailService {
       rethrow;
     }
     _session = session;
+    _webArchiveAsked = false;
   }
 
   @override
-  Future<List<MailFolder>> folders() async =>
-      parseFolders(await _s.call(findFoldersSoap), _roles);
+  Future<List<MailFolder>> folders() async {
+    if (!_webArchiveAsked) {
+      try {
+        _webArchive = parseWebArchiveFolder(await _s.call(getWebOptionsSoap));
+      } on EwsException {
+        _webArchive = null; // no web settings: a folder named «Архив» will do
+      }
+      _webArchiveAsked = true;
+    }
+    return parseFolders(await _s.call(findFoldersSoap), {
+      ..._roles,
+      if (_webArchive case final id?) id: FolderRole.archive,
+    });
+  }
 
   @override
   Future<int> inboxUnread() async {
@@ -142,6 +160,32 @@ class EwsMailService implements MailService {
   @override
   Future<void> delete(MailFolder folder, String id) =>
       _s.call(deleteSoap(id, permanently: folder.role == FolderRole.trash));
+
+  @override
+  Future<void> setPinned(MailFolder folder, String id,
+      {required bool pinned, DateTime? received}) async {
+    try {
+      await _s.call(setPinnedSoap(id, pinned: pinned, received: received));
+    } on EwsException {
+      // Not a plain message (a meeting request, say): as any item.
+      await _s.call(
+          setPinnedSoap(id, pinned: pinned, received: received, kind: 'Item'));
+    }
+    final ids = _pinnedIds[folder.path];
+    if (ids != null) {
+      _pinnedIds[folder.path] = {...ids}..remove(id);
+      if (pinned) _pinnedIds[folder.path]!.add(id);
+    }
+  }
+
+  @override
+  Future<MailFolder> createFolder(String name) async {
+    final doc = await _s.call(createFolderSoap(name));
+    final id = _t(doc, 'FolderId').firstOrNull?.getAttribute('Id');
+    if (id == null) throw const EwsException('папка не создана');
+    return MailFolder(
+        name: name, path: id, role: folderRole(path: id, name: name));
+  }
 
   @override
   Future<void> send(Uint8List mime) => _s.call(createItemSoap(mime));
@@ -302,6 +346,45 @@ String setReadSoap(String id, {required bool seen}) =>
     '<t:Message><t:IsRead>$seen</t:IsRead></t:Message></t:SetItemField>'
     '</t:Updates></t:ItemChange></m:ItemChanges></m:UpdateItem>';
 
+/// The two times Outlook on the web sets to pin a message: «received or
+/// renewed», which the list is sorted by, and the pin's own.
+const _renewTimeTag =
+    '<t:ExtendedFieldURI PropertyTag="0x0F01" PropertyType="SystemTime"/>';
+const _pinTimeTag =
+    '<t:ExtendedFieldURI PropertyTag="0x0F02" PropertyType="SystemTime"/>';
+
+/// Outlook on the web's pin date: past any real one, so pinned go first.
+final pinTime = DateTime.utc(4500, 9, 1);
+
+/// Pins [id] as Outlook on the web does: both times at [pinTime]. Unpinning
+/// drops the pin's time and puts «renewed» back to [received], so the
+/// message returns to its place by date. [kind] is the item's element:
+/// `Message`, or `Item` for anything else.
+String setPinnedSoap(String id,
+    {required bool pinned, DateTime? received, String kind = 'Message'}) {
+  String set(String tag, DateTime time) => '<t:SetItemField>$tag<t:$kind>'
+      '<t:ExtendedProperty>$tag'
+      '<t:Value>${time.toUtc().toIso8601String()}</t:Value>'
+      '</t:ExtendedProperty></t:$kind></t:SetItemField>';
+  final updates = pinned
+      ? set(_renewTimeTag, pinTime) + set(_pinTimeTag, pinTime)
+      : '${set(_renewTimeTag, received ?? DateTime.now())}'
+          '<t:DeleteItemField>$_pinTimeTag</t:DeleteItemField>';
+  return '<m:UpdateItem MessageDisposition="SaveOnly" '
+      'ConflictResolution="AlwaysOverwrite" SuppressReadReceipts="true">'
+      '<m:ItemChanges><t:ItemChange><t:ItemId Id="${xmlText(id)}"/>'
+      '<t:Updates>$updates</t:Updates></t:ItemChange></m:ItemChanges>'
+      '</m:UpdateItem>';
+}
+
+/// A mail folder [name] at the top of the mailbox, beside Входящие.
+String createFolderSoap(String name) => '<m:CreateFolder>'
+    '<m:ParentFolderId><t:DistinguishedFolderId Id="msgfolderroot"/>'
+    '</m:ParentFolderId><m:Folders><t:Folder>'
+    '<t:FolderClass>IPF.Note</t:FolderClass>'
+    '<t:DisplayName>${xmlText(name)}</t:DisplayName>'
+    '</t:Folder></m:Folders></m:CreateFolder>';
+
 String moveSoap(String id, String folderId) => '<m:MoveItem>'
     '<m:ToFolderId><t:FolderId Id="${xmlText(folderId)}"/></m:ToFolderId>'
     '<m:ItemIds><t:ItemId Id="${xmlText(id)}"/></m:ItemIds></m:MoveItem>';
@@ -378,7 +461,7 @@ String setAutoReplySoap(String address, AutoReply r) {
       '</t:UserOofSettings></m:SetUserOofSettingsRequest>';
 }
 
-/// Outlook on the web's settings, the signature among them.
+/// Outlook on the web's settings: the signature, the archive folder, …
 const getWebOptionsSoap = '<m:GetUserConfiguration>'
     '<m:UserConfigurationName Name="OWA.UserOptions">'
     '<t:DistinguishedFolderId Id="root"/></m:UserConfigurationName>'
@@ -502,24 +585,32 @@ AutoReply parseAutoReply(XmlDocument doc) {
   );
 }
 
+/// The value of setting [key] in [getWebOptionsSoap]'s answer.
+String? _webOption(XmlDocument doc, String key) {
+  for (final e in _t(doc, 'DictionaryEntry')) {
+    final k = _t(e, 'DictionaryKey').firstOrNull;
+    if (k != null && _text(k, 'Value')?.toLowerCase() == key.toLowerCase()) {
+      final v = _t(e, 'DictionaryValue').firstOrNull;
+      return v == null ? null : _text(v, 'Value');
+    }
+  }
+  return null;
+}
+
 /// The web mail's signature from [getWebOptionsSoap]: its text version, or
 /// the HTML one made readable (pictures can't come along).
 String? parseWebSignature(XmlDocument doc) {
-  String? value(String key) {
-    for (final e in _t(doc, 'DictionaryEntry')) {
-      final k = _t(e, 'DictionaryKey').firstOrNull;
-      if (k != null && _text(k, 'Value') == key) {
-        final v = _t(e, 'DictionaryValue').firstOrNull;
-        return v == null ? null : _text(v, 'Value');
-      }
-    }
-    return null;
-  }
-
-  final text = value('signaturetext')?.trim() ?? '';
+  final text = _webOption(doc, 'signaturetext')?.trim() ?? '';
   if (text.isNotEmpty) return text;
-  final html = htmlToText(value('signaturehtml') ?? '');
+  final html = htmlToText(_webOption(doc, 'signaturehtml') ?? '');
   return html.isEmpty ? null : html;
+}
+
+/// The folder Outlook on the web's Archive button files into, from
+/// [getWebOptionsSoap]; null when it was never chosen there.
+String? parseWebArchiveFolder(XmlDocument doc) {
+  final id = _webOption(doc, 'ArchiveFolderId')?.trim() ?? '';
+  return id.isEmpty ? null : id;
 }
 
 /// The people a [resolveNamesSoap] found, each address once.
@@ -550,18 +641,25 @@ Map<String, FolderRole> parseRoles(XmlDocument doc) {
   return roles;
 }
 
-/// Mail folders (not calendar, contacts, …), system ones first.
+/// Mail folders (not calendar, contacts, …), system ones first. When the
+/// archive [roles] know is among them, others named «Архив» are just folders.
 List<MailFolder> parseFolders(XmlDocument doc, Map<String, FolderRole> roles) {
+  final archiveKnown = _t(doc, 'FolderId')
+      .any((e) => roles[e.getAttribute('Id')] == FolderRole.archive);
   final list = <MailFolder>[];
   for (final f in _t(doc, 'Folder')) {
     final id = _t(f, 'FolderId').firstOrNull?.getAttribute('Id');
     final cls = _text(f, 'FolderClass');
     if (id == null || (cls != null && !cls.startsWith('IPF.Note'))) continue;
     final name = _text(f, 'DisplayName') ?? '';
+    var role = roles[id] ?? folderRole(path: id, name: name);
+    if (role == FolderRole.archive && archiveKnown && roles[id] == null) {
+      role = FolderRole.other;
+    }
     list.add(MailFolder(
       name: name,
       path: id,
-      role: roles[id] ?? folderRole(path: id, name: name),
+      role: role,
       unseen: int.tryParse(_text(f, 'UnreadCount') ?? '') ?? 0,
     ));
   }
