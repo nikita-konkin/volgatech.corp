@@ -94,6 +94,8 @@ but:
 - «Почта» opens the web mail in a new tab: the mail server doesn't let a web page
   talk to it, so there is no built-in mail client;
 - there is no lock with Face ID, a fingerprint or a PIN;
+- there are no reminders before lessons, no home-screen widget and no mail
+  notifications: a web page can't wake up at a set time;
 - updates need nothing: the site is rebuilt whenever the app changes, and the
   app loads the new version the next time it starts.
 
@@ -101,31 +103,97 @@ but:
 
 - **Login** with JWT + auto-refresh; tokens in the OS keystore, the password is
   never stored.
-- **Расписание занятий** — day view, swipe between days, offline cache, a
-  week-type accent colour (red for week 1, blue for week 2), and an **«Обзор
-  недели»** overview (Пн–Вс, lessons per day, gaps «окна», total pairs, tap a
-  day to jump).
-- **Расписание экзаменов** — study-year picker, grouped by date, offline cache.
+- **Расписание занятий** — day view, swipe between days, «Сегодня», offline
+  cache, a week-type accent colour (red for week 1, blue for week 2), and an
+  **«Обзор недели»** overview (Пн–Вс, lessons per day, gaps «окна», total
+  pairs, tap a day to jump); the week goes to a calendar app with «В
+  календарь». On Android: **reminders** before lessons and the **«Ближайшая
+  пара»** home-screen widget.
+- **Расписание экзаменов** — study-year picker, grouped by date, offline
+  cache, «В календарь».
 - **Профиль** — photo, birthday, and every appointment (main department first)
   with its **ставка / почасовая** load, department and start date, plus a
   combined-load line and work experience.
 - **Иностранные группы** — the monthly «служебная записка» about classes taught
   to foreign students (groups with a 3-digit number, e.g. ИСТ-110), built from
   your schedule and shared as a .docx in the portal's own template.
-- **Настройки** — theme (system / light / dark) and an optional
-  fingerprint / PIN **app-lock**.
+- **Настройки** — theme (system / light / dark, and Liquid Glass in the
+  browser), an optional fingerprint / PIN **app-lock**, notifications, and
+  **«Отчёты об ошибках»** kept on the device to send by hand.
 - **Обновления** — a new release on GitHub shows up as a banner in the app;
   «Обновить» downloads the right APK for the phone, checks it and opens the
   Android installer.
 - **Почта** — in the `app-mail-*` APKs, a **built-in client** for the
-  university's Exchange mailbox (EWS): folders, search, pinned messages,
-  attachments, replies with a signature, address-book suggestions,
-  «Автоответ», mailbox size and an unread badge. The mail password is kept
+  university's Exchange mailbox (EWS): folders, search, pin and «В архив»,
+  several messages at once, attachments that open in the app, replies with
+  a signature, address-book suggestions, «Автоответ», mailbox size, an
+  unread badge and new-mail notifications. The mail password is kept
   in the OS keystore and deleted on «Выйти из почты». In the plain APKs,
   OWA opens in-app (WebView) as before.
 - **Портал** — the corporate portal opens **in-app** (WebView), keeping only
   the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.2
+
+<img src="docs/screenshots/widget.webp" width="15%" alt="Виджет «Ближайшая пара»">
+<img src="docs/screenshots/reminder.webp" width="15%" alt="Напоминание о занятии">
+<img src="docs/screenshots/mail-notify.webp" width="15%" alt="Уведомления о новых письмах">
+<img src="docs/screenshots/mail-pick.webp" width="15%" alt="Почта: несколько писем выбрано">
+<img src="docs/screenshots/crash-reports.webp" width="15%" alt="Отчёты об ошибках">
+<img src="docs/screenshots/glass.webp" width="15%" alt="Liquid Glass в браузере">
+
+**Schedule**
+
+- **«Сегодня»** — one tap back to today from another day or week (on a
+  computer, the Home key).
+- **«В календарь»** — on the week overview and on the exams, the lessons or
+  exams as a calendar file for Google Calendar, Outlook or the iPhone's
+  calendar.
+- **Reminders before lessons** (Android) — **Настройки → Уведомления →
+  «Перед занятием»**: 10, 15 or 30 minutes before, with the subject and the
+  room. They cover the weeks the app has loaded, one or two ahead, so open
+  the schedule at least once a week.
+- **«Ближайшая пара»**, a home-screen widget (Android) — the lesson on now or
+  next, its time and room, and the one after it; it changes by itself as
+  lessons start and end. Long-press the home screen → Виджеты →
+  Волгатех.Коллектив.
+
+**Mail** (the `app-mail-*` APKs)
+
+- **New mail notifications** — **Настройки → Уведомления → «Новые письма»**:
+  «Входящие» is checked every 15 minutes, even with the app closed; tapping
+  a notification opens «Почта».
+- **Several messages at once** — long-press one, tap the others, then mark
+  them read or unread, archive, move, delete (one «Отменить» brings them all
+  back), or pin them.
+- **Pin and unpin, «В архив»** — from an open message or for several at
+  once. Pins are Outlook on the web's own, so they show there too; the
+  archive is the folder Outlook archives to, or «Архив», which the app
+  offers to create.
+- **Attachments open in the app** — pictures (pinch to zoom), PDFs page by
+  page, and text files; anything else opens, saves or shares as before.
+
+**Everywhere**
+
+- **Отчёты об ошибках** — **Настройки → Ошибки**. Errors the app runs into
+  are kept on the device and nowhere else. «Отправить» (or «Скопировать» in
+  the browser) hands a report to the developer through the app of your
+  choice; it has what broke and where, and no login, mail or schedule data.
+
+**In the browser** (the site is updated with every change)
+
+- **Liquid Glass** — **Настройки → Тема оформления**: translucent panels
+  over a coloured background, on top of the light or dark theme. Solid
+  again by itself when the system asks to reduce transparency or increase
+  contrast.
+- A layout for computers (see [On a computer](#on-a-computer)).
+- A logo and a progress bar while the app loads, with a way to reload if
+  it takes too long.
+- Starts without the network after a single visit.
+
+From v0.5.1 the app offers this update by itself (**Настройки →
+Обновления**).
 
 ## What's new — v0.5.1
 
