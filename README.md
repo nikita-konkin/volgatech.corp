@@ -136,12 +136,7 @@ but:
 
 ## What's new — v0.5.2
 
-<img src="docs/screenshots/widget.webp" width="15%" alt="Виджет «Ближайшая пара»">
-<img src="docs/screenshots/reminder.webp" width="15%" alt="Напоминание о занятии">
-<img src="docs/screenshots/mail-notify.webp" width="15%" alt="Уведомления о новых письмах">
-<img src="docs/screenshots/mail-pick.webp" width="15%" alt="Почта: несколько писем выбрано">
-<img src="docs/screenshots/crash-reports.webp" width="15%" alt="Отчёты об ошибках">
-<img src="docs/screenshots/glass.webp" width="15%" alt="Liquid Glass в браузере">
+<img src="docs/screenshots/widget.webp" width="15%" alt="Виджет «Ближайшая пара»"> <img src="docs/screenshots/reminder.webp" width="15%" alt="Напоминание о занятии"> <img src="docs/screenshots/mail-notify.webp" width="15%" alt="Уведомления о новых письмах"> <img src="docs/screenshots/mail-pick.webp" width="15%" alt="Почта: несколько писем выбрано"> <img src="docs/screenshots/crash-reports.webp" width="15%" alt="Отчёты об ошибках"> <img src="docs/screenshots/glass.webp" width="15%" alt="Liquid Glass в браузере">
 
 **Schedule**
 
