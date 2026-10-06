@@ -56,6 +56,8 @@ class WeekSummaryPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Обзор недели'),
         actions: [
+          if (!c.onThisWeek)
+            TodayButton(onPressed: () => unawaited(c.goToToday())),
           if (desktopBrowser)
             RefreshButton(
                 onPressed: c.loading ? null : () => unawaited(c.refresh())),
@@ -72,6 +74,7 @@ class WeekSummaryPage extends StatelessWidget {
       body: ArrowKeys(
         onPrevious: () => unawaited(c.prevWeek()),
         onNext: () => unawaited(c.nextWeek()),
+        onHome: () => unawaited(c.goToToday()),
         child: GestureDetector(
           onHorizontalDragEnd: (d) {
             final v = d.primaryVelocity ?? 0;

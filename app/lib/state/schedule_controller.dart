@@ -46,6 +46,14 @@ class ScheduleController extends ChangeNotifier {
   DateTime get weekStart => _mondayOf(selectedDay);
   String get _week => _key(weekStart);
 
+  /// Today is the day shown.
+  bool get onToday => selectedDay == _dateOnly(DateTime.now());
+
+  /// Today falls in the week shown.
+  bool get onThisWeek => weekStart == _mondayOf(DateTime.now());
+
+  Future<void> goToToday() => goToDay(DateTime.now());
+
   /// The seven dates Mon..Sun of the current week.
   List<DateTime> get weekDays {
     final m = weekStart;

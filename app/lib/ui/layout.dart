@@ -64,10 +64,14 @@ class ArrowKeys extends StatelessWidget {
       {super.key,
       required this.onPrevious,
       required this.onNext,
+      this.onHome,
       required this.child});
 
   final VoidCallback onPrevious;
   final VoidCallback onNext;
+
+  /// Home: back to today.
+  final VoidCallback? onHome;
   final Widget child;
 
   @override
@@ -75,8 +79,23 @@ class ArrowKeys extends StatelessWidget {
         bindings: {
           const SingleActivator(LogicalKeyboardKey.arrowLeft): onPrevious,
           const SingleActivator(LogicalKeyboardKey.arrowRight): onNext,
+          if (onHome case final home?)
+            const SingleActivator(LogicalKeyboardKey.home): home,
         },
         child: Focus(autofocus: true, child: child),
+      );
+}
+
+/// Back to today, shown once the screen has moved away from it.
+class TodayButton extends StatelessWidget {
+  const TodayButton({super.key, required this.onPressed});
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: 'Сегодня',
+        icon: const Icon(Icons.today),
+        onPressed: onPressed,
       );
 }
 

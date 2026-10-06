@@ -65,6 +65,8 @@ class _ScheduleView extends StatelessWidget {
         leading: kNativeMail && !inShell ? const MenuButtonWithMail() : null,
         title: const Text('Расписание занятий'),
         actions: [
+          if (!c.onToday)
+            TodayButton(onPressed: () => unawaited(c.goToToday())),
           if (desktopBrowser)
             RefreshButton(
                 onPressed: c.loading ? null : () => unawaited(c.refresh())),
@@ -89,6 +91,7 @@ class _ScheduleView extends StatelessWidget {
       body: ArrowKeys(
         onPrevious: () => unawaited(c.prevDay()),
         onNext: () => unawaited(c.nextDay()),
+        onHome: () => unawaited(c.goToToday()),
         child: Column(
           children: [
             if (c.fromCache) OfflineBanner(savedAt: c.cacheSavedAt),
