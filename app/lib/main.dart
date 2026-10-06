@@ -1,13 +1,16 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'core/api_client.dart';
 import 'core/app_lock.dart';
 import 'core/cache.dart';
+import 'core/crash_log.dart';
 import 'core/lesson_reminders.dart';
 import 'core/lesson_widget.dart';
 import 'core/notifications.dart';
@@ -33,6 +36,14 @@ Future<void> main() async {
   final api = VolgatechApi(client);
   final cache = JsonCache();
   final prefs = await Prefs.load();
+  // From here on, what goes wrong is written down on the device (Settings →
+  // «Отчёты об ошибках»), for its owner to send if they like.
+  final crashes =
+      CrashLog(prefs, platform: kIsWeb ? 'браузер' : defaultTargetPlatform.name)
+        ..install();
+  unawaited(PackageInfo.fromPlatform()
+      .then((i) => crashes.version = '${i.version}+${i.buildNumber}')
+      .catchError((_) => ''));
   // A build without the mail client never keeps the mail password, even one
   // left behind by a MAIL build installed over before.
   if (!kNativeMail) unawaited(MailCredentialStore().clear());
@@ -63,6 +74,7 @@ Future<void> main() async {
         Provider<JsonCache>.value(value: cache),
         Provider<PhotoStore>.value(value: PhotoStore(api, cache)),
         Provider<Prefs>.value(value: prefs),
+        ChangeNotifierProvider<CrashLog>.value(value: crashes),
         ChangeNotifierProvider<ThemeController>(
           create: (_) => ThemeController(prefs),
         ),
