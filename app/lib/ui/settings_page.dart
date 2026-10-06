@@ -11,6 +11,7 @@ import '../mail/mail_alerts.dart';
 import '../state/theme_controller.dart';
 import '../state/updater.dart';
 import '../web/a11y.dart';
+import 'crash_log_page.dart';
 import 'easter_egg.dart';
 import 'layout.dart';
 
@@ -108,6 +109,13 @@ class SettingsPage extends StatelessWidget {
             ),
             const _UpdateTile(),
           ],
+          const Divider(height: 1),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child:
+                Text('Ошибки', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const CrashLogTile(),
           const EasterEggFooter(),
         ],
       ),

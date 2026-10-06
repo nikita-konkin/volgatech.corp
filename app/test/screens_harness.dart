@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:volgatech_pro/core/app_lock.dart';
 import 'package:volgatech_pro/core/cache.dart';
+import 'package:volgatech_pro/core/crash_log.dart';
 import 'package:volgatech_pro/core/lesson_reminders.dart';
 import 'package:volgatech_pro/core/lesson_widget.dart';
 import 'package:volgatech_pro/core/photo_store.dart';
@@ -132,6 +133,7 @@ Future<Widget> screensApp(Widget home,
         Provider<VolgatechApi>.value(value: api),
         Provider<JsonCache>.value(value: cache),
         Provider<Prefs>.value(value: prefs),
+        ChangeNotifierProvider(create: (_) => CrashLog(prefs)),
         Provider<PhotoStore>.value(value: PhotoStore(api, cache)),
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider(create: (_) => ThemeController(prefs)),
