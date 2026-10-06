@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_lock.dart';
+import '../core/lesson_reminders.dart';
 import '../state/theme_controller.dart';
 import '../state/updater.dart';
 import 'easter_egg.dart';
@@ -85,6 +86,15 @@ class SettingsPage extends StatelessWidget {
               onChanged: (v) => _toggleLock(context, v),
             ),
           ],
+          if (LessonReminders.supported) ...[
+            const Divider(height: 1),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text('Напоминания',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            const _LessonReminderTile(),
+          ],
           if (context.read<Updater>().enabled) ...[
             const Divider(height: 1),
             const Padding(
@@ -96,6 +106,48 @@ class SettingsPage extends StatelessWidget {
           ],
           const EasterEggFooter(),
         ],
+      ),
+    );
+  }
+}
+
+/// How long before a lesson to remind of it, if at all.
+class _LessonReminderTile extends StatelessWidget {
+  const _LessonReminderTile();
+
+  static const _choices = {
+    0: 'Не напоминать',
+    10: 'За 10 минут',
+    15: 'За 15 минут',
+    30: 'За 30 минут',
+  };
+
+  Future<void> _set(BuildContext context, int minutes) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await context.read<LessonReminders>().setMinutes(minutes);
+    if (!ok) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'Уведомления запрещены. Разрешите их приложению в настройках телефона.'),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final minutes = context.watch<LessonReminders>().minutes;
+    return ListTile(
+      title: const Text('Перед занятием'),
+      subtitle: const Text(
+          'Уведомление с предметом и аудиторией. Расписание на 1–2 недели вперёд — откройте его хотя бы раз в неделю'),
+      trailing: DropdownButton<int>(
+        value: _choices.containsKey(minutes) ? minutes : 0,
+        underline: const SizedBox.shrink(),
+        items: [
+          for (final MapEntry(key: m, value: label) in _choices.entries)
+            DropdownMenuItem(value: m, child: Text(label)),
+        ],
+        onChanged: (m) => _set(context, m!),
       ),
     );
   }

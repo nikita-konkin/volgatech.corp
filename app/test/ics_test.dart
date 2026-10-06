@@ -29,8 +29,7 @@ void main() {
     final ics = buildIcs(
         lessonEvents({
           day: [
-            _lesson('08:00', '09:35', 'Системы ИИ; часть 1, введение',
-                'ИСТ-43',
+            _lesson('08:00', '09:35', 'Системы ИИ; часть 1, введение', 'ИСТ-43',
                 type: 'Лабораторные'),
           ],
         }),
@@ -42,8 +41,7 @@ void main() {
     expect(lines, contains('DTSTART:20261006T050000Z'));
     expect(lines, contains('DTEND:20261006T063500Z'));
     expect(lines, contains('DTSTAMP:20261001T120000Z'));
-    expect(lines,
-        contains(r'SUMMARY:Системы ИИ\; часть 1\, введение (лаб.)'));
+    expect(lines, contains(r'SUMMARY:Системы ИИ\; часть 1\, введение (лаб.)'));
     expect(lines, contains('LOCATION:333г (III)'));
     expect(
         lines,
@@ -66,8 +64,7 @@ void main() {
         'SUMMARY:${('Проектирование ' * 8).trim()} (лекция)');
   });
 
-  test('a shared slot is one event; ids hold from one export to the next',
-      () {
+  test('a shared slot is one event; ids hold from one export to the next', () {
     List<IcsEvent> week() => lessonEvents({
           day: [
             _lesson('09:45', '11:20', 'Сети', 'ИСТ-41'),

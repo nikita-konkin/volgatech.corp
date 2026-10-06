@@ -8,6 +8,8 @@ import 'app.dart';
 import 'core/api_client.dart';
 import 'core/app_lock.dart';
 import 'core/cache.dart';
+import 'core/lesson_reminders.dart';
+import 'core/notifications.dart';
 import 'core/photo_store.dart';
 import 'core/prefs.dart';
 import 'core/session.dart';
@@ -47,6 +49,9 @@ Future<void> main() async {
           create: (_) => AppLock(prefs),
         ),
         ChangeNotifierProvider<Updater>(create: (_) => Updater(prefs: prefs)),
+        ChangeNotifierProvider<LessonReminders>(
+          create: (_) => LessonReminders(prefs, LocalReminderPlatform()),
+        ),
         if (kNativeMail)
           ChangeNotifierProvider<MailBadge>(
             create: (_) =>
