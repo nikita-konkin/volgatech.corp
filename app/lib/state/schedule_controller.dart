@@ -13,10 +13,14 @@ import '../models/schedule.dart';
 /// in flight, failed — so paging back to a week already seen costs nothing,
 /// and a slow response for one week can never overwrite the state of another.
 class ScheduleController extends ChangeNotifier {
-  ScheduleController(this._api, this._personId, this._cache);
+  ScheduleController(this._api, this._personId, this._cache, {this.onWeek});
   final VolgatechApi _api;
   final int _personId;
   final JsonCache _cache;
+
+  /// Told each week as it arrives (from disk or the network): its seven
+  /// days, a day without lessons empty. Reminders are planned from it.
+  final void Function(Map<DateTime, List<ScheduleEvent>> week)? onWeek;
 
   DateTime selectedDay = _dateOnly(DateTime.now());
 
@@ -45,6 +49,14 @@ class ScheduleController extends ChangeNotifier {
   /// Monday of the selected day's week.
   DateTime get weekStart => _mondayOf(selectedDay);
   String get _week => _key(weekStart);
+
+  /// Today is the day shown.
+  bool get onToday => selectedDay == _dateOnly(DateTime.now());
+
+  /// Today falls in the week shown.
+  bool get onThisWeek => weekStart == _mondayOf(DateTime.now());
+
+  Future<void> goToToday() => goToDay(DateTime.now());
 
   /// The seven dates Mon..Sun of the current week.
   List<DateTime> get weekDays {
@@ -214,6 +226,10 @@ class ScheduleController extends ChangeNotifier {
         ..sort((a, b) => (a.timeBegin ?? '').compareTo(b.timeBegin ?? ''));
       _byDay[_key(d.date)] = List.unmodifiable(sorted);
     }
+    onWeek?.call({
+      for (var i = 0; i < 7; i++)
+        _plusDays(monday, i): eventsOn(_plusDays(monday, i)),
+    });
   }
 
   void _notify() {

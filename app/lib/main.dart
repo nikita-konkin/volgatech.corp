@@ -8,6 +8,9 @@ import 'app.dart';
 import 'core/api_client.dart';
 import 'core/app_lock.dart';
 import 'core/cache.dart';
+import 'core/lesson_reminders.dart';
+import 'core/lesson_widget.dart';
+import 'core/notifications.dart';
 import 'core/photo_store.dart';
 import 'core/prefs.dart';
 import 'core/session.dart';
@@ -32,6 +35,18 @@ Future<void> main() async {
   // left behind by a MAIL build installed over before.
   if (!kNativeMail) unawaited(MailCredentialStore().clear());
 
+  final auth = AuthController(api, session, cache);
+  final reminders = LessonReminders(prefs, LocalReminderPlatform());
+  final lessonWidget = LessonWidget();
+  if (LessonReminders.supported) {
+    // Signed out, the phone stops showing that person's lessons.
+    whenSignedOut(auth, () {
+      unawaited(reminders.forget());
+      unawaited(lessonWidget.forget());
+    });
+  }
+  unawaited(auth.bootstrap());
+
   runApp(
     MultiProvider(
       providers: [
@@ -47,18 +62,14 @@ Future<void> main() async {
           create: (_) => AppLock(prefs),
         ),
         ChangeNotifierProvider<Updater>(create: (_) => Updater(prefs: prefs)),
+        ChangeNotifierProvider<LessonReminders>.value(value: reminders),
+        Provider<LessonWidget>.value(value: lessonWidget),
         if (kNativeMail)
           ChangeNotifierProvider<MailBadge>(
             create: (_) =>
                 MailBadge(prefs: prefs, store: MailCredentialStore())..watch(),
           ),
-        ChangeNotifierProvider<AuthController>(
-          create: (_) {
-            final auth = AuthController(api, session, cache);
-            unawaited(auth.bootstrap());
-            return auth;
-          },
-        ),
+        ChangeNotifierProvider<AuthController>.value(value: auth),
       ],
       child: const VolgatechApp(),
     ),

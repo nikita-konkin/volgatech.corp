@@ -5,11 +5,13 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../core/cache.dart';
+import '../core/ics.dart';
 import '../data/volgatech_api.dart';
 import '../models/exams.dart';
 import '../state/auth_controller.dart';
 import '../state/exams_controller.dart';
 import '../theme.dart';
+import 'calendar_export.dart';
 import 'layout.dart';
 import 'offline_banner.dart';
 
@@ -46,6 +48,16 @@ class _ExamsView extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Расписание экзаменов'),
         actions: [
+          CalendarButton(
+            onPressed: !c.exams.any((x) => x.examDate != null)
+                ? null
+                : () => unawaited(exportCalendar(
+                      buildIcs(examEvents(c.exams),
+                          name: 'Экзамены ${c.selectedYear?.name ?? ''}'),
+                      fileName: 'ekzameny-${c.selectedYear?.value ?? ''}.ics',
+                      title: 'Экзамены ${c.selectedYear?.name ?? ''}',
+                    )),
+          ),
           if (desktopBrowser)
             RefreshButton(
                 onPressed: c.loadingYears || c.loadingExams
