@@ -6,10 +6,18 @@ import 'package:flutter/foundation.dart';
 import '../models/auth.dart';
 import 'session.dart';
 
+/// A build with `--dart-define=API=test` talks to the university's test
+/// server: for trying changes without real data. It says so on screen
+/// (app.dart).
+const kTestServer = String.fromEnvironment('API') == 'test';
+
 /// Base URLs from the reverse-engineered contract.
 class Api {
   static const prod = 'https://api.volgatech.net';
   static const test = 'https://test-api.volgatech.net';
+
+  /// The one this build talks to.
+  static const current = kTestServer ? test : prod;
 
   // Endpoints (see reverse_engineering/API_CONTRACT.md).
   static const login = '/api/Auth/GetToken';
@@ -26,7 +34,7 @@ class Api {
 class ApiClient {
   ApiClient(
     this.session, {
-    String baseUrl = Api.prod,
+    String baseUrl = Api.current,
     @visibleForTesting HttpClientAdapter? adapter,
   }) : dio = Dio(BaseOptions(
           baseUrl: baseUrl,

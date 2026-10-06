@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'core/api_client.dart';
 import 'core/app_lock.dart';
 import 'core/notifications.dart';
 import 'mail/mail_config.dart';
@@ -65,9 +66,11 @@ class _VolgatechAppState extends State<VolgatechApp>
       ],
       // Wrap the whole Navigator so the lock covers pushed routes too
       // (Settings, Profile), not just the home screen.
-      builder: (context, child) => BrowserInsets(
-          child: _LockGate(
-              child: UpdateWatcher(child: child ?? const SizedBox.shrink()))),
+      builder: (context, child) => _TestServerMark(
+          child: BrowserInsets(
+              child: _LockGate(
+                  child:
+                      UpdateWatcher(child: child ?? const SizedBox.shrink())))),
       home: const _AuthGate(),
     );
   }
@@ -176,4 +179,21 @@ class _NotificationTapsState extends State<_NotificationTaps> {
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// On a build for the test server (`--dart-define=API=test`), «ТЕСТ» across
+/// the corner, so it is never taken for the real thing.
+class _TestServerMark extends StatelessWidget {
+  const _TestServerMark({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => kTestServer
+      ? Banner(
+          message: 'ТЕСТ',
+          location: BannerLocation.topEnd,
+          color: Colors.deepOrange,
+          child: child,
+        )
+      : child;
 }

@@ -276,6 +276,7 @@ flutter analyze
 flutter test
 flutter build apk --release --split-per-abi   # Android: APK под каждый тип процессора (arm64 ≈ 20 МБ)
 flutter build apk --release --split-per-abi --dart-define=MAIL=true   # …со встроенным почтовым клиентом
+flutter build apk --debug --dart-define=API=test   # с тестовым сервером test-api.volgatech.net, с пометкой «ТЕСТ»
 flutter build ios --release --no-codesign      # iOS: сборка без подписи (нужны macOS и Xcode)
 flutter build web --release --no-web-resources-cdn   # версия для браузера, в build/web
 ```

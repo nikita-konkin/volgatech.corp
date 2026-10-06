@@ -29,7 +29,7 @@ Future<void> main() async {
   await initializeDateFormatting('ru_RU', null);
 
   final session = Session();
-  final client = ApiClient(session); // base: https://api.volgatech.net
+  final client = ApiClient(session); // Api.current: prod, or test by flag
   final api = VolgatechApi(client);
   final cache = JsonCache();
   final prefs = await Prefs.load();
