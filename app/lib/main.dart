@@ -15,6 +15,8 @@ import 'core/photo_store.dart';
 import 'core/prefs.dart';
 import 'core/session.dart';
 import 'data/volgatech_api.dart';
+import 'mail/mail_alerts.dart';
+import 'mail/mail_background.dart';
 import 'mail/mail_badge.dart';
 import 'mail/mail_config.dart';
 import 'mail/mail_credentials.dart';
@@ -34,6 +36,12 @@ Future<void> main() async {
   // A build without the mail client never keeps the mail password, even one
   // left behind by a MAIL build installed over before.
   if (!kNativeMail) unawaited(MailCredentialStore().clear());
+
+  if (Notifications.supported) unawaited(Notifications.start());
+  final mailAlerts = MailAlerts.supported
+      ? (MailAlerts(prefs, LocalMailAlerts(), BackgroundMailCheck())
+        ..resume().ignore())
+      : null;
 
   final auth = AuthController(api, session, cache);
   final reminders = LessonReminders(prefs, LocalReminderPlatform());
@@ -64,6 +72,8 @@ Future<void> main() async {
         ChangeNotifierProvider<Updater>(create: (_) => Updater(prefs: prefs)),
         ChangeNotifierProvider<LessonReminders>.value(value: reminders),
         Provider<LessonWidget>.value(value: lessonWidget),
+        if (mailAlerts != null)
+          ChangeNotifierProvider<MailAlerts>.value(value: mailAlerts),
         if (kNativeMail)
           ChangeNotifierProvider<MailBadge>(
             create: (_) =>

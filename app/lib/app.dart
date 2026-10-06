@@ -3,6 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_lock.dart';
+import 'core/notifications.dart';
+import 'mail/mail_config.dart';
+import 'mail/ui/mail_page.dart';
 import 'state/auth_controller.dart';
 import 'state/theme_controller.dart';
 import 'theme.dart';
@@ -93,7 +96,7 @@ class _AuthGate extends StatelessWidget {
     final status = context.watch<AuthController>().status;
     switch (status) {
       case AuthStatus.authenticated:
-        return const HomeShell();
+        return const _NotificationTaps(child: HomeShell());
       case AuthStatus.unauthenticated:
       case AuthStatus.authenticating:
         return const LoginPage();
@@ -103,4 +106,45 @@ class _AuthGate extends StatelessWidget {
         );
     }
   }
+}
+
+/// A tapped notification of new mail opens «Почта» (a lesson's just opens
+/// the app, on the schedule).
+class _NotificationTaps extends StatefulWidget {
+  const _NotificationTaps({required this.child});
+  final Widget child;
+
+  @override
+  State<_NotificationTaps> createState() => _NotificationTapsState();
+}
+
+class _NotificationTapsState extends State<_NotificationTaps> {
+  @override
+  void initState() {
+    super.initState();
+    Notifications.tapped.addListener(_open);
+    // One that started the app came before this screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _open());
+  }
+
+  @override
+  void dispose() {
+    Notifications.tapped.removeListener(_open);
+    super.dispose();
+  }
+
+  void _open() {
+    final what = Notifications.tapped.value;
+    if (what == null || !mounted) return;
+    Notifications.tapped.value = null;
+    if (what == 'mail' && kNativeMail) {
+      final nav = Navigator.of(context);
+      // Not a second «Почта» on top of an open one.
+      nav.popUntil((r) => r.isFirst);
+      nav.push(MaterialPageRoute<void>(builder: (_) => const MailPage()));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

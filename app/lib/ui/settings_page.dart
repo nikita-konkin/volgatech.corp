@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_lock.dart';
 import '../core/lesson_reminders.dart';
+import '../mail/mail_alerts.dart';
 import '../state/theme_controller.dart';
 import '../state/updater.dart';
 import 'easter_egg.dart';
@@ -90,10 +91,11 @@ class SettingsPage extends StatelessWidget {
             const Divider(height: 1),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Напоминания',
+              child: Text('Уведомления',
                   style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const _LessonReminderTile(),
+            if (MailAlerts.supported) const _MailAlertTile(),
           ],
           if (context.read<Updater>().enabled) ...[
             const Divider(height: 1),
@@ -149,6 +151,33 @@ class _LessonReminderTile extends StatelessWidget {
         ],
         onChanged: (m) => _set(context, m!),
       ),
+    );
+  }
+}
+
+/// New mail in «Входящие» as notifications.
+class _MailAlertTile extends StatelessWidget {
+  const _MailAlertTile();
+
+  Future<void> _set(BuildContext context, bool on) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await context.read<MailAlerts>().setEnabled(on);
+    if (!ok) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            'Уведомления запрещены. Разрешите их приложению в настройках телефона.'),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      title: const Text('Новые письма'),
+      subtitle: const Text(
+          'Проверять «Входящие» раз в 15 минут, даже когда приложение закрыто'),
+      value: context.watch<MailAlerts>().enabled,
+      onChanged: (v) => _set(context, v),
     );
   }
 }

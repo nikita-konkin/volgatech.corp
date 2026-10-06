@@ -24,11 +24,29 @@ class Prefs {
   static const _kUpdateDismissed = 'update_dismissed';
   static const _kSignature = 'mail_signature';
   static const _kUnread = 'mail_unread';
+  static const _kMailNotify = 'mail_notify';
+  static const _kMailSeenUntil = 'mail_seen_until';
   static const _kDraft = 'mail_draft';
   static const _kSignNew = 'mail_signature_new';
   static const _kSignReplies = 'mail_signature_replies';
 
   String? get rememberedLogin => _p.getString(_kLogin);
+
+  /// What the background check (another isolate) may have written meanwhile.
+  Future<void> reload() => _p.reload();
+
+  /// Notifications of new mail (MAIL builds on Android).
+  bool get mailNotify => _p.getBool(_kMailNotify) ?? false;
+  Future<void> setMailNotify(bool on) async => _p.setBool(_kMailNotify, on);
+
+  /// The newest arrival in «Входящие» already shown or told of: only mail
+  /// after it makes a notification.
+  DateTime? get mailSeenUntil => switch (_p.getInt(_kMailSeenUntil)) {
+        final ms? => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
+        null => null,
+      };
+  Future<void> setMailSeenUntil(DateTime t) async =>
+      _p.setInt(_kMailSeenUntil, t.millisecondsSinceEpoch);
 
   /// Minutes before a lesson to remind of it; 0: no reminders.
   int get lessonReminderMinutes => _p.getInt(_kLessonReminder) ?? 0;

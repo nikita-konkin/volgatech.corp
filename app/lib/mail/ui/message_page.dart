@@ -1,13 +1,10 @@
 import 'dart:async';
 
 import 'package:enough_mail/enough_mail.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -17,7 +14,9 @@ import '../compose.dart';
 import '../mail_controller.dart';
 import '../mail_html.dart';
 import '../mail_models.dart';
+import 'attachment_view.dart';
 import 'compose_page.dart';
+import 'mail_actions.dart';
 import 'recipient_field.dart' show initials;
 
 /// One message: sender, recipients, attachments and the body.
@@ -35,6 +34,9 @@ class _MessagePageState extends State<MessagePage> {
   Future<MimeMessage> _load() =>
       context.read<MailController>().open(widget.header);
 
+  /// Pinned, as far as this page knows: it changes here.
+  late bool _pinned = widget.header.pinned;
+
   Future<void> _delete() async {
     final c = context.read<MailController>();
     Navigator.pop(context);
@@ -42,33 +44,23 @@ class _MessagePageState extends State<MessagePage> {
   }
 
   Future<void> _move() async {
-    final c = context.read<MailController>();
-    final to = await showModalBottomSheet<MailFolder>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: ListView(shrinkWrap: true, children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text('Переместить в папку',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          ),
-          for (final f in c.folders)
-            if (f != c.folder)
-              ListTile(
-                leading: const Icon(Icons.folder_outlined),
-                title: Text(f.title),
-                onTap: () => Navigator.pop(context, f),
-              ),
-        ]),
-      ),
-    );
+    final to = await pickFolder(context, context.read<MailController>());
     if (to == null || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+    moveMessages(context, [widget.header], to);
     Navigator.pop(context);
-    messenger.showSnackBar(
-        SnackBar(content: Text('Письмо перемещено в «${to.title}»')));
-    await c.move(widget.header, to);
+  }
+
+  Future<void> _archive() async {
+    if (await archiveMessages(context, [widget.header]) && mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _togglePin() async {
+    if (await togglePin(context, widget.header.copyWith(pinned: _pinned)) &&
+        mounted) {
+      setState(() => _pinned = !_pinned);
+    }
   }
 
   Future<void> _markUnread() async {
@@ -82,15 +74,26 @@ class _MessagePageState extends State<MessagePage> {
     return Scaffold(
       appBar: AppBar(
         actions: [
+          if (context.read<MailController>().folder.role != FolderRole.archive)
+            IconButton(
+              tooltip: 'В архив',
+              icon: const Icon(Icons.archive_outlined),
+              onPressed: () => unawaited(_archive()),
+            ),
+          IconButton(
+            tooltip: 'Удалить',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => unawaited(_delete()),
+          ),
           IconButton(
             tooltip: 'Переместить',
             icon: const Icon(Icons.drive_file_move_outline),
             onPressed: () => unawaited(_move()),
           ),
           IconButton(
-            tooltip: 'Удалить',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => unawaited(_delete()),
+            tooltip: _pinned ? 'Открепить' : 'Закрепить',
+            icon: Icon(_pinned ? Icons.push_pin : Icons.push_pin_outlined),
+            onPressed: () => unawaited(_togglePin()),
           ),
           IconButton(
             tooltip: 'Отметить непрочитанным',
@@ -318,11 +321,18 @@ class _Attachments extends StatelessWidget {
       return;
     }
     final name = attachmentFileName(info.fileName);
-    final file = _Received(
+    final file = ReceivedFile(
       name: name,
       bytes: bytes,
       type: attachmentType(name, info.mediaType),
     );
+    // Pictures, PDFs and text right here; the rest in another app.
+    if (file.preview != null) {
+      await Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => AttachmentViewPage(file)));
+      return;
+    }
+    if (!context.mounted) return;
     final action = await showModalBottomSheet<_FileAction>(
       context: context,
       showDragHandle: true,
@@ -370,58 +380,9 @@ class _Attachments extends StatelessWidget {
 
 enum _FileAction { open, save, share }
 
-/// A decoded attachment and what can be done with it.
-class _Received {
-  const _Received({required this.name, required this.bytes, this.type});
-  final String name;
-  final Uint8List bytes;
-  final String? type;
-
-  /// In whichever app handles the type (a PDF reader, Word, a gallery…).
-  Future<void> open(ScaffoldMessengerState messenger) async {
-    final file = await attachmentFile(name, bytes);
-    final result = await OpenFilex.open(file.path, type: type);
-    switch (result.type) {
-      case ResultType.done:
-        return;
-      case ResultType.noAppToOpen:
-        messenger.showSnackBar(SnackBar(
-          content: const Text('Нет приложения, чтобы открыть этот файл'),
-          // Goes after its duration (with an action Flutter would keep it).
-          persist: false,
-          action: SnackBarAction(
-              label: 'Сохранить', onPressed: () => unawaited(save(messenger))),
-        ));
-      case _:
-        messenger.showSnackBar(
-            const SnackBar(content: Text('Не удалось открыть файл')));
-    }
-  }
-
-  /// Through the system «save as» dialog — Загрузки or any folder, drive.
-  Future<void> save(ScaffoldMessengerState messenger) async {
-    try {
-      final saved = await FilePicker.saveFile(fileName: name, bytes: bytes);
-      if (saved != null) {
-        messenger.showSnackBar(SnackBar(content: Text('Сохранено: $name')));
-      }
-    } on Object {
-      messenger.showSnackBar(
-          const SnackBar(content: Text('Не удалось сохранить файл')));
-    }
-  }
-
-  Future<void> share() async {
-    final file = await attachmentFile(name, bytes);
-    await SharePlus.instance.share(ShareParams(
-      files: [XFile(file.path, mimeType: type)],
-    ));
-  }
-}
-
 class _FileSheet extends StatelessWidget {
   const _FileSheet(this.file);
-  final _Received file;
+  final ReceivedFile file;
 
   @override
   Widget build(BuildContext context) {

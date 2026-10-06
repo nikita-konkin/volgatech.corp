@@ -25,6 +25,7 @@ class MailController extends ChangeNotifier {
     this.sizeColors = true,
     this.manualQuota,
     this.onInboxUnread,
+    this.onInboxShown,
   })  : _service = service,
         _store = store,
         _cache = cache;
@@ -47,6 +48,10 @@ class MailController extends ChangeNotifier {
   /// badge in the app's menu.
   final void Function(int unread)? onInboxUnread;
 
+  /// Told the first page of «Входящие» each time it is shown fresh: that
+  /// mail isn't news for a notification any more.
+  final void Function(List<MailHeader> headers)? onInboxShown;
+
   MailStatus status = MailStatus.starting;
   MailCredentials? _credentials;
   List<MailFolder> folders = const [_inbox];
@@ -64,6 +69,38 @@ class MailController extends ChangeNotifier {
 
   MailFolder? folderWith(FolderRole role) =>
       folders.where((f) => f.role == role).firstOrNull;
+
+  /// Messages picked to act on together (a long press starts picking).
+  Set<String> selected = const {};
+  bool get selecting => selected.isNotEmpty;
+
+  /// The picked ones, in list order.
+  List<MailHeader> get selection => [
+        for (final h in headers)
+          if (selected.contains(h.id)) h
+      ];
+
+  void toggleSelected(MailHeader h) {
+    selected = selected.contains(h.id)
+        ? ({...selected}..remove(h.id))
+        : {...selected, h.id};
+    _notify();
+  }
+
+  /// All on the list, or only those of [hs].
+  void selectAll([Iterable<MailHeader>? hs]) {
+    selected = {for (final h in hs ?? headers) h.id};
+    _notify();
+  }
+
+  void clearSelection() {
+    if (selected.isEmpty) return;
+    selected = const {};
+    _notify();
+  }
+
+  /// Where «В архив» files messages; null until the mailbox has one.
+  MailFolder? get archiveFolder => folderWith(FolderRole.archive);
 
   Future<void> start() async {
     _credentials = await _store.read();
@@ -125,6 +162,7 @@ class MailController extends ChangeNotifier {
   Future<void> openFolder(MailFolder f) async {
     if (f == folder) return;
     folder = f;
+    selected = const {};
     headers = const [];
     hasMore = false;
     await _showCached(f);
@@ -176,7 +214,13 @@ class MailController extends ChangeNotifier {
       final page = await _service.headers(f,
           before: headers.last.seq, pinnedFirst: pinnedFirst);
       if (f != folder) return;
-      headers = [...headers, ...page.headers];
+      // A message pinned or unpinned meanwhile may come round again.
+      final have = {for (final h in headers) h.id};
+      headers = [
+        ...headers,
+        for (final h in page.headers)
+          if (!have.contains(h.id)) h
+      ];
       hasMore = page.hasMore;
     });
     loadingMore = false;
@@ -201,16 +245,25 @@ class MailController extends ChangeNotifier {
     return msg;
   }
 
-  Future<void> markUnread(MailHeader h) async {
-    if (h.seen) _countUnread(folder, 1);
-    _replace(h.copyWith(seen: false));
-    await _guard(() => _service.setSeen(folder, h.id, seen: false));
-  }
+  Future<void> markUnread(MailHeader h) => markAll([h], seen: false);
 
-  Future<void> markRead(MailHeader h) async {
-    if (!h.seen) _countUnread(folder, -1);
-    _replace(h.copyWith(seen: true));
-    await _guard(() => _service.setSeen(folder, h.id, seen: true));
+  Future<void> markRead(MailHeader h) => markAll([h], seen: true);
+
+  /// Read or unread, all of [hs]: on the list at once, then on the server.
+  Future<void> markAll(List<MailHeader> hs, {required bool seen}) async {
+    final f = folder;
+    final changed = [
+      for (final h in hs)
+        if (h.seen != seen) h
+    ];
+    final ids = {for (final h in changed) h.id};
+    if (changed.isEmpty) return;
+    _countUnread(f, seen ? -changed.length : changed.length);
+    headers = [
+      for (final x in headers) ids.contains(x.id) ? x.copyWith(seen: seen) : x
+    ];
+    _notify();
+    await _each(changed, (h) => _service.setSeen(f, h.id, seen: seen));
   }
 
   /// Read ↔ unread, without opening it (a swipe to the right).
@@ -228,30 +281,117 @@ class MailController extends ChangeNotifier {
   }
 
   /// Files [h] into [to]: off this list at once, then on the server.
-  Future<void> move(MailHeader h, MailFolder to) async {
+  Future<void> move(MailHeader h, MailFolder to) => moveAll([h], to);
+
+  /// Files all of [hs] into [to], as [move] does one.
+  Future<void> moveAll(List<MailHeader> hs, MailFolder to) async {
     final f = folder;
+    final ids = {for (final h in hs) h.id};
     headers = [
       for (final x in headers)
-        if (x.id != h.id) x
+        if (!ids.contains(x.id)) x
     ];
-    if (!h.seen) {
-      _countUnread(f, -1);
-      _countUnread(to, 1);
+    selected = selected.difference(ids);
+    final unseen = hs.where((h) => !h.seen).length;
+    if (unseen > 0) {
+      _countUnread(f, -unseen);
+      _countUnread(to, unseen);
     }
     _notify();
-    await _guard(() => _service.move(f, h.id, to));
+    await _each(hs, (h) => _service.move(f, h.id, to));
     unawaited(_saveCache(f));
+  }
+
+  /// Files [h] into [archiveFolder] (see [createArchive] for when there is
+  /// none yet).
+  Future<void> archive(MailHeader h) => archiveAll([h]);
+
+  Future<void> archiveAll(List<MailHeader> hs) async {
+    final to = archiveFolder;
+    if (to == null) throw StateError('no archive folder');
+    await moveAll(hs, to);
+  }
+
+  /// Makes «Архив» at the top of the mailbox, for [archive].
+  Future<MailFolder> createArchive() async {
+    final made = await _retrying(() => _service.createFolder('Архив'));
+    final f = made.role == FolderRole.archive
+        ? made
+        : MailFolder(
+            name: made.name, path: made.path, role: FolderRole.archive);
+    folders = _sorted([...folders, f]);
+    _notify();
+    return f;
+  }
+
+  /// Pins [h] above the rest, or puts it back among them by date; on the
+  /// list at once, then on the server. Throws, and puts it back as it was,
+  /// when the server refuses.
+  Future<void> setPinned(MailHeader h, bool pinned) async {
+    final f = folder;
+    final before = headers;
+    headers = _placed(h.copyWith(pinned: pinned));
+    _notify();
+    try {
+      await _guard(
+          () => _service.setPinned(f, h.id, pinned: pinned, received: h.date));
+    } on Object {
+      if (f == folder) headers = before;
+      _notify();
+      rethrow;
+    }
+    unawaited(_saveCache(f));
+  }
+
+  /// Pins (or unpins) each of [hs] that isn't already; stops at the first
+  /// the server refuses, and throws.
+  Future<void> pinAll(List<MailHeader> hs, bool pinned) async {
+    for (final h in hs) {
+      if (h.pinned != pinned) await setPinned(h, pinned);
+    }
+  }
+
+  /// The list with [h] where it now belongs: with the pinned ones first, a
+  /// newly pinned one tops them and an unpinned one goes back by date;
+  /// otherwise it stays put. A message not on the list stays off it.
+  List<MailHeader> _placed(MailHeader h) {
+    final i = headers.indexWhere((x) => x.id == h.id);
+    if (i < 0) return headers;
+    final rest = [...headers]..removeAt(i);
+    if (!pinnedFirst) return rest..insert(i, h);
+    if (h.pinned) return rest..insert(0, h);
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    final at = rest.indexWhere(
+        (x) => !x.pinned && (x.date ?? epoch).isBefore(h.date ?? epoch));
+    // Older than all loaded: at the end, unless more are still to come.
+    if (at < 0 && hasMore) return rest;
+    return rest..insert(at < 0 ? rest.length : at, h);
   }
 
   /// Swipe to delete: off the list at once, off the server after [delay]
   /// unless [undoDelete] brings it back first.
-  void deleteSoon(MailHeader h, {Duration delay = const Duration(seconds: 4)}) {
+  void deleteSoon(MailHeader h,
+          {Duration delay = const Duration(seconds: 4)}) =>
+      deleteSoonAll([h], delay: delay);
+
+  /// [deleteSoon] for several at once; one [undoDelete] brings all back.
+  void deleteSoonAll(List<MailHeader> hs,
+      {Duration delay = const Duration(seconds: 4)}) {
     unawaited(_commitDelete()); // the previous one can't be undone any more
-    final i = headers.indexWhere((x) => x.id == h.id);
-    if (i < 0) return;
-    headers = [...headers]..removeAt(i);
-    if (!h.seen) _countUnread(folder, -1);
-    _pending = _PendingDelete(h, i, folder, Timer(delay, _commitSoon));
+    final ids = {for (final h in hs) h.id};
+    final taken = [
+      for (var i = 0; i < headers.length; i++)
+        if (ids.contains(headers[i].id)) (i, headers[i])
+    ];
+    if (taken.isEmpty) return;
+    headers = [
+      for (final x in headers)
+        if (!ids.contains(x.id)) x
+    ];
+    selected = selected.difference(ids);
+    final unseen = taken.where((t) => !t.$2.seen).length;
+    if (unseen > 0) _countUnread(folder, -unseen);
+    _pending = _PendingDelete(taken, folder, Timer(delay, _commitSoon));
     _notify();
   }
 
@@ -260,9 +400,15 @@ class MailController extends ChangeNotifier {
     if (p == null) return;
     p.timer.cancel();
     _pending = null;
-    if (!p.header.seen) _countUnread(p.folder, 1);
+    final unseen = p.taken.where((t) => !t.$2.seen).length;
+    if (unseen > 0) _countUnread(p.folder, unseen);
     if (p.folder != folder) return;
-    headers = [...headers]..insert(min(p.index, headers.length), p.header);
+    // Back where each was, the first first, so the later places hold.
+    final list = [...headers];
+    for (final (i, h) in p.taken) {
+      list.insert(min(i, list.length), h);
+    }
+    headers = list;
     _notify();
   }
 
@@ -275,7 +421,8 @@ class MailController extends ChangeNotifier {
     if (p == null) return;
     _pending = null;
     p.timer.cancel();
-    await _guard(() => _service.delete(p.folder, p.header.id));
+    await _each([for (final t in p.taken) t.$2],
+        (h) => _service.delete(p.folder, h.id));
     unawaited(_saveCache(p.folder));
   }
 
@@ -422,11 +569,7 @@ class MailController extends ChangeNotifier {
   }
 
   Future<void> _loadFolders() async {
-    final list = await _service.folders();
-    list.sort((a, b) {
-      final r = a.role.index.compareTo(b.role.index);
-      return r != 0 ? r : a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
+    final list = _sorted(await _service.folders());
     folders = list.isEmpty ? const [_inbox] : list;
     folder = folders.firstWhere((f) => f == folder, orElse: () => folders[0]);
     _reportUnread();
@@ -457,13 +600,16 @@ class MailController extends ChangeNotifier {
       // A swiped message the server still has stays hidden.
       headers = [
         for (final h in page.headers)
-          if (h.id != _pending?.header.id) h
+          if (!(_pending?.ids.contains(h.id) ?? false)) h
       ];
       hasMore = page.hasMore;
+      // Picked ones the server no longer has can't stay picked.
+      selected = selected.intersection({for (final h in headers) h.id});
       loadedAt = DateTime.now();
       error = null;
       status = MailStatus.ready;
       unawaited(_saveCache(f));
+      if (f.role == FolderRole.inbox) onInboxShown?.call(headers);
     } finally {
       loading = false;
       _notify();
@@ -482,6 +628,17 @@ class MailController extends ChangeNotifier {
     }
   }
 
+  /// [job] for each of [hs] in turn, each retried on its own after a
+  /// dropped connection (so none is done twice); stops when the server
+  /// can't be reached.
+  Future<void> _each(
+      List<MailHeader> hs, Future<void> Function(MailHeader h) job) async {
+    for (final h in hs) {
+      await _guard(() => job(h));
+      if (status != MailStatus.ready) return;
+    }
+  }
+
   Future<void> _guard(Future<void> Function() job) async {
     try {
       await _retrying(job);
@@ -496,6 +653,13 @@ class MailController extends ChangeNotifier {
       _set(MailStatus.offline);
     }
   }
+
+  /// System folders first, then by name.
+  static List<MailFolder> _sorted(List<MailFolder> list) => list
+    ..sort((a, b) {
+      final r = a.role.index.compareTo(b.role.index);
+      return r != 0 ? r : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
 
   void _replace(MailHeader h) {
     headers = [for (final x in headers) x.id == h.id ? h : x];
@@ -559,9 +723,12 @@ class _PendingSend {
 }
 
 class _PendingDelete {
-  _PendingDelete(this.header, this.index, this.folder, this.timer);
-  final MailHeader header;
-  final int index;
+  _PendingDelete(this.taken, this.folder, this.timer);
+
+  /// Each with where it was on the list, in list order.
+  final List<(int, MailHeader)> taken;
   final MailFolder folder;
   final Timer timer;
+
+  late final ids = {for (final t in taken) t.$2.id};
 }

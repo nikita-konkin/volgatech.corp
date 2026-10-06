@@ -10,6 +10,7 @@ import '../../ui/web_view_page.dart';
 import '../attachments.dart';
 import '../compose.dart';
 import '../ews_mail_service.dart';
+import '../mail_alerts.dart';
 import '../mail_badge.dart';
 import '../mail_config.dart';
 import '../mail_controller.dart';
@@ -17,6 +18,7 @@ import '../mail_credentials.dart';
 import '../mail_models.dart';
 import 'auto_reply_page.dart';
 import 'compose_page.dart';
+import 'mail_actions.dart';
 import 'mailbox_size_page.dart';
 import 'message_tile.dart';
 import 'search_page.dart';
@@ -44,6 +46,9 @@ class MailPage extends StatelessWidget {
               sizeColors: ctx.read<Prefs>().mailSizeColors,
               manualQuota: ctx.read<Prefs>().mailQuota,
               onInboxUnread: ctx.read<MailBadge>().set,
+              onInboxShown: MailAlerts.supported
+                  ? (h) => unawaited(ctx.read<MailAlerts>().seen(h))
+                  : null,
             );
         unawaited(c.start());
         return c;
@@ -82,69 +87,165 @@ class _MailViewState extends State<_MailView> {
   Widget build(BuildContext context) {
     final c = context.watch<MailController>();
     final signedOut = c.status == MailStatus.signedOut;
-    return Scaffold(
-      appBar: AppBar(
-        title: signedOut || c.status == MailStatus.starting
-            ? const Text('Почта')
-            : _FolderTitle(c),
-        actions: [
-          if (c.usageSummary case final u?
-              when c.status == MailStatus.ready ||
-                  c.status == MailStatus.offline)
-            UsageBar(
-              usage: u,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => ChangeNotifierProvider.value(
-                    value: c, child: const MailboxSizePage()),
-              )),
-            ),
-          if (c.status == MailStatus.ready || c.status == MailStatus.offline)
-            IconButton(
-              tooltip: 'Поиск',
-              icon: const Icon(Icons.search),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => ChangeNotifierProvider.value(
-                      value: c, child: const SearchPage()),
-                ),
-              ),
-            ),
-          _Menu(signedIn: !signedOut),
-        ],
-        bottom: c.status == MailStatus.connecting || c.loading
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(3),
-                child: LinearProgressIndicator(minHeight: 3),
-              )
-            : null,
-      ),
-      floatingActionButton:
-          c.status == MailStatus.ready || c.status == MailStatus.offline
-              ? FloatingActionButton(
-                  tooltip: 'Написать',
-                  backgroundColor: Brand.coral,
-                  foregroundColor: Colors.white,
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ChangeNotifierProvider.value(
-                        value: c,
-                        child: ComposePage(
-                            draft: switch (context.read<Prefs>().mailDraft) {
-                          final Map<String, dynamic> kept =>
-                            ComposeDraft.fromJson(kept),
-                          _ => ComposeDraft(),
-                        }),
+    final picking = c.selecting;
+    return PopScope(
+      // Back first puts the picked ones down.
+      canPop: !picking,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) c.clearSelection();
+      },
+      child: Scaffold(
+        appBar: picking
+            ? _PickedBar(c)
+            : AppBar(
+                title: signedOut || c.status == MailStatus.starting
+                    ? const Text('Почта')
+                    : _FolderTitle(c),
+                actions: [
+                  if (c.usageSummary case final u?
+                      when c.status == MailStatus.ready ||
+                          c.status == MailStatus.offline)
+                    UsageBar(
+                      usage: u,
+                      onTap: () =>
+                          Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => ChangeNotifierProvider.value(
+                            value: c, child: const MailboxSizePage()),
+                      )),
+                    ),
+                  if (c.status == MailStatus.ready ||
+                      c.status == MailStatus.offline)
+                    IconButton(
+                      tooltip: 'Поиск',
+                      icon: const Icon(Icons.search),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChangeNotifierProvider.value(
+                              value: c, child: const SearchPage()),
+                        ),
                       ),
                     ),
+                  _Menu(signedIn: !signedOut),
+                ],
+                bottom: c.status == MailStatus.connecting || c.loading
+                    ? const PreferredSize(
+                        preferredSize: Size.fromHeight(3),
+                        child: LinearProgressIndicator(minHeight: 3),
+                      )
+                    : null,
+              ),
+        floatingActionButton: !picking &&
+                (c.status == MailStatus.ready || c.status == MailStatus.offline)
+            ? FloatingActionButton(
+                tooltip: 'Написать',
+                backgroundColor: Brand.coral,
+                foregroundColor: Colors.white,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ChangeNotifierProvider.value(
+                      value: c,
+                      child: ComposePage(
+                          draft: switch (context.read<Prefs>().mailDraft) {
+                        final Map<String, dynamic> kept =>
+                          ComposeDraft.fromJson(kept),
+                        _ => ComposeDraft(),
+                      }),
+                    ),
                   ),
-                  child: const Icon(Icons.edit),
-                )
-              : null,
-      body: switch (c.status) {
-        MailStatus.starting => const Center(child: CircularProgressIndicator()),
-        MailStatus.signedOut => const _SignInForm(),
-        _ => const _MessageList(),
-      },
+                ),
+                child: const Icon(Icons.edit),
+              )
+            : null,
+        body: switch (c.status) {
+          MailStatus.starting =>
+            const Center(child: CircularProgressIndicator()),
+          MailStatus.signedOut => const _SignInForm(),
+          _ => const _MessageList(),
+        },
+      ),
+    );
+  }
+}
+
+/// The bar while messages are picked: how many, and what to do to them.
+class _PickedBar extends StatelessWidget implements PreferredSizeWidget {
+  const _PickedBar(this.c);
+  final MailController c;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    final hs = c.selection;
+    final unread = hs.any((h) => !h.seen);
+    final unpinned = hs.any((h) => !h.pinned);
+    return AppBar(
+      leading: IconButton(
+        tooltip: 'Отменить выбор',
+        icon: const Icon(Icons.close),
+        onPressed: c.clearSelection,
+      ),
+      title: Text('${hs.length}'),
+      actions: [
+        IconButton(
+          tooltip: unread ? 'Отметить прочитанными' : 'Отметить непрочитанными',
+          icon: Icon(unread
+              ? Icons.mark_email_read_outlined
+              : Icons.mark_email_unread_outlined),
+          onPressed: () {
+            c.clearSelection();
+            unawaited(c.markAll(hs, seen: unread));
+          },
+        ),
+        if (c.folder.role != FolderRole.archive)
+          IconButton(
+            tooltip: 'В архив',
+            icon: const Icon(Icons.archive_outlined),
+            onPressed: () async {
+              if (await archiveMessages(context, hs)) c.clearSelection();
+            },
+          ),
+        IconButton(
+          tooltip: 'Переместить',
+          icon: const Icon(Icons.drive_file_move_outline),
+          onPressed: () async {
+            final to = await pickFolder(context, c);
+            if (to == null || !context.mounted) return;
+            moveMessages(context, hs, to);
+            c.clearSelection();
+          },
+        ),
+        IconButton(
+          tooltip: 'Удалить',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () {
+            deleteWithUndo(context, hs);
+            c.clearSelection();
+          },
+        ),
+        PopupMenuButton<String>(
+          onSelected: (v) async {
+            if (v == 'all') {
+              // Not the pinned ones folded out of sight.
+              final hidden =
+                  c.pinnedFirst && context.read<Prefs>().mailPinsFolded;
+              c.selectAll([
+                for (final h in c.headers)
+                  if (!(hidden && h.pinned)) h
+              ]);
+            } else if (await pinMessages(context, hs, unpinned)) {
+              c.clearSelection();
+            }
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'all', child: Text('Выбрать все')),
+            PopupMenuItem(
+                value: 'pin',
+                child: Text(unpinned ? 'Закрепить' : 'Открепить')),
+          ],
+        ),
+      ],
     );
   }
 }

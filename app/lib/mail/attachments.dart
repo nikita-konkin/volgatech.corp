@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:enough_convert/enough_convert.dart';
 import 'package:enough_mail/enough_mail.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -32,6 +33,41 @@ String? attachmentType(String name, MediaType? declared) {
   if (known(declared)) return declared!.text;
   final guess = MediaType.guessFromFileName(name);
   return known(guess) ? guess.text : null;
+}
+
+/// What the app can show itself, without another app.
+enum PreviewKind { image, pdf, text }
+
+/// How to show [name] of [type] in the app; null when only another app can.
+PreviewKind? previewKind(String name, String? type) {
+  final t = (type ?? '').toLowerCase();
+  final dot = name.lastIndexOf('.');
+  final ext = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+  // What Flutter decodes itself on every phone.
+  const images = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'};
+  if (images.contains(ext) ||
+      const {'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'}
+          .contains(t)) {
+    return PreviewKind.image;
+  }
+  if (ext == 'pdf' || t == 'application/pdf') return PreviewKind.pdf;
+  if (const {'txt', 'csv', 'log'}.contains(ext) ||
+      t == 'text/plain' ||
+      t == 'text/csv') {
+    return PreviewKind.text;
+  }
+  return null;
+}
+
+/// A text file's text: UTF-8 when it is that, else Windows-1251, which
+/// Russian files from Windows mostly are.
+String decodeText(Uint8List bytes) {
+  try {
+    final text = utf8.decode(bytes);
+    return text.startsWith('\uFEFF') ? text.substring(1) : text;
+  } on FormatException {
+    return const Windows1251Codec(allowInvalid: true).decode(bytes);
+  }
 }
 
 /// Where attachments go to be opened or shared: the app's private cache,

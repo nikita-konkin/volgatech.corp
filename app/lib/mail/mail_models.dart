@@ -1,4 +1,6 @@
-enum FolderRole { inbox, sent, drafts, trash, junk, other }
+/// [archive]: where «В архив» files messages — the folder Outlook on the
+/// web's own Archive button uses, or else one named «Архив».
+enum FolderRole { inbox, sent, drafts, trash, junk, archive, other }
 
 class MailFolder {
   const MailFolder({
@@ -20,7 +22,7 @@ class MailFolder {
         FolderRole.drafts => 'Черновики',
         FolderRole.trash => 'Удалённые',
         FolderRole.junk => 'Нежелательная почта',
-        FolderRole.other => name,
+        FolderRole.archive || FolderRole.other => name,
       };
 
   MailFolder withUnseen(int n) =>
@@ -60,6 +62,7 @@ FolderRole folderRole({
   if (n == 'нежелательная почта' || n == 'junk email' || n == 'junk') {
     return FolderRole.junk;
   }
+  if (n == 'архив' || n == 'archive') return FolderRole.archive;
   return FolderRole.other;
 }
 
@@ -94,7 +97,7 @@ class MailHeader {
   final bool answered;
   final bool hasAttachments;
 
-  /// Pinned in Outlook on the web: kept above everything else.
+  /// Pinned (here or in Outlook on the web): kept above everything else.
   final bool pinned;
 
   /// The whole message with attachments, in bytes, as Exchange counts it.
@@ -102,7 +105,7 @@ class MailHeader {
 
   String get from => fromName.isNotEmpty ? fromName : fromEmail;
 
-  MailHeader copyWith({bool? seen, bool? answered}) => MailHeader(
+  MailHeader copyWith({bool? seen, bool? answered, bool? pinned}) => MailHeader(
         id: id,
         seq: seq,
         fromName: fromName,
@@ -113,7 +116,7 @@ class MailHeader {
         flagged: flagged,
         answered: answered ?? this.answered,
         hasAttachments: hasAttachments,
-        pinned: pinned,
+        pinned: pinned ?? this.pinned,
         size: size,
       );
 
