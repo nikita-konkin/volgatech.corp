@@ -15,6 +15,7 @@ class Prefs {
   static const _kLogin = 'remembered_login';
   static const _kRemember = 'remember_login';
   static const _kTheme = 'theme_mode';
+  static const _kLessonReminder = 'lesson_reminder_minutes';
   static const _kAppLock = 'app_lock_enabled';
   static const _kPinsFolded = 'mail_pins_folded';
   static const _kPinnedFirst = 'mail_pinned_first';
@@ -28,6 +29,11 @@ class Prefs {
   static const _kSignReplies = 'mail_signature_replies';
 
   String? get rememberedLogin => _p.getString(_kLogin);
+
+  /// Minutes before a lesson to remind of it; 0: no reminders.
+  int get lessonReminderMinutes => _p.getInt(_kLessonReminder) ?? 0;
+  Future<void> setLessonReminderMinutes(int m) async =>
+      _p.setInt(_kLessonReminder, m);
   bool get rememberLogin => _p.getBool(_kRemember) ?? true;
 
   Future<void> setRememberedLogin(String? login) async {

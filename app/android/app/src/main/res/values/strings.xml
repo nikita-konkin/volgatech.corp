@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lesson_widget_label">Ближайшая пара</string>
+    <string name="lesson_widget_description">Занятие сейчас или следующее: время, предмет, аудитория</string>
+</resources>

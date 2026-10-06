@@ -144,6 +144,36 @@ void main() {
     await closeScreens(tester);
   }, variant: desktop);
 
+  testWidgets('«Сегодня»: shown away from today, and back', (tester) async {
+    await open(tester, const Size(1280, 800), const HomeShell());
+    expect(find.byTooltip('Сегодня'), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await settle(tester);
+    expect(find.text(dayBar(plus(2))), findsOneWidget);
+    await tester.tap(find.byTooltip('Сегодня'));
+    await settle(tester);
+    expect(find.text(dayBar(today)), findsOneWidget);
+    expect(find.byTooltip('Сегодня'), findsNothing);
+
+    // The Home key does the same; in the overview, by the week.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await settle(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.home);
+    await settle(tester);
+    expect(find.text(dayBar(today)), findsOneWidget);
+    await tester.tap(find.byTooltip('Обзор недели'));
+    await settle(tester);
+    expect(find.byTooltip('Сегодня'), findsNothing);
+    await tester.tap(find.byTooltip('Следующая неделя'));
+    await settle(tester);
+    await tester.tap(find.byTooltip('Сегодня'));
+    await settle(tester);
+    expect(find.byTooltip('Сегодня'), findsNothing);
+    expect(find.text('сегодня'), findsOneWidget); // today's card is back
+    await closeScreens(tester);
+  }, variant: desktop);
+
   testWidgets('the menu item of the open screen goes back to its start',
       (tester) async {
     await open(tester, const Size(1280, 800), const HomeShell());

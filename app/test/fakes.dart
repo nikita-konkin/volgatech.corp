@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:volgatech_pro/core/cache.dart';
+import 'package:volgatech_pro/core/lesson_reminders.dart';
 import 'package:volgatech_pro/data/volgatech_api.dart';
 import 'package:volgatech_pro/models/profile.dart';
 import 'package:volgatech_pro/models/schedule.dart';
@@ -83,3 +84,19 @@ ScheduleEvent lesson(String begin, {String subject = 'Физика', int? week})
 
 ScheduleDay day(DateTime date, List<ScheduleEvent> events) =>
     ScheduleDay(date: date, events: events);
+
+/// Reminders kept in a list rather than shown.
+class FakeReminders implements ReminderPlatform {
+  bool allow = true;
+  List<LessonReminder> planned = const [];
+  int replaced = 0;
+
+  @override
+  Future<bool> requestPermission() async => allow;
+
+  @override
+  Future<void> replace(List<LessonReminder> reminders) async {
+    planned = reminders;
+    replaced++;
+  }
+}

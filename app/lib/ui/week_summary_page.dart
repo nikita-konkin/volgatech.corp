@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../core/ics.dart';
 import '../core/lesson_grouping.dart';
 import '../core/week_summary.dart';
 import '../state/schedule_controller.dart';
 import '../theme.dart';
+import 'calendar_export.dart';
 import 'layout.dart';
 import 'widgets/marquee_text.dart';
 import 'widgets/skeleton.dart';
@@ -56,6 +58,21 @@ class WeekSummaryPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Обзор недели'),
         actions: [
+          if (!c.onThisWeek)
+            TodayButton(onPressed: () => unawaited(c.goToToday())),
+          CalendarButton(
+            onPressed: total == 0
+                ? null
+                : () => unawaited(exportCalendar(
+                      buildIcs(
+                          lessonEvents(
+                              {for (final d in days) d: c.eventsOn(d)}),
+                          name: 'Расписание $range'),
+                      fileName:
+                          'raspisanie-${DateFormat('yyyy-MM-dd').format(days.first)}.ics',
+                      title: 'Расписание $range',
+                    )),
+          ),
           if (desktopBrowser)
             RefreshButton(
                 onPressed: c.loading ? null : () => unawaited(c.refresh())),
@@ -72,6 +89,7 @@ class WeekSummaryPage extends StatelessWidget {
       body: ArrowKeys(
         onPrevious: () => unawaited(c.prevWeek()),
         onNext: () => unawaited(c.nextWeek()),
+        onHome: () => unawaited(c.goToToday()),
         child: GestureDetector(
           onHorizontalDragEnd: (d) {
             final v = d.primaryVelocity ?? 0;
