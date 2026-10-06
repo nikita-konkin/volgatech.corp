@@ -107,6 +107,15 @@ class FakeMailService implements MailService {
   }
 
   @override
+  Future<List<MailHeader>> latestInbox({int count = 20}) async {
+    _check();
+    return [
+      for (final h in inbox.reversed.take(count))
+        seenOnServer.contains(h.id) ? h.copyWith(seen: true) : h
+    ];
+  }
+
+  @override
   Future<List<MailHeader>> search(MailFolder f, String query,
       {int count = 50}) async {
     _check();
@@ -277,6 +286,23 @@ void main() {
     final saved = await store.read();
     expect(saved?.login, r'MARSTU\konkinna');
     expect(saved?.password, 'secret');
+  });
+
+  test('the inbox, once shown, is reported for notifications; others not',
+      () async {
+    final shown = <List<String>>[];
+    final c = MailController(
+        service: server,
+        store: store,
+        cache: cache,
+        onInboxShown: (h) => shown.add([for (final m in h) m.id]));
+    await c.start();
+    await c.signIn('konkinna', 'secret');
+    expect(shown, [
+      ['msg5', 'msg4', 'msg3', 'msg2', 'msg1']
+    ]);
+    await c.openFolder(_trash);
+    expect(shown, hasLength(1));
   });
 
   test('a wrong password leaves nothing stored', () async {

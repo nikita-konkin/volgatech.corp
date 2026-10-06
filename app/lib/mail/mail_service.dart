@@ -18,6 +18,10 @@ abstract class MailService {
   /// Unread messages in «Входящие», for the badge in the menu.
   Future<int> inboxUnread();
 
+  /// The newest [count] messages of «Входящие» by arrival (pins aside), in
+  /// one request: the background check for new mail.
+  Future<List<MailHeader>> latestInbox({int count = 20});
+
   /// Newest [count] messages of [folder] after sequence number [before];
   /// with [pinnedFirst], the ones pinned in Outlook come before the rest.
   Future<MailPage> headers(MailFolder folder,

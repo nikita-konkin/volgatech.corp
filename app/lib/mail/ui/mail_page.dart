@@ -10,6 +10,7 @@ import '../../ui/web_view_page.dart';
 import '../attachments.dart';
 import '../compose.dart';
 import '../ews_mail_service.dart';
+import '../mail_alerts.dart';
 import '../mail_badge.dart';
 import '../mail_config.dart';
 import '../mail_controller.dart';
@@ -44,6 +45,9 @@ class MailPage extends StatelessWidget {
               sizeColors: ctx.read<Prefs>().mailSizeColors,
               manualQuota: ctx.read<Prefs>().mailQuota,
               onInboxUnread: ctx.read<MailBadge>().set,
+              onInboxShown: MailAlerts.supported
+                  ? (h) => unawaited(ctx.read<MailAlerts>().seen(h))
+                  : null,
             );
         unawaited(c.start());
         return c;

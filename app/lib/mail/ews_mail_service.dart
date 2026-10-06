@@ -73,6 +73,13 @@ class EwsMailService implements MailService {
   }
 
   @override
+  Future<List<MailHeader>> latestInbox({int count = 20}) async {
+    final doc =
+        await _s.call(findItemsSoap('inbox', 0, count, distinguished: true));
+    return parseItems(doc, offset: 0).headers;
+  }
+
+  @override
   Future<MailPage> headers(MailFolder folder,
       {int? before, int count = 40, bool pinnedFirst = true}) async {
     final offset = before == null ? 0 : before + 1;
@@ -305,8 +312,10 @@ String findPinnedSoap(String folderId) => '<m:FindItem Traversal="Shallow">'
 ///
 /// A [query] searches the way Outlook does (Exchange's index: sender,
 /// subject, text); [subjectHas] is the plain fallback without the index.
+/// With [distinguished], [folderId] is a well-known name («inbox»).
 String findItemsSoap(String folderId, int offset, int count,
-        {bool pins = false,
+        {bool distinguished = false,
+        bool pins = false,
         bool pinnedFirst = true,
         String? query,
         String? subjectHas}) =>
@@ -329,7 +338,8 @@ String findItemsSoap(String folderId, int offset, int count,
     '<m:SortOrder><t:FieldOrder Order="Descending">'
     '${pins && pinnedFirst ? _renewTime : '<t:FieldURI FieldURI="item:DateTimeReceived"/>'}'
     '</t:FieldOrder></m:SortOrder>'
-    '<m:ParentFolderIds><t:FolderId Id="${xmlText(folderId)}"/></m:ParentFolderIds>'
+    '<m:ParentFolderIds><t:${distinguished ? 'Distinguished' : ''}FolderId '
+    'Id="${xmlText(folderId)}"/></m:ParentFolderIds>'
     '${query == null ? '' : '<m:QueryString>${xmlText(query)}</m:QueryString>'}'
     '</m:FindItem>';
 

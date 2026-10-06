@@ -10,6 +10,14 @@ class Notifications {
   static final plugin = FlutterLocalNotificationsPlugin();
   static Future<void>? _ready;
 
+  /// Only the Android app shows them.
+  static bool get supported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  /// What a tapped notification asks to open ('mail', 'lesson'), until the
+  /// app has.
+  static final tapped = ValueNotifier<String?>(null);
+
   static AndroidFlutterLocalNotificationsPlugin? get android =>
       plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
@@ -18,7 +26,17 @@ class Notifications {
         settings: const InitializationSettings(
           android: AndroidInitializationSettings('ic_stat_lesson'),
         ),
+        onDidReceiveNotificationResponse: (r) => tapped.value = r.payload,
       );
+
+  /// At launch: set up, and see whether a notification opened the app.
+  static Future<void> start() async {
+    await ensureReady();
+    final launch = await plugin.getNotificationAppLaunchDetails();
+    if (launch?.didNotificationLaunchApp ?? false) {
+      tapped.value = launch!.notificationResponse?.payload;
+    }
+  }
 
   /// Asks to show notifications (Android 13+ asks the user); true when
   /// allowed.

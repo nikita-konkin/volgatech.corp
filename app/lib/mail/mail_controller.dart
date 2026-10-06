@@ -25,6 +25,7 @@ class MailController extends ChangeNotifier {
     this.sizeColors = true,
     this.manualQuota,
     this.onInboxUnread,
+    this.onInboxShown,
   })  : _service = service,
         _store = store,
         _cache = cache;
@@ -46,6 +47,10 @@ class MailController extends ChangeNotifier {
   /// Told the inbox's unread count whenever it is known to change, for the
   /// badge in the app's menu.
   final void Function(int unread)? onInboxUnread;
+
+  /// Told the first page of «Входящие» each time it is shown fresh: that
+  /// mail isn't news for a notification any more.
+  final void Function(List<MailHeader> headers)? onInboxShown;
 
   MailStatus status = MailStatus.starting;
   MailCredentials? _credentials;
@@ -525,6 +530,7 @@ class MailController extends ChangeNotifier {
       error = null;
       status = MailStatus.ready;
       unawaited(_saveCache(f));
+      if (f.role == FolderRole.inbox) onInboxShown?.call(headers);
     } finally {
       loading = false;
       _notify();
