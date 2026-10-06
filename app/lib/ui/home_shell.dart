@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_drawer.dart';
 import 'exams_page.dart';
 import 'foreign_memo_page.dart';
+import 'glass.dart';
 import 'layout.dart';
 import 'profile_page.dart';
 import 'schedule_page.dart';
@@ -100,6 +101,7 @@ class _WideShellState extends State<_WideShell> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final glass = Glass.of(context);
     return NavShell(
       section: _section,
       select: _select,
@@ -108,11 +110,15 @@ class _WideShellState extends State<_WideShell> {
           SizedBox(
             width: _menuWidth,
             child: Material(
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              // On glass: a tinted pane over the page's wallpaper.
+              color: glass.on
+                  ? glass.panel
+                  : Theme.of(context).colorScheme.surfaceContainerLow,
               child: const NavMenu(),
             ),
           ),
-          const VerticalDivider(width: 1, thickness: 1),
+          VerticalDivider(
+              width: 1, thickness: 1, color: glass.on ? glass.rim : null),
           Expanded(
             // The screens measure themselves against this side, not the
             // whole window.

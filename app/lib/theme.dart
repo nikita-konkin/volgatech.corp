@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'ui/glass.dart';
+
 /// Brand palette approximated from the original Volgatech PRO screens.
 class Brand {
   static const blue = Color(0xFF34517B); // header / app bar (light)
@@ -55,12 +57,13 @@ class Brand {
 }
 
 /// [browser]: the web build, which brings its own font (see pubspec.yaml).
-ThemeData buildLightTheme({bool browser = kIsWeb}) =>
-    _base(Brightness.light, browser);
-ThemeData buildDarkTheme({bool browser = kIsWeb}) =>
-    _base(Brightness.dark, browser);
+/// [glass]: «Liquid Glass» (glass.dart).
+ThemeData buildLightTheme({bool browser = kIsWeb, bool glass = false}) =>
+    _base(Brightness.light, browser, glass);
+ThemeData buildDarkTheme({bool browser = kIsWeb, bool glass = false}) =>
+    _base(Brightness.dark, browser, glass);
 
-ThemeData _base(Brightness b, bool browser) {
+ThemeData _base(Brightness b, bool browser, bool glass) {
   final dark = b == Brightness.dark;
   // In a browser on an iPhone the platform is iOS, whose system fonts the
   // web engine doesn't have: the Roboto bundled for it (pubspec.yaml). On
@@ -72,6 +75,7 @@ ThemeData _base(Brightness b, bool browser) {
       : defaultTargetPlatform == TargetPlatform.android
           ? 'sans-serif'
           : null;
+  final solid = dark ? Brand.surfaceDark : Brand.surfaceLight;
   final scheme = (dark
           ? const ColorScheme.dark(
               primary: Brand.blueOnDark,
@@ -85,7 +89,18 @@ ThemeData _base(Brightness b, bool browser) {
               surface: Brand.surfaceLight,
             ))
       .copyWith(
-    onSurfaceVariant: dark ? const Color(0xFFB0B0B0) : Colors.black54,
+    onSurfaceVariant: dark
+        ? const Color(0xFFB0B0B0)
+        // Black54 is a shade too faint on glass (test/glass_test.dart).
+        : Colors.black.withValues(alpha: glass ? 0.64 : 0.54),
+    // Cards and tiles are glass; dialogs, sheets and menus stay solid,
+    // as they come over the page with nothing to blur it.
+    surface: glass ? (dark ? Glass.darkSurface : Glass.lightSurface) : null,
+    surfaceContainerLowest: glass ? solid : null,
+    surfaceContainerLow: glass ? solid : null,
+    surfaceContainer: glass ? solid : null,
+    surfaceContainerHigh: glass ? solid : null,
+    surfaceContainerHighest: glass ? solid : null,
   );
 
   return ThemeData(
@@ -93,9 +108,24 @@ ThemeData _base(Brightness b, bool browser) {
     brightness: b,
     fontFamily: font,
     colorScheme: scheme,
-    scaffoldBackgroundColor: dark ? Brand.bgDark : Brand.bgLight,
+    extensions: [
+      if (glass) dark ? Glass.dark : Glass.light else Glass.off,
+    ],
+    // Each page lies on its Wallpaper (glass.dart), whether or not glass.
+    pageTransitionsTheme: wallpaperTransitions(),
+    scaffoldBackgroundColor: glass
+        ? Colors.transparent
+        : dark
+            ? Brand.bgDark
+            : Brand.bgLight,
     appBarTheme: AppBarTheme(
-      backgroundColor: dark ? Brand.blueDark : Brand.blue,
+      backgroundColor: glass
+          ? (dark ? Glass.darkBar : Glass.lightBar)
+          : dark
+              ? Brand.blueDark
+              : Brand.blue,
+      // No Material tint over the glass as the page scrolls under.
+      surfaceTintColor: glass ? Colors.transparent : null,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: false,

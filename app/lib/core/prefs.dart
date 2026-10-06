@@ -15,6 +15,7 @@ class Prefs {
   static const _kLogin = 'remembered_login';
   static const _kRemember = 'remember_login';
   static const _kTheme = 'theme_mode';
+  static const _kGlass = 'theme_glass';
   static const _kLessonReminder = 'lesson_reminder_minutes';
   static const _kAppLock = 'app_lock_enabled';
   static const _kPinsFolded = 'mail_pins_folded';
@@ -115,6 +116,10 @@ class Prefs {
   /// «Закреплённые» folded away at the top of the mail list.
   bool get mailPinsFolded => _p.getBool(_kPinsFolded) ?? false;
   Future<void> setMailPinsFolded(bool v) async => _p.setBool(_kPinsFolded, v);
+
+  /// «Liquid Glass» (the browser's choice in Settings).
+  bool get glass => _p.getBool(_kGlass) ?? false;
+  Future<void> setGlass(bool on) async => _p.setBool(_kGlass, on);
 
   ThemeMode get themeMode {
     switch (_p.getString(_kTheme)) {

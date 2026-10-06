@@ -16,6 +16,7 @@ import '../state/auth_controller.dart';
 import '../state/schedule_controller.dart';
 import '../theme.dart';
 import 'app_drawer.dart';
+import 'glass.dart';
 import 'home_shell.dart';
 import 'layout.dart';
 import 'offline_banner.dart';
@@ -261,10 +262,10 @@ class _LessonCard extends StatelessWidget {
         color: Brand.card(context),
         borderRadius: BorderRadius.circular(8),
         border: Border(left: BorderSide(color: accent, width: 5)),
-        boxShadow: const [
+        boxShadow: cardShadow(context, const [
           BoxShadow(
               color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
-        ],
+        ]),
       ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(

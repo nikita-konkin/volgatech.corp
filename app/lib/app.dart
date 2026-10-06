@@ -13,20 +13,49 @@ import 'ui/home_shell.dart';
 import 'ui/lock_screen.dart';
 import 'ui/login_page.dart';
 import 'ui/update_banner.dart';
+import 'web/a11y.dart';
 import 'web/insets.dart';
 
-class VolgatechApp extends StatelessWidget {
+class VolgatechApp extends StatefulWidget {
   const VolgatechApp({super.key});
 
   @override
+  State<VolgatechApp> createState() => _VolgatechAppState();
+}
+
+class _VolgatechAppState extends State<VolgatechApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // High contrast switched on or off meanwhile.
+  @override
+  void didChangeAccessibilityFeatures() => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
-    final themeMode = context.watch<ThemeController>().mode;
+    final theme = context.watch<ThemeController>();
+    // Glass gives way to solid surfaces for whoever asked the system for
+    // them.
+    final glass = theme.glass &&
+        !WidgetsBinding
+            .instance.platformDispatcher.accessibilityFeatures.highContrast &&
+        !prefersSolidSurfaces();
     return MaterialApp(
       title: 'Волгатех.Коллектив',
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(),
-      darkTheme: buildDarkTheme(),
-      themeMode: themeMode,
+      theme: buildLightTheme(glass: glass),
+      darkTheme: buildDarkTheme(glass: glass),
+      themeMode: theme.mode,
       locale: const Locale('ru'),
       supportedLocales: const [Locale('ru'), Locale('en')],
       localizationsDelegates: const [

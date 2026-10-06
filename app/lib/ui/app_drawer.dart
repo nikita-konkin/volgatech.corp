@@ -14,6 +14,7 @@ import '../mail/mail_credentials.dart';
 import '../mail/ui/mail_page.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
+import 'glass.dart';
 import 'home_shell.dart';
 import 'web_view_page.dart';
 import 'widgets/person_avatar.dart';
@@ -29,7 +30,14 @@ class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
   @override
-  Widget build(BuildContext context) => const Drawer(child: NavMenu());
+  Widget build(BuildContext context) => Glass.of(context).on
+      // Over the page: frosted glass.
+      ? const Drawer(
+          backgroundColor: Colors.transparent,
+          clipBehavior: Clip.antiAlias,
+          child: FrostedPanel(child: NavMenu()),
+        )
+      : const Drawer(child: NavMenu());
 }
 
 /// The menu: in the drawer, or always open on the left of a wide window
@@ -82,11 +90,13 @@ class NavMenu extends StatelessWidget {
     final auth = context.watch<AuthController>();
     final profile = auth.profile;
     final shell = NavShell.maybeOf(context);
+    // Brand blue, made lighter on dark backgrounds to stay visible.
+    final accent = Theme.of(context).colorScheme.primary;
 
     Widget item(Section section, IconData icon, String title,
             {String? subtitle}) =>
         ListTile(
-          leading: Icon(icon, color: Brand.blue),
+          leading: Icon(icon, color: accent),
           title: Text(title),
           subtitle: subtitle == null ? null : Text(subtitle),
           selected: shell?.section == section,
@@ -132,7 +142,7 @@ class NavMenu extends StatelessWidget {
         item(Section.foreign, Icons.translate, 'Иностранные группы',
             subtitle: 'служебная записка за месяц'),
         ListTile(
-          leading: const Icon(Icons.mail_outline, color: Brand.blue),
+          leading: Icon(Icons.mail_outline, color: accent),
           title: const Text('Мои обращения'),
           onTap: () => _soon(context),
         ),
