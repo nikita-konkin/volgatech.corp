@@ -622,7 +622,7 @@ void main() {
     expect(server.deleted, isEmpty);
   });
 
-  testWidgets('a long press: pin, and «В архив» making the folder first',
+  testWidgets('a long press picks: pin, and «В архив» making the folder first',
       (tester) async {
     await initializeDateFormatting('ru_RU');
     SharedPreferences.setMockInitialValues({});
@@ -634,58 +634,142 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.longPress(find.text('Письмо 3'));
-    await tester.pumpAndSettle();
+    Future<void> pick(String subject) async {
+      await tester.longPress(find.text(subject));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> menu(String item) async {
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(item));
+      await tester.pumpAndSettle();
+    }
+
+    await pick('Письмо 3');
+    expect(find.byTooltip('Отменить выбор'), findsOneWidget);
     for (final action in [
-      'Закрепить',
+      'Отметить прочитанными',
       'В архив',
       'Переместить',
-      'Отметить прочитанным',
       'Удалить'
     ]) {
-      expect(find.text(action), findsOneWidget, reason: action);
+      expect(find.byTooltip(action), findsOneWidget, reason: action);
     }
-    await tester.tap(find.text('Закрепить'));
+    // While picking, a tap picks or puts down rather than opens.
+    await tester.tap(find.text('Письмо 4'));
     await tester.pumpAndSettle();
+    expect(find.text('2'), findsOneWidget);
+    await tester.tap(find.text('Письмо 4'));
+    await tester.pumpAndSettle();
+    expect(find.text('1'), findsOneWidget);
+
+    await menu('Закрепить');
     expect(find.text('Закреплённые · 1'), findsOneWidget);
     expect(find.text('Письмо закреплено'), findsOneWidget);
     expect(server.pinnedOnServer, {'msg3': true});
+    expect(find.byTooltip('Отменить выбор'), findsNothing, reason: 'done');
 
     // Pinned now: the same menu unpins.
-    await tester.longPress(find.text('Письмо 3'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Открепить'));
-    await tester.pumpAndSettle();
+    await pick('Письмо 3');
+    await menu('Открепить');
     expect(find.textContaining('Закреплённые ·'), findsNothing);
     expect(server.pinnedOnServer, {'msg3': false});
 
     // No archive folder yet: offered first; declined, nothing happens.
-    Future<void> archive(String subject) async {
-      await tester.longPress(find.text(subject));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('В архив'));
-      await tester.pumpAndSettle();
-    }
-
-    await archive('Письмо 2');
+    await pick('Письмо 2');
+    await tester.tap(find.byTooltip('В архив'));
+    await tester.pumpAndSettle();
     expect(find.text('Создать папку «Архив»?'), findsOneWidget);
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();
     expect(find.text('Письмо 2'), findsOneWidget);
     expect(server.created, isEmpty);
 
-    // Made, and the message goes there.
-    await archive('Письмо 2');
+    // Made, and the message goes there (it is still picked).
+    await tester.tap(find.byTooltip('В архив'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Создать'));
     await tester.pumpAndSettle();
     expect(find.text('Письмо 2'), findsNothing);
     expect(find.text('Письмо перемещено в «Архив»'), findsOneWidget);
     expect(server.moved, {'msg2': 'id-Архив'});
 
-    // From then on, straight there.
-    await archive('Письмо 4');
+    // From then on, straight there; two at once.
+    await pick('Письмо 4');
+    await tester.tap(find.text('Письмо 5'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('В архив'));
+    await tester.pumpAndSettle();
     expect(find.text('Создать папку «Архив»?'), findsNothing);
+    expect(find.text('2 письма перемещены в «Архив»'), findsOneWidget);
     expect(server.moved['msg4'], 'id-Архив');
+    expect(server.moved['msg5'], 'id-Архив');
+  });
+
+  testWidgets(
+      'picked ones: read, deleted and brought back together; Back '
+      'puts them down', (tester) async {
+    await initializeDateFormatting('ru_RU');
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await Prefs.load();
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+    await tester.pumpWidget(Provider<Prefs>.value(
+      value: prefs,
+      child: MaterialApp(home: ui.MailPage(create: (_) => controller())),
+    ));
+    await tester.pumpAndSettle();
+
+    List<String> shown() => [
+          for (final e in find.textContaining('Письмо ').evaluate())
+            (e.widget as Text).data!
+        ];
+
+    // All of them, then read in one go.
+    await tester.longPress(find.text('Письмо 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Выбрать все'));
+    await tester.pumpAndSettle();
+    expect(find.text('5'), findsOneWidget);
+    await tester.tap(find.byTooltip('Отметить прочитанными'));
+    await tester.pumpAndSettle();
+    expect(server.seenOnServer, {'msg1', 'msg2', 'msg3', 'msg4', 'msg5'});
+
+    // Two deleted; «Отменить» puts each back in its place.
+    await tester.longPress(find.text('Письмо 2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Письмо 4'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Удалить'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 письма перемещены в «Удалённые»'), findsOneWidget);
+    expect(shown(), ['Письмо 5', 'Письмо 3', 'Письмо 1']);
+    await tester.tap(find.text('Отменить'));
+    await tester.pumpAndSettle();
+    expect(
+        shown(), ['Письмо 5', 'Письмо 4', 'Письмо 3', 'Письмо 2', 'Письмо 1']);
+    expect(find.byTooltip('Отменить выбор'), findsNothing);
+
+    // Back while picking: the pick goes, the mail stays open.
+    await tester.longPress(find.text('Письмо 3'));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Отменить выбор'), findsNothing);
+    expect(find.byTooltip('Написать'), findsOneWidget);
+
+    // Deleted for good once the moment passes, both.
+    await tester.longPress(find.text('Письмо 2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Письмо 4'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Удалить'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(server.deleted.keys.toSet(), {'msg2', 'msg4'});
   });
 
   testWidgets('the open message: pin it, then «В архив»', (tester) async {

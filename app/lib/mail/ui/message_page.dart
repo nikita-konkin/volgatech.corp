@@ -48,12 +48,12 @@ class _MessagePageState extends State<MessagePage> {
   Future<void> _move() async {
     final to = await pickFolder(context, context.read<MailController>());
     if (to == null || !mounted) return;
-    moveMessage(context, widget.header, to);
+    moveMessages(context, [widget.header], to);
     Navigator.pop(context);
   }
 
   Future<void> _archive() async {
-    if (await archiveMessage(context, widget.header) && mounted) {
+    if (await archiveMessages(context, [widget.header]) && mounted) {
       Navigator.pop(context);
     }
   }

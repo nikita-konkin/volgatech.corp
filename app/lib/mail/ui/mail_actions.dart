@@ -3,14 +3,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/ru_plural.dart';
 import '../mail_controller.dart';
 import '../mail_models.dart';
 import 'message_tile.dart' show folderIcon;
 
-/// What can be done to a message, from the list (a long press) or the open
-/// message: shared so both say and do the same.
+/// What can be done to messages, from the list (one swiped, or several
+/// picked) or the open message: shared so all say and do the same.
 
-/// A folder to move a message to, other than the open one; null if none
+/// «Письмо» or «3 письма»: the start of what was done to [n] messages.
+String lettersDone(int n, String one, String several) => n == 1
+    ? 'Письмо $one'
+    : '$n ${pluralRu(n, 'письмо', 'письма', 'писем')} '
+        '${pluralRu(n, one, several, several)}';
+
+/// A folder to move messages to, other than the open one; null if none
 /// was picked.
 Future<MailFolder?> pickFolder(BuildContext context, MailController c) =>
     showModalBottomSheet<MailFolder>(
@@ -34,27 +41,27 @@ Future<MailFolder?> pickFolder(BuildContext context, MailController c) =>
       ),
     );
 
-/// Moves [h] to [to]: off the list at once, said in a snackbar; the list
+/// Moves [hs] to [to]: off the list at once, said in a snackbar; the list
 /// comes back from the server if the server refuses.
-void moveMessage(BuildContext context, MailHeader h, MailFolder to) {
+void moveMessages(BuildContext context, List<MailHeader> hs, MailFolder to) {
   final c = context.read<MailController>();
   final messenger = ScaffoldMessenger.of(context);
   messenger
     ..hideCurrentSnackBar()
-    ..showSnackBar(
-        SnackBar(content: Text('Письмо перемещено в «${to.title}»')));
-  unawaited(c.move(h, to).catchError((Object e) {
+    ..showSnackBar(SnackBar(
+        content: Text('${lettersDone(hs.length, 'перемещено', 'перемещены')} '
+            'в «${to.title}»')));
+  unawaited(c.moveAll(hs, to).catchError((Object e) {
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-          SnackBar(content: Text('Не удалось переместить письмо: $e')));
+      ..showSnackBar(SnackBar(content: Text('Не удалось переместить: $e')));
     return c.refresh();
   }));
 }
 
-/// Files [h] in the archive, first offering to make «Архив» when the
-/// mailbox has no archive folder. True once the message is on its way.
-Future<bool> archiveMessage(BuildContext context, MailHeader h) async {
+/// Files [hs] in the archive, first offering to make «Архив» when the
+/// mailbox has no archive folder. True once they are on their way.
+Future<bool> archiveMessages(BuildContext context, List<MailHeader> hs) async {
   final c = context.read<MailController>();
   final messenger = ScaffoldMessenger.of(context);
   var to = c.archiveFolder;
@@ -69,7 +76,7 @@ Future<bool> archiveMessage(BuildContext context, MailHeader h) async {
     }
   }
   if (!context.mounted) return false;
-  moveMessage(context, h, to);
+  moveMessages(context, hs, to);
   return true;
 }
 
@@ -92,100 +99,51 @@ Future<bool> _confirmNewArchive(BuildContext context) async =>
     ) ??
     false;
 
-/// Pins [h], or unpins it if it is pinned. True when the server took it.
-Future<bool> togglePin(BuildContext context, MailHeader h) async {
+/// Pins [hs] (or unpins them, with [pin] false). True when the server took
+/// them all.
+Future<bool> pinMessages(
+    BuildContext context, List<MailHeader> hs, bool pin) async {
   final c = context.read<MailController>();
   final messenger = ScaffoldMessenger.of(context);
-  final pin = !h.pinned;
   try {
-    await c.setPinned(h, pin);
+    await c.pinAll(hs, pin);
   } on Object catch (e) {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
-          content: Text(
-              'Не удалось ${pin ? 'закрепить' : 'открепить'} письмо: $e')));
+          content: Text('Не удалось ${pin ? 'закрепить' : 'открепить'}: $e')));
     return false;
   }
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
-      content: Text(pin ? 'Письмо закреплено' : 'Письмо откреплено'),
+      content: Text(pin
+          ? lettersDone(hs.length, 'закреплено', 'закреплены')
+          : lettersDone(hs.length, 'откреплено', 'откреплены')),
       duration: const Duration(seconds: 2),
     ));
   return true;
 }
 
-/// Deletes [h] with a few seconds to take it back.
-void deleteWithUndo(BuildContext context, MailHeader h) {
+/// Pins [h], or unpins it if it is pinned. True when the server took it.
+Future<bool> togglePin(BuildContext context, MailHeader h) =>
+    pinMessages(context, [h], !h.pinned);
+
+/// Deletes [hs] with a few seconds to take them back.
+void deleteWithUndo(BuildContext context, List<MailHeader> hs) {
   final c = context.read<MailController>();
   final forever = c.folder.role == FolderRole.trash;
-  c.deleteSoon(h);
+  c.deleteSoonAll(hs);
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
       content: Text(forever
-          ? 'Письмо удалено навсегда'
-          : 'Письмо перемещено в «Удалённые»'),
+          ? '${lettersDone(hs.length, 'удалено', 'удалены')} навсегда'
+          : '${lettersDone(hs.length, 'перемещено', 'перемещены')} '
+              'в «Удалённые»'),
       duration: const Duration(seconds: 4),
       // Goes after its duration (with an action Flutter would keep it).
       persist: false,
       action: SnackBarAction(label: 'Отменить', onPressed: c.undoDelete),
     ));
-}
-
-enum _Action { pin, archive, move, seen, delete }
-
-/// Everything for [h] at once: what a long press on it in the list opens.
-Future<void> showMessageActions(BuildContext context, MailHeader h) async {
-  final c = context.read<MailController>();
-  final action = await showModalBottomSheet<_Action>(
-    context: context,
-    showDragHandle: true,
-    builder: (context) {
-      Widget item(_Action a, IconData icon, String title) => ListTile(
-            leading: Icon(icon),
-            title: Text(title),
-            onTap: () => Navigator.pop(context, a),
-          );
-      return SafeArea(
-        child: ListView(shrinkWrap: true, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(h.subject.isEmpty ? '(без темы)' : h.subject,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          ),
-          item(_Action.pin, h.pinned ? Icons.push_pin : Icons.push_pin_outlined,
-              h.pinned ? 'Открепить' : 'Закрепить'),
-          if (c.folder.role != FolderRole.archive)
-            item(_Action.archive, Icons.archive_outlined, 'В архив'),
-          item(_Action.move, Icons.drive_file_move_outline, 'Переместить'),
-          item(
-              _Action.seen,
-              h.seen
-                  ? Icons.mark_email_unread_outlined
-                  : Icons.mark_email_read_outlined,
-              h.seen ? 'Отметить непрочитанным' : 'Отметить прочитанным'),
-          item(_Action.delete, Icons.delete_outline, 'Удалить'),
-        ]),
-      );
-    },
-  );
-  if (action == null || !context.mounted) return;
-  switch (action) {
-    case _Action.pin:
-      await togglePin(context, h);
-    case _Action.archive:
-      await archiveMessage(context, h);
-    case _Action.move:
-      final to = await pickFolder(context, c);
-      if (to != null && context.mounted) moveMessage(context, h, to);
-    case _Action.seen:
-      await c.toggleSeen(h);
-    case _Action.delete:
-      deleteWithUndo(context, h);
-  }
 }

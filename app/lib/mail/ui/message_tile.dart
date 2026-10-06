@@ -12,8 +12,8 @@ import 'mail_actions.dart';
 import 'message_page.dart';
 
 /// A message in the folder list: swipe left to delete it (with a moment to
-/// take that back), right to mark it read or unread; a long press for the
-/// rest (pin, archive, move).
+/// take that back), right to mark it read or unread; a long press picks it,
+/// and others with a tap, to act on them together (mail_page.dart).
 class SwipeableMessage extends StatelessWidget {
   const SwipeableMessage(this.h, {super.key});
   final MailHeader h;
@@ -21,8 +21,13 @@ class SwipeableMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final (picking, picked) = context.select<MailController, (bool, bool)>(
+        (c) => (c.selecting, c.selected.contains(h.id)));
+    final c = context.read<MailController>();
     return Dismissible(
       key: ValueKey(h.id),
+      // No swiping away while picking.
+      direction: picking ? DismissDirection.none : DismissDirection.horizontal,
       background: _SwipeHint(
           start: true,
           color: primary,
@@ -41,9 +46,11 @@ class SwipeableMessage extends StatelessWidget {
         unawaited(context.read<MailController>().toggleSeen(h));
         return false;
       },
-      onDismissed: (_) => deleteWithUndo(context, h),
+      onDismissed: (_) => deleteWithUndo(context, [h]),
       child: MessageTile(h,
-          onLongPress: () => unawaited(showMessageActions(context, h))),
+          picked: picking ? picked : null,
+          onTap: picking ? () => c.toggleSelected(h) : null,
+          onLongPress: () => c.toggleSelected(h)),
     );
   }
 }
@@ -125,12 +132,20 @@ Color sizeTintAt(double t, {required bool dark}) {
 
 /// One line of a message list: sender, date, subject and marks.
 class MessageTile extends StatelessWidget {
-  const MessageTile(this.h, {super.key, this.onOpened, this.onLongPress});
+  const MessageTile(this.h,
+      {super.key, this.onOpened, this.onTap, this.onLongPress, this.picked});
   final MailHeader h;
 
   /// After the message was opened (it is read now).
   final VoidCallback? onOpened;
+
+  /// Instead of opening it.
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+
+  /// While messages are being picked: whether this one is; a check mark
+  /// shows it. Null otherwise.
+  final bool? picked;
 
   @override
   Widget build(BuildContext context) {
@@ -143,34 +158,50 @@ class MessageTile extends StatelessWidget {
         tint = tint == null ? bySize : Color.alphaBlend(bySize, tint);
       }
     }
+    final primary = Theme.of(context).colorScheme.primary;
+    if (picked ?? false) {
+      final mark = primary.withValues(alpha: 0.16);
+      tint = tint == null ? mark : Color.alphaBlend(mark, tint);
+    }
     return Material(
       color: tint ?? Colors.transparent,
       child: InkWell(
-        onTap: () async {
-          await Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (_) => ChangeNotifierProvider.value(
-              value: context.read<MailController>(),
-              child: MessagePage(header: h),
-            ),
-          ));
-          onOpened?.call();
-        },
+        onTap: onTap ??
+            () async {
+              await Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => ChangeNotifierProvider.value(
+                  value: context.read<MailController>(),
+                  child: MessagePage(header: h),
+                ),
+              ));
+              onOpened?.call();
+            },
         onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 16,
-                child: h.seen
-                    ? null
-                    : const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: CircleAvatar(
-                            radius: 4, backgroundColor: Brand.coral),
-                      ),
-              ),
+              if (picked case final on?)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Icon(
+                      on ? Icons.check_circle : Icons.radio_button_unchecked,
+                      size: 22,
+                      color: on ? primary : muted,
+                      semanticLabel: on ? 'Выбрано' : 'Не выбрано'),
+                )
+              else
+                SizedBox(
+                  width: 16,
+                  child: h.seen
+                      ? null
+                      : const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: CircleAvatar(
+                              radius: 4, backgroundColor: Brand.coral),
+                        ),
+                ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
