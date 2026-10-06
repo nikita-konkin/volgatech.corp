@@ -10,6 +10,7 @@ import '../core/lesson_reminders.dart';
 import '../mail/mail_alerts.dart';
 import '../state/theme_controller.dart';
 import '../state/updater.dart';
+import '../web/a11y.dart';
 import 'easter_egg.dart';
 import 'layout.dart';
 
@@ -71,6 +72,7 @@ class SettingsPage extends StatelessWidget {
               ],
             ),
           ),
+          if (kIsWeb) const _GlassTile(),
           // A browser can't ask for a fingerprint or Face ID.
           if (!kIsWeb) ...[
             const Divider(height: 1),
@@ -109,6 +111,27 @@ class SettingsPage extends StatelessWidget {
           const EasterEggFooter(),
         ],
       ),
+    );
+  }
+}
+
+/// «Liquid Glass», in the browser: on top of light or dark.
+class _GlassTile extends StatelessWidget {
+  const _GlassTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.watch<ThemeController>();
+    final solid = MediaQuery.highContrastOf(context) || prefersSolidSurfaces();
+    return SwitchListTile(
+      title: const Text('Liquid Glass'),
+      subtitle: Text(solid
+          ? 'Полупрозрачные панели на цветном фоне. Сейчас не действует: '
+              'в системе включено «Уменьшить прозрачность» или «Увеличить '
+              'контраст»'
+          : 'Полупрозрачные панели на цветном фоне'),
+      value: theme.glass,
+      onChanged: theme.setGlass,
     );
   }
 }

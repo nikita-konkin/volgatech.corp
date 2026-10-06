@@ -262,6 +262,7 @@ flutter analyze
 flutter test
 flutter build apk --release --split-per-abi   # Android: per-ABI APKs (arm64 ≈ 20 MB)
 flutter build apk --release --split-per-abi --dart-define=MAIL=true   # …with the built-in mail client
+flutter build apk --debug --dart-define=API=test   # against test-api.volgatech.net, marked «ТЕСТ»
 flutter build ios --release --no-codesign      # iOS: unsigned build (needs macOS + Xcode)
 flutter build web --release --no-web-resources-cdn   # the browser version, in build/web
 ```

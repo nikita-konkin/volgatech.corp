@@ -115,4 +115,11 @@ void main() {
     expect(auth.consumeSessionExpired(), isFalse, reason: 'shown once');
     auth.dispose();
   });
+
+  test('a build without a flag talks to the real server', () {
+    expect(kTestServer, isFalse);
+    expect(Api.current, Api.prod);
+    expect(
+        ApiClient(Session()).dio.options.baseUrl, 'https://api.volgatech.net');
+  });
 }

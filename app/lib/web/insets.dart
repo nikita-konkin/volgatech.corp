@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../ui/glass.dart';
 import 'insets_stub.dart' if (dart.library.js_interop) 'insets_web.dart'
     as impl;
 
@@ -28,8 +29,8 @@ class BrowserInsets extends StatelessWidget {
         // Turned sideways, the notch or Dynamic Island takes a side: the app
         // keeps clear of both sides, as Android does with a cutout, rather
         // than every screen padding its content for it.
-        return ColoredBox(
-          color: Theme.of(context).scaffoldBackgroundColor,
+        return Wallpaper(
+          solid: Theme.of(context).scaffoldBackgroundColor,
           child: Padding(
             padding: EdgeInsets.only(
                 left: data.padding.left, right: data.padding.right),

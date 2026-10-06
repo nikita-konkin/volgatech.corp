@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'core/api_client.dart';
 import 'core/app_lock.dart';
 import 'core/notifications.dart';
 import 'mail/mail_config.dart';
@@ -13,20 +14,49 @@ import 'ui/home_shell.dart';
 import 'ui/lock_screen.dart';
 import 'ui/login_page.dart';
 import 'ui/update_banner.dart';
+import 'web/a11y.dart';
 import 'web/insets.dart';
 
-class VolgatechApp extends StatelessWidget {
+class VolgatechApp extends StatefulWidget {
   const VolgatechApp({super.key});
 
   @override
+  State<VolgatechApp> createState() => _VolgatechAppState();
+}
+
+class _VolgatechAppState extends State<VolgatechApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // High contrast switched on or off meanwhile.
+  @override
+  void didChangeAccessibilityFeatures() => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
-    final themeMode = context.watch<ThemeController>().mode;
+    final theme = context.watch<ThemeController>();
+    // Glass gives way to solid surfaces for whoever asked the system for
+    // them.
+    final glass = theme.glass &&
+        !WidgetsBinding
+            .instance.platformDispatcher.accessibilityFeatures.highContrast &&
+        !prefersSolidSurfaces();
     return MaterialApp(
       title: 'Волгатех.Коллектив',
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(),
-      darkTheme: buildDarkTheme(),
-      themeMode: themeMode,
+      theme: buildLightTheme(glass: glass),
+      darkTheme: buildDarkTheme(glass: glass),
+      themeMode: theme.mode,
       locale: const Locale('ru'),
       supportedLocales: const [Locale('ru'), Locale('en')],
       localizationsDelegates: const [
@@ -36,9 +66,11 @@ class VolgatechApp extends StatelessWidget {
       ],
       // Wrap the whole Navigator so the lock covers pushed routes too
       // (Settings, Profile), not just the home screen.
-      builder: (context, child) => BrowserInsets(
-          child: _LockGate(
-              child: UpdateWatcher(child: child ?? const SizedBox.shrink()))),
+      builder: (context, child) => _TestServerMark(
+          child: BrowserInsets(
+              child: _LockGate(
+                  child:
+                      UpdateWatcher(child: child ?? const SizedBox.shrink())))),
       home: const _AuthGate(),
     );
   }
@@ -147,4 +179,21 @@ class _NotificationTapsState extends State<_NotificationTaps> {
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// On a build for the test server (`--dart-define=API=test`), «ТЕСТ» across
+/// the corner, so it is never taken for the real thing.
+class _TestServerMark extends StatelessWidget {
+  const _TestServerMark({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => kTestServer
+      ? Banner(
+          message: 'ТЕСТ',
+          location: BannerLocation.topEnd,
+          color: Colors.deepOrange,
+          child: child,
+        )
+      : child;
 }

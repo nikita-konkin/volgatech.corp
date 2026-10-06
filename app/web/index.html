@@ -218,6 +218,7 @@
       function finish() {
         if (done) return;
         done = true;
+        keepForOffline();
         clearInterval(creep);
         clearTimeout(slow);
         clearTimeout(stuck);
@@ -240,6 +241,18 @@
       }, true);
       return { step: step, fail: fail };
     })();
+    // Once the app has started: the files it took, handed to sw.js to keep
+    // (the first visit loads them before the worker is there to see).
+    function keepForOffline() {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.ready.then(function (reg) {
+        var urls = performance.getEntriesByType('resource')
+          .map(function (e) { return e.name; })
+          .filter(function (u) { return new URL(u).origin === location.origin; });
+        urls.push(location.href.split('#')[0]);
+        if (reg.active) reg.active.postMessage({ type: 'keep', urls: urls });
+      });
+    }
     // The app's own files, for opening without a connection (sw.js).
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
