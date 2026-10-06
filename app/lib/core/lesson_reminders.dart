@@ -110,6 +110,14 @@ class LessonReminders extends ChangeNotifier {
     });
   }
 
+  /// Signed out: no more reminders of that person's lessons (the setting
+  /// stays for the next one).
+  Future<void> forget() {
+    _debounce?.cancel();
+    _days.clear();
+    return _plan();
+  }
+
   /// Plans now rather than after the pause (tests).
   @visibleForTesting
   Future<void> flush() async {

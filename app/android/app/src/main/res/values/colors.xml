@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- The home-screen widget (lesson_widget.xml); values-night has the dark ones. -->
+    <color name="widget_background">#FFFFFF</color>
+    <color name="widget_text">#1B1F24</color>
+    <color name="widget_muted">#5F6670</color>
+    <color name="widget_accent">#34517B</color>
 </resources>

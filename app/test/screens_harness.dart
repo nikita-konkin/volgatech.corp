@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:volgatech_pro/core/app_lock.dart';
 import 'package:volgatech_pro/core/cache.dart';
 import 'package:volgatech_pro/core/lesson_reminders.dart';
+import 'package:volgatech_pro/core/lesson_widget.dart';
 import 'package:volgatech_pro/core/photo_store.dart';
 import 'package:volgatech_pro/core/prefs.dart';
 import 'package:volgatech_pro/core/session.dart';
@@ -139,6 +140,9 @@ Future<Widget> screensApp(Widget home,
             create: (_) => Updater(prefs: prefs, enabled: false)),
         ChangeNotifierProvider(
             create: (_) => LessonReminders(prefs, FakeReminders())),
+        Provider(
+            create: (_) => LessonWidget(
+                channel: const MethodChannel('test/lesson_widget'))),
       ],
       child: MaterialApp(
         theme: buildLightTheme(browser: true),

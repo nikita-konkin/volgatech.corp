@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../core/cache.dart';
 import '../core/lesson_grouping.dart';
 import '../core/lesson_reminders.dart';
+import '../core/lesson_widget.dart';
 import '../core/ru_plural.dart';
 import '../data/volgatech_api.dart';
 import '../mail/mail_config.dart';
@@ -29,12 +30,19 @@ class SchedulePage extends StatelessWidget {
     final api = context.read<VolgatechApi>();
     final cache = context.read<JsonCache>();
     final personId = context.read<AuthController>().personId ?? 0;
+    // The phone's own reminders and home-screen widget get each week too.
     final reminders =
         LessonReminders.supported ? context.read<LessonReminders>() : null;
+    final widget = LessonWidget.supported ? context.read<LessonWidget>() : null;
     return ChangeNotifierProvider(
       create: (_) {
         final c = ScheduleController(api, personId, cache,
-            onWeek: reminders?.addWeek);
+            onWeek: reminders == null && widget == null
+                ? null
+                : (week) {
+                    reminders?.addWeek(week);
+                    widget?.addWeek(week);
+                  });
         unawaited(c.ensureLoaded());
         return c;
       },

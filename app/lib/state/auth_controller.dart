@@ -117,3 +117,14 @@ class AuthController extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// Calls [action] whenever the session ends, however it ends (Выход, the
+/// lock screen, the server), and when the app starts signed out.
+void whenSignedOut(AuthController auth, VoidCallback action) {
+  var was = auth.status;
+  auth.addListener(() {
+    if (auth.status == was) return;
+    was = auth.status;
+    if (was == AuthStatus.unauthenticated) action();
+  });
+}

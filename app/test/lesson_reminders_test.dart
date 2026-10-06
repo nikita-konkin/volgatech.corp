@@ -107,6 +107,18 @@ void main() {
       expect(platform.planned, isEmpty);
     });
 
+    test('sign-out clears them; the setting stays', () async {
+      await reminders.setMinutes(15);
+      reminders.addWeek({
+        tue: [at('09:45', '11:20', 'Сети')]
+      });
+      await reminders.flush();
+      expect(platform.planned, hasLength(1));
+      await reminders.forget();
+      expect(platform.planned, isEmpty);
+      expect(reminders.minutes, 15);
+    });
+
     test('stays off when notifications are refused', () async {
       platform.allow = false;
       expect(await reminders.setMinutes(10), isFalse);
