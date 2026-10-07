@@ -193,6 +193,27 @@ class _GlassTile extends StatelessWidget {
               onSelectionChanged: (s) => theme.setScuffed(s.first),
             ),
           ),
+        // How strong: from nearly solid panels to the full effect.
+        if (theme.glass)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+            child: Row(
+              children: [
+                const Text('Сила эффекта'),
+                Expanded(
+                  child: Slider(
+                    value: theme.strength,
+                    divisions: 20,
+                    label: '${(theme.strength * 100).round()} %',
+                    semanticFormatterCallback: (v) =>
+                        'Сила эффекта ${(v * 100).round()} процентов',
+                    onChanged: (v) => theme.setStrength(v, save: false),
+                    onChangeEnd: theme.setStrength,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

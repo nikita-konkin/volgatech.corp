@@ -31,6 +31,7 @@ class Glass extends ThemeExtension<Glass> {
     this.wash = const [],
     this.grain = 0,
     this.scuffs = 0,
+    this.strength = 1,
   });
 
   static const off = Glass(on: false);
@@ -50,6 +51,48 @@ class Glass extends ThemeExtension<Glass> {
   final double scuffs;
 
   bool get scuffed => grain > 0 || scuffs > 0;
+
+  /// How strong the effect is, as [scaled] made it: 1, the full design.
+  final double strength;
+
+  /// The blur behind a frosted panel.
+  double get blur => 24 * strength;
+
+  /// This glass at [t] of its strength (0 to 1): the panels, cards and bars
+  /// thicken towards [solid], the wallpaper's colour fades towards [base],
+  /// and the rim, sheen, shadows and texture soften — the shape stays. At 1
+  /// it is this glass as designed, the one the contrast tests hold to the
+  /// most see-through; anything less is thicker, so reads at least as well.
+  Glass scaled(double t) {
+    t = t.clamp(0.0, 1.0);
+    if (!on || t == 1) return this;
+    Color thicken(Color c) => mixOver(solid, c, t);
+    Color fade(Color c, double least) =>
+        c.withValues(alpha: c.a * (least + (1 - least) * t));
+    return Glass(
+      on: true,
+      base: base,
+      blobs: [for (final b in blobs) fade(b, 0)],
+      wash: [for (final w in wash) Color.lerp(base, w, t)!],
+      panel: thicken(panel),
+      bar: thicken(bar),
+      card: thicken(card),
+      field: thicken(field),
+      solid: solid,
+      lens: lens,
+      stroke: fade(stroke, 0.35),
+      line: line,
+      highlight: fade(highlight, 0.35),
+      sheen: fade(sheen, 0.2),
+      rim: [for (final r in rim) fade(r, 0.35)],
+      shadows: [
+        for (final s in shadows) s.copyWith(color: fade(s.color, 0.5)),
+      ],
+      grain: grain * t,
+      scuffs: scuffs * t,
+      strength: strength * t,
+    );
+  }
 
   /// The menu and the drawer.
   final Color panel;
@@ -247,10 +290,27 @@ class Glass extends ThemeExtension<Glass> {
         wash: wash,
         grain: grain,
         scuffs: scuffs,
+        strength: strength,
       );
 
   @override
   Glass lerp(Glass? other, double t) => t < 0.5 || other == null ? this : other;
+}
+
+/// [a] turning into [b] by [t], the way one looks over anything below:
+/// colour weighted by how opaque it is (premultiplied), unlike Color.lerp,
+/// which takes an opaque dark and a see-through white halfway to a
+/// see-through grey lighter than either.
+Color mixOver(Color a, Color b, double t) {
+  final alpha = a.a + (b.a - a.a) * t;
+  if (alpha <= 0) return const Color(0x00000000);
+  double channel(double ca, double cb) =>
+      ((ca * a.a) + (cb * b.a - ca * a.a) * t) / alpha;
+  return Color.from(
+      alpha: alpha,
+      red: channel(a.r, b.r),
+      green: channel(a.g, b.g),
+      blue: channel(a.b, b.b));
 }
 
 /// What a glass surface of [fill] looks like over [below]: what text on it
@@ -705,7 +765,8 @@ class GlassPanel extends StatelessWidget {
         child: BackdropFilter(
           filter: ui.ImageFilter.compose(
               outer: _saturate(1.8),
-              inner: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24)),
+              inner:
+                  ui.ImageFilter.blur(sigmaX: glass.blur, sigmaY: glass.blur)),
           child: panel,
         ),
       );
