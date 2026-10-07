@@ -28,7 +28,7 @@ class ThemeController extends ChangeNotifier {
   /// How strong the clear glass is, 0 to 1; 1, as designed.
   double get strength => _strength;
 
-  /// How far frost has grown on the matte glass, 0 to 1.
+  /// How far frost has grown on the glass, clear or matte, 0 to 1.
   double get frost => _frost;
 
   Future<void> setMode(ThemeMode m) async {
@@ -55,7 +55,7 @@ class ThemeController extends ChangeNotifier {
     if (save) await _prefs.setGlassStrength(v);
   }
 
-  /// As [setStrength], for the frost on the matte glass.
+  /// As [setStrength], for the frost.
   Future<void> setFrost(double v, {bool save = true}) async {
     v = v.clamp(0.0, 1.0);
     if (v != _frost) {

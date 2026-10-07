@@ -112,7 +112,7 @@ void main() {
       expect(none.panel, g.solid);
       expect(none.bar, g.solid);
       expect(none.grain, 0);
-      expect(none.frost, 0);
+      expect(none.frost, g.frost, reason: 'frost has a slider of its own');
       expect(none.blur, 0);
       expect(none.blobs.every((b) => b.a == 0), isTrue);
       final half = g.scaled(0.5);
@@ -134,12 +134,16 @@ void main() {
     }
   });
 
-  for (final frost in [0.0, 0.5, 1.0]) {
-    testWidgets('matte glass, frost ${(frost * 100).round()} %: drawn',
+  for (final (scuffed, frost) in [
+    for (final scuffed in [true, false])
+      for (final frost in [0.0, 0.5, 1.0]) (scuffed, frost),
+  ]) {
+    testWidgets(
+        '${scuffed ? 'matte' : 'clear'} glass, frost ${(frost * 100).round()} %: drawn',
         (tester) async {
       final theme = buildLightTheme(
-          browser: true, glass: true, scuffed: true, frost: frost);
-      expect(theme.extension<Glass>()!.scuffed, isTrue);
+          browser: true, glass: true, scuffed: scuffed, frost: frost);
+      expect(theme.extension<Glass>()!.scuffed, scuffed);
       expect(theme.extension<Glass>()!.frost, frost);
       expect(GlassTexture.grain, isNotNull);
       await tester.pumpWidget(MaterialApp(
@@ -278,10 +282,22 @@ void main() {
     });
 
     // Where frost runs under text, the text still reads.
-    for (final dark in [false, true]) {
-      test('${dark ? 'dark' : 'light'}: text over the thickest ice', () {
+    for (final (dark, scuffed, strength) in [
+      for (final dark in [false, true]) ...[
+        (dark, true, 1.0),
+        (dark, false, 1.0),
+        (dark, false, 0.0),
+      ],
+    ]) {
+      final name = '${dark ? 'dark' : 'light'}, ${scuffed ? 'matte' : 'clear'}'
+          '${strength < 1 ? ', ${(strength * 100).round()} %' : ''}';
+      test('$name: text over the thickest ice', () {
         final theme = (dark ? buildDarkTheme : buildLightTheme)(
-            browser: true, glass: true, scuffed: true, frost: 1);
+            browser: true,
+            glass: true,
+            scuffed: scuffed,
+            strength: strength,
+            frost: 1);
         final glass = theme.extension<Glass>()!;
         for (final wall in wallpaperColors(glass)) {
           final under = composite(theme.colorScheme.surface, wall);
@@ -298,7 +314,7 @@ void main() {
     }
   });
 
-  test('clear glass keeps its strength, matte its frost', () async {
+  test('the strength and the frost are kept apart', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = Prefs(await SharedPreferences.getInstance());
     final theme = ThemeController(prefs);

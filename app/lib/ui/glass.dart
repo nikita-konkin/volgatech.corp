@@ -50,14 +50,15 @@ class Glass extends ThemeExtension<Glass> {
   /// wallpaper and the glass (0: none, 1: as drawn).
   final double grain;
 
-  /// Matte glass: how far frost has grown on it, as on a window in winter
-  /// (0: none, 1: in full; see [GlassFrost]): [ice], as on a stem, with its
-  /// [iceEdge] beside it (see [paintFrost]).
+  /// How far frost has grown on the glass, clear or matte, as on a window
+  /// in winter (0: none, 1: in full; see [GlassFrost]): [ice], as on an arm,
+  /// with its [iceEdge] beside it (see [paintFrost]).
   final double frost;
   final Color ice;
   final Color iceEdge;
 
-  bool get scuffed => grain > 0 || frost > 0;
+  /// Matte: frosted.
+  bool get scuffed => grain > 0;
 
   /// How strong the effect is, as [scaled] made it: 1, the full design.
   final double strength;
@@ -67,7 +68,8 @@ class Glass extends ThemeExtension<Glass> {
 
   /// This glass at [t] of its strength (0 to 1): the panels, cards and bars
   /// thicken towards [solid], the wallpaper's colour fades towards [base],
-  /// and the rim, sheen, shadows and texture soften — the shape stays. At 1
+  /// and the rim, sheen, shadows and grain soften — the shape stays, and
+  /// the frost is as it was. At 1
   /// it is this glass as designed, the one the contrast tests hold to the
   /// most see-through; anything less is thicker, so reads at least as well.
   Glass scaled(double t) {
@@ -96,7 +98,7 @@ class Glass extends ThemeExtension<Glass> {
         for (final s in shadows) s.copyWith(color: fade(s.color, 0.5)),
       ],
       grain: grain * t,
-      frost: frost * t,
+      frost: frost,
       ice: ice,
       iceEdge: iceEdge,
       strength: strength * t,
@@ -156,6 +158,8 @@ class Glass extends ThemeExtension<Glass> {
     solid: Color(0xFFF7F8FD),
     lens: Color(0xF0FFFFFF),
     field: Color(0xBFFFFFFF),
+    ice: Color(0xD9FFFFFF),
+    iceEdge: Color(0x4D334E70),
     stroke: Color(0xB8FFFFFF),
     line: Color(0x170F1426),
     highlight: Color(0xF2FFFFFF),
@@ -191,6 +195,8 @@ class Glass extends ThemeExtension<Glass> {
     solid: Color(0xFF14182A),
     lens: Color(0x26FFFFFF),
     field: Color(0x3D000000),
+    ice: Color(0x47FFFFFF),
+    iceEdge: Color(0x66000000),
     stroke: Color(0x21FFFFFF),
     line: Color(0x1AFFFFFF),
     highlight: Color(0x33FFFFFF),
@@ -580,8 +586,8 @@ class _GlassPainter extends BoxPainter {
               stops: const [0, 0.46],
             ).createShader(rect));
     }
-    // Matte glass: frosted, with frost grown on it, moving with it.
-    if (g.scuffed && d.sheen) {
+    // Matte glass's frosting, and frost grown on the glass, moving with it.
+    if ((g.scuffed || g.frost > 0) && d.sheen) {
       canvas
         ..save()
         ..clipRRect(shape);

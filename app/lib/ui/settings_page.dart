@@ -193,36 +193,64 @@ class _GlassTile extends StatelessWidget {
               onSelectionChanged: (s) => theme.setScuffed(s.first),
             ),
           ),
-        // How strong: clear glass from nearly solid panels to the full
-        // effect; matte glass from clear of frost to frosted over.
+        // Clear glass: how strong, from nearly solid panels to the full
+        // effect.
+        if (theme.glass && !theme.scuffed)
+          _PercentSlider(
+            label: 'Сила эффекта',
+            value: theme.strength,
+            onChanged: (v) => theme.setStrength(v, save: false),
+            onChangeEnd: theme.setStrength,
+          ),
+        // Either: how far frost has grown on it.
         if (theme.glass)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
-            child: Row(
-              children: [
-                const Text('Сила эффекта'),
-                Expanded(
-                  child: Slider(
-                    value: theme.scuffed ? theme.frost : theme.strength,
-                    divisions: 20,
-                    label:
-                        '${((theme.scuffed ? theme.frost : theme.strength) * 100).round()} %',
-                    semanticFormatterCallback: (v) =>
-                        'Сила эффекта ${(v * 100).round()} процентов',
-                    onChanged: (v) => theme.scuffed
-                        ? theme.setFrost(v, save: false)
-                        : theme.setStrength(v, save: false),
-                    onChangeEnd: (v) => theme.scuffed
-                        ? theme.setFrost(v)
-                        : theme.setStrength(v),
-                  ),
-                ),
-              ],
-            ),
+          _PercentSlider(
+            label: 'Иней',
+            value: theme.frost,
+            onChanged: (v) => theme.setFrost(v, save: false),
+            onChangeEnd: theme.setFrost,
           ),
       ],
     );
   }
+}
+
+/// A setting from 0 to 100 %: its [label], then the slider. The look
+/// follows the thumb ([onChanged]); [onChangeEnd] keeps it.
+class _PercentSlider extends StatelessWidget {
+  const _PercentSlider({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.onChangeEnd,
+  });
+
+  final String label;
+  final double value;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeEnd;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 8, 4),
+        child: Row(
+          children: [
+            // One width for every label, so the sliders line up.
+            SizedBox(width: 112, child: Text(label)),
+            Expanded(
+              child: Slider(
+                value: value,
+                divisions: 20,
+                label: '${(value * 100).round()} %',
+                semanticFormatterCallback: (v) =>
+                    '$label ${(v * 100).round()} процентов',
+                onChanged: onChanged,
+                onChangeEnd: onChangeEnd,
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 /// How long before a lesson to remind of it, if at all.

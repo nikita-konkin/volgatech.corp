@@ -134,8 +134,8 @@ class Prefs {
   Future<void> setGlassStrength(double v) async =>
       _p.setDouble(_kGlassStrength, v);
 
-  /// How far frost has grown on the matte glass, 0 to 1 (the same slider,
-  /// for matte).
+  /// How far frost has grown on the glass, clear or matte, 0 to 1
+  /// (Settings' «Иней»).
   double get glassFrost => (_p.getDouble(_kGlassFrost) ?? 0.5).clamp(0.0, 1.0);
   Future<void> setGlassFrost(double v) async => _p.setDouble(_kGlassFrost, v);
 
