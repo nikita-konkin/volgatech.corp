@@ -6,6 +6,7 @@ import '../core/ru_plural.dart';
 import '../models/profile.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
+import 'glass.dart';
 import 'layout.dart';
 import 'widgets/person_avatar.dart';
 
@@ -132,11 +133,15 @@ class _ProfilePageState extends State<ProfilePage> {
           {String? badge, String? meta}) =>
       Container(
         margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: Brand.card(context),
-          borderRadius: BorderRadius.circular(8),
-          border: const Border(left: BorderSide(color: Brand.coral, width: 5)),
-        ),
+        decoration: cardDecoration(
+            context,
+            BoxDecoration(
+              color: Brand.card(context),
+              borderRadius: BorderRadius.circular(8),
+              border:
+                  const Border(left: BorderSide(color: Brand.coral, width: 5)),
+            ),
+            seed: (title, value)),
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

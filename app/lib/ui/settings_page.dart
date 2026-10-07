@@ -13,6 +13,7 @@ import '../state/updater.dart';
 import '../web/a11y.dart';
 import 'crash_log_page.dart';
 import 'easter_egg.dart';
+import 'glass.dart';
 import 'layout.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -48,76 +49,110 @@ class SettingsPage extends StatelessWidget {
             ? null
             : sides.copyWith(bottom: MediaQuery.paddingOf(context).bottom),
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Тема оформления',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+          _Section(
+            title: 'Тема оформления',
+            first: true,
+            children: [
+              RadioGroup<ThemeMode>(
+                groupValue: theme.mode,
+                onChanged: (m) => theme.setMode(m!),
+                child: const Column(
+                  children: [
+                    RadioListTile<ThemeMode>(
+                      title: Text('Системная'),
+                      value: ThemeMode.system,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('Светлая'),
+                      value: ThemeMode.light,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('Тёмная'),
+                      value: ThemeMode.dark,
+                    ),
+                  ],
+                ),
+              ),
+              if (kIsWeb) const _GlassTile(),
+            ],
           ),
-          RadioGroup<ThemeMode>(
-            groupValue: theme.mode,
-            onChanged: (m) => theme.setMode(m!),
-            child: const Column(
+          // A browser can't ask for a fingerprint or Face ID.
+          if (!kIsWeb)
+            _Section(
+              title: 'Безопасность',
               children: [
-                RadioListTile<ThemeMode>(
-                  title: Text('Системная'),
-                  value: ThemeMode.system,
-                ),
-                RadioListTile<ThemeMode>(
-                  title: Text('Светлая'),
-                  value: ThemeMode.light,
-                ),
-                RadioListTile<ThemeMode>(
-                  title: Text('Тёмная'),
-                  value: ThemeMode.dark,
+                SwitchListTile(
+                  title: const Text('Блокировка при входе'),
+                  subtitle: const Text(
+                      'Спрашивать отпечаток, Face ID или PIN при открытии приложения'),
+                  value: lock.enabled,
+                  onChanged: (v) => _toggleLock(context, v),
                 ),
               ],
             ),
-          ),
-          if (kIsWeb) const _GlassTile(),
-          // A browser can't ask for a fingerprint or Face ID.
-          if (!kIsWeb) ...[
-            const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Безопасность',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+          if (LessonReminders.supported)
+            _Section(
+              title: 'Уведомления',
+              children: [
+                const _LessonReminderTile(),
+                if (MailAlerts.supported) const _MailAlertTile(),
+              ],
             ),
-            SwitchListTile(
-              title: const Text('Блокировка при входе'),
-              subtitle: const Text(
-                  'Спрашивать отпечаток, Face ID или PIN при открытии приложения'),
-              value: lock.enabled,
-              onChanged: (v) => _toggleLock(context, v),
-            ),
-          ],
-          if (LessonReminders.supported) ...[
-            const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Уведомления',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            const _LessonReminderTile(),
-            if (MailAlerts.supported) const _MailAlertTile(),
-          ],
-          if (context.read<Updater>().enabled) ...[
-            const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Обновления',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            const _UpdateTile(),
-          ],
-          const Divider(height: 1),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child:
-                Text('Ошибки', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          const CrashLogTile(),
+          if (context.read<Updater>().enabled)
+            const _Section(title: 'Обновления', children: [_UpdateTile()]),
+          const _Section(title: 'Ошибки', children: [CrashLogTile()]),
           const EasterEggFooter(),
         ],
+      ),
+    );
+  }
+}
+
+/// A titled group of settings, after a line; on glass, a card of its own.
+class _Section extends StatelessWidget {
+  const _Section(
+      {required this.title, required this.children, this.first = false});
+
+  final String title;
+  final List<Widget> children;
+
+  /// At the top: no line above it.
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final glass = Glass.of(context);
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+    );
+    if (!glass.on) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!first) const Divider(height: 1),
+          header,
+          ...children,
+        ],
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: DecoratedBox(
+        decoration: GlassDecoration(glass, seed: title.hashCode),
+        child: Material(
+          type: MaterialType.transparency,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [header, ...children],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -131,17 +166,91 @@ class _GlassTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeController>();
     final solid = MediaQuery.highContrastOf(context) || prefersSolidSurfaces();
-    return SwitchListTile(
-      title: const Text('Liquid Glass'),
-      subtitle: Text(solid
-          ? 'Полупрозрачные панели на цветном фоне. Сейчас не действует: '
-              'в системе включено «Уменьшить прозрачность» или «Увеличить '
-              'контраст»'
-          : 'Полупрозрачные панели на цветном фоне'),
-      value: theme.glass,
-      onChanged: theme.setGlass,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          title: const Text('Liquid Glass'),
+          subtitle: Text(solid
+              ? 'Полупрозрачные панели на цветном фоне. Сейчас не действует: '
+                  'в системе включено «Уменьшить прозрачность» или «Увеличить '
+                  'контраст»'
+              : 'Полупрозрачные панели на цветном фоне'),
+          value: theme.glass,
+          onChanged: theme.setGlass,
+        ),
+        // Clear glass, or matte: frosted and lightly scuffed.
+        if (theme.glass)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: false, label: Text('Прозрачное')),
+                ButtonSegment(value: true, label: Text('Матовое')),
+              ],
+              selected: {theme.scuffed},
+              onSelectionChanged: (s) => theme.setScuffed(s.first),
+            ),
+          ),
+        // Clear glass: how strong, from nearly solid panels to the full
+        // effect.
+        if (theme.glass && !theme.scuffed)
+          _PercentSlider(
+            label: 'Сила эффекта',
+            value: theme.strength,
+            onChanged: (v) => theme.setStrength(v, save: false),
+            onChangeEnd: theme.setStrength,
+          ),
+        // Either: how far frost has grown on it.
+        if (theme.glass)
+          _PercentSlider(
+            label: 'Иней',
+            value: theme.frost,
+            onChanged: (v) => theme.setFrost(v, save: false),
+            onChangeEnd: theme.setFrost,
+          ),
+      ],
     );
   }
+}
+
+/// A setting from 0 to 100 %: its [label], then the slider. The look
+/// follows the thumb ([onChanged]); [onChangeEnd] keeps it.
+class _PercentSlider extends StatelessWidget {
+  const _PercentSlider({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.onChangeEnd,
+  });
+
+  final String label;
+  final double value;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeEnd;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 8, 4),
+        child: Row(
+          children: [
+            // One width for every label, so the sliders line up.
+            SizedBox(width: 112, child: Text(label)),
+            Expanded(
+              child: Slider(
+                value: value,
+                divisions: 20,
+                label: '${(value * 100).round()} %',
+                semanticFormatterCallback: (v) =>
+                    '$label ${(v * 100).round()} процентов',
+                onChanged: onChanged,
+                onChangeEnd: onChangeEnd,
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 /// How long before a lesson to remind of it, if at all.

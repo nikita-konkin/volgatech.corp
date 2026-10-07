@@ -17,6 +17,7 @@ import '../data/volgatech_api.dart';
 import '../state/auth_controller.dart';
 import '../state/memo_controller.dart';
 import '../theme.dart';
+import 'glass.dart';
 import 'layout.dart';
 import 'memo_header_page.dart';
 
@@ -266,33 +267,31 @@ class _MonthBar extends StatelessWidget {
         if (v < -250) onNext();
         if (v > 250) onPrev();
       },
-      child: Container(
+      child: AccentBar(
         color: Brand.blue,
-        child: ReadableWidth(
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left,
-                    color: Colors.white, size: 30),
-                tooltip: 'Предыдущий месяц',
-                onPressed: onPrev,
-              ),
-              Expanded(
-                child: Text(label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right,
-                    color: Colors.white, size: 30),
-                tooltip: 'Следующий месяц',
-                onPressed: onNext,
-              ),
-            ],
-          ),
+        child: Row(
+          children: [
+            IconButton(
+              icon:
+                  const Icon(Icons.chevron_left, color: Colors.white, size: 30),
+              tooltip: 'Предыдущий месяц',
+              onPressed: onPrev,
+            ),
+            Expanded(
+              child: Text(label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.chevron_right,
+                  color: Colors.white, size: 30),
+              tooltip: 'Следующий месяц',
+              onPressed: onNext,
+            ),
+          ],
         ),
       ),
     );
@@ -377,11 +376,15 @@ class _EntryTile extends StatelessWidget {
       opacity: off ? 0.45 : 1,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: Brand.card(context),
-          borderRadius: BorderRadius.circular(8),
-          border: const Border(left: BorderSide(color: Brand.blue, width: 4)),
-        ),
+        decoration: cardDecoration(
+            context,
+            BoxDecoration(
+              color: Brand.card(context),
+              borderRadius: BorderRadius.circular(8),
+              border:
+                  const Border(left: BorderSide(color: Brand.blue, width: 4)),
+            ),
+            seed: r.key),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

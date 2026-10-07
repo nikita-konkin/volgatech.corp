@@ -7,6 +7,7 @@ import '../core/login_utils.dart';
 import '../core/prefs.dart';
 import '../state/auth_controller.dart';
 import '../theme.dart';
+import 'glass.dart';
 import 'layout.dart';
 
 class LoginPage extends StatefulWidget {
@@ -82,6 +83,8 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final authenticating = context.select<AuthController, bool>(
         (a) => a.status == AuthStatus.authenticating);
+    final glass = Glass.of(context);
+    final bar = Theme.of(context).appBarTheme;
 
     return Scaffold(
       // In a browser on an iPhone the banner goes up behind the clock, whose
@@ -93,18 +96,19 @@ class _LoginPageState extends State<LoginPage> {
             // Brand banner
             Container(
               width: double.infinity,
-              color: Brand.blue,
+              // On glass: the top bar's glass.
+              color: glass.on ? bar.backgroundColor : Brand.blue,
               padding: EdgeInsets.fromLTRB(
                   20,
                   18 + (kIsWeb ? MediaQuery.paddingOf(context).top : 0),
                   20,
                   18),
               // In line with the form below it.
-              child: const ReadableWidth(
+              child: ReadableWidth(
                 max: _formWidth,
                 child: Row(
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       radius: 26,
                       backgroundColor: Colors.white,
                       child: Text('ПГТУ',
@@ -113,12 +117,13 @@ class _LoginPageState extends State<LoginPage> {
                               fontWeight: FontWeight.bold,
                               fontSize: 12)),
                     ),
-                    SizedBox(width: 14),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Text(
                         'ЛИЧНЫЙ КАБИНЕТ\nРАБОТНИКА ПГТУ',
                         style: TextStyle(
-                            color: Colors.white,
+                            color:
+                                glass.on ? bar.foregroundColor : Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             height: 1.2),

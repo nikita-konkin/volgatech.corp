@@ -16,6 +16,9 @@ class Prefs {
   static const _kRemember = 'remember_login';
   static const _kTheme = 'theme_mode';
   static const _kGlass = 'theme_glass';
+  static const _kScuffed = 'theme_glass_scuffed';
+  static const _kGlassStrength = 'theme_glass_strength';
+  static const _kGlassFrost = 'theme_glass_frost';
   static const _kLessonReminder = 'lesson_reminder_minutes';
   static const _kAppLock = 'app_lock_enabled';
   static const _kPinsFolded = 'mail_pins_folded';
@@ -120,6 +123,21 @@ class Prefs {
   /// «Liquid Glass» (the browser's choice in Settings).
   bool get glass => _p.getBool(_kGlass) ?? false;
   Future<void> setGlass(bool on) async => _p.setBool(_kGlass, on);
+
+  /// The glass matte — frosted and scuffed — rather than clear.
+  bool get glassScuffed => _p.getBool(_kScuffed) ?? false;
+  Future<void> setGlassScuffed(bool on) async => _p.setBool(_kScuffed, on);
+
+  /// How strong the glass is, 0 to 1 (Settings' slider); 1, as designed.
+  double get glassStrength =>
+      (_p.getDouble(_kGlassStrength) ?? 1).clamp(0.0, 1.0);
+  Future<void> setGlassStrength(double v) async =>
+      _p.setDouble(_kGlassStrength, v);
+
+  /// How far frost has grown on the glass, clear or matte, 0 to 1
+  /// (Settings' «Иней»).
+  double get glassFrost => (_p.getDouble(_kGlassFrost) ?? 0.5).clamp(0.0, 1.0);
+  Future<void> setGlassFrost(double v) async => _p.setDouble(_kGlassFrost, v);
 
   ThemeMode get themeMode {
     switch (_p.getString(_kTheme)) {

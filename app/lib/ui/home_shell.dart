@@ -109,16 +109,22 @@ class _WideShellState extends State<_WideShell> {
         children: [
           SizedBox(
             width: _menuWidth,
-            child: Material(
-              // On glass: a tinted pane over the page's wallpaper.
-              color: glass.on
-                  ? glass.panel
-                  : Theme.of(context).colorScheme.surfaceContainerLow,
-              child: const NavMenu(),
-            ),
+            child: glass.on
+                // On glass: a panel floating over the page's wallpaper.
+                ? const Padding(
+                    padding: EdgeInsets.fromLTRB(12, 12, 4, 12),
+                    child:
+                        GlassPanel(radius: 24, shadow: true, child: NavMenu()),
+                  )
+                : Material(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    child: const NavMenu(),
+                  ),
           ),
-          VerticalDivider(
-              width: 1, thickness: 1, color: glass.on ? glass.rim : null),
+          if (glass.on)
+            const SizedBox(width: 1)
+          else
+            const VerticalDivider(width: 1, thickness: 1),
           Expanded(
             // The screens measure themselves against this side, not the
             // whole window.

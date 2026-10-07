@@ -54,8 +54,16 @@ class _VolgatechAppState extends State<VolgatechApp>
     return MaterialApp(
       title: 'Волгатех.Коллектив',
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(glass: glass),
-      darkTheme: buildDarkTheme(glass: glass),
+      theme: buildLightTheme(
+          glass: glass,
+          scuffed: theme.scuffed,
+          strength: theme.strength,
+          frost: theme.frost),
+      darkTheme: buildDarkTheme(
+          glass: glass,
+          scuffed: theme.scuffed,
+          strength: theme.strength,
+          frost: theme.frost),
       themeMode: theme.mode,
       locale: const Locale('ru'),
       supportedLocales: const [Locale('ru'), Locale('en')],

@@ -35,7 +35,7 @@ class AppDrawer extends StatelessWidget {
       ? const Drawer(
           backgroundColor: Colors.transparent,
           clipBehavior: Clip.antiAlias,
-          child: FrostedPanel(child: NavMenu()),
+          child: GlassPanel(frosted: true, child: NavMenu()),
         )
       : const Drawer(child: NavMenu());
 }
@@ -90,8 +90,12 @@ class NavMenu extends StatelessWidget {
     final auth = context.watch<AuthController>();
     final profile = auth.profile;
     final shell = NavShell.maybeOf(context);
+    final glass = Glass.of(context);
     // Brand blue, made lighter on dark backgrounds to stay visible.
     final accent = Theme.of(context).colorScheme.primary;
+    // The selected item: on glass, a drop of clearer glass.
+    final selectedColor =
+        glass.on ? glass.lens : Brand.blue.withValues(alpha: 0.10);
 
     Widget item(Section section, IconData icon, String title,
             {String? subtitle}) =>
@@ -100,17 +104,24 @@ class NavMenu extends StatelessWidget {
           title: Text(title),
           subtitle: subtitle == null ? null : Text(subtitle),
           selected: shell?.section == section,
-          selectedTileColor: Brand.blue.withValues(alpha: 0.10),
+          selectedTileColor: selectedColor,
           onTap: () => _go(context, section),
         );
 
-    return ListView(
-      padding: EdgeInsets.zero,
+    final list = ListView(
+      // On glass the items are pills, clear of the panel's edges.
+      padding: glass.on
+          ? const EdgeInsets.symmetric(horizontal: 8)
+          : EdgeInsets.zero,
       children: [
         InkWell(
           onTap: () => _go(context, Section.profile),
+          customBorder: glass.on
+              ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+              : null,
           child: Container(
-            color: Brand.blue,
+            // On glass: the panel itself.
+            color: glass.on ? null : Brand.blue,
             // In a drawer it starts under the status bar.
             padding: EdgeInsets.fromLTRB(16, shell == null ? 48 : 24, 16, 20),
             width: double.infinity,
@@ -127,8 +138,10 @@ class NavMenu extends StatelessWidget {
                 Text(
                   (profile?.fullName ?? 'Профиль').toUpperCase(),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: glass.on
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold),
                 ),
@@ -171,7 +184,7 @@ class NavMenu extends StatelessWidget {
           leading: const Icon(Icons.settings, color: Colors.grey),
           title: const Text('Настройки'),
           selected: shell?.section == Section.settings,
-          selectedTileColor: Brand.blue.withValues(alpha: 0.10),
+          selectedTileColor: selectedColor,
           onTap: () => _go(context, Section.settings),
         ),
         ListTile(
@@ -193,6 +206,11 @@ class NavMenu extends StatelessWidget {
           },
         ),
       ],
+    );
+    if (!glass.on) return list;
+    return ListTileTheme(
+      data: const ListTileThemeData(shape: StadiumBorder()),
+      child: list,
     );
   }
 }
