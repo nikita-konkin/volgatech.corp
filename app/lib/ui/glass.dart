@@ -704,22 +704,24 @@ void paintTexture(Canvas canvas, Rect rect, ui.Image? texture, Offset origin,
 /// colour over its edge, which shows [lift] beside it (see [paintFrost]).
 typedef FrostMark = ({Path path, double depth, double lift});
 
-/// Frost on a piece of matte glass, as on a window in winter: [GlassFrost.of]
-/// its size and how far it has grown (0 to 1), as marks to draw in order.
-/// Fronds of ice grow in from the edges — most from the bottom, fewest from
-/// the top — each a stem curling a little at its tip, with barbs off either
-/// side, barbed in turn and shorter towards the tip, like a feather. Where
-/// one reaches ice another frond got to first, it stops: they meet but
-/// don't cross, and the middle stays clearest. A piece's seed keeps its
-/// frost as it grows: a frond only grows on.
+/// Frost on a piece of matte glass, as on a window in winter, grown as
+/// fractal crystals: [GlassFrost.of] its size and how far it has grown (0
+/// to 1), as marks to draw in order. Each crystal is a snowflake of six
+/// arms alike; off each arm, pairs of branches at sixty degrees, as ice
+/// branches, shorter towards its tip; each branch the same again, smaller,
+/// three times over. Big ones grow first from the edges — most from the
+/// bottom, seldom from the top — then smaller ones fill the room left.
+/// Where ice reaches ice another crystal got to first, it stops: they meet
+/// but don't cross. A piece's seed keeps its frost as it grows: it only
+/// grows on.
 @immutable
 class GlassFrost {
   const GlassFrost._(this.marks);
 
   final List<FrostMark> marks;
 
-  /// Ridges by thickness, fine to thick — barbs of barbs, barbs, stems:
-  /// one path each, to draw at once.
+  /// Ice by thickness, fine to thick — twigs, branches, arms: one path
+  /// each, to draw at once.
   static const _depths = 3;
 
   static final _made = <(int, int, int, int), GlassFrost>{};
@@ -739,12 +741,25 @@ class GlassFrost {
   }
 
   /// The frost on a piece [size] across, grown in full: each branch as far
-  /// as it got, and which frond it belongs to.
+  /// as it got — of which crystal, whether one of the small ones between,
+  /// whether an arm, and how many branchings from one.
   @visibleForTesting
-  static List<(int, List<Offset>)> fronds(Size size, int seed) => [
-        for (final b in _Ice.of(size, seed).branches)
-          if (b.alive > 0) (b.frond, b.points.sublist(0, b.alive + 1)),
-      ];
+  static List<
+          ({int frond, bool flake, bool root, int level, List<Offset> line})>
+      fronds(Size size, int seed) {
+    final ice = _Ice.of(size, seed);
+    return [
+      for (final b in ice.branches)
+        if (b.alive > 0)
+          (
+            frond: b.frond,
+            flake: ice._flake[b.frond],
+            root: b.parent < 0,
+            level: b.level,
+            line: b.points.sublist(0, b.alive + 1),
+          ),
+    ];
+  }
 
   static GlassFrost _make(_Ice ice, double frost) {
     if (frost <= 0) return const GlassFrost._([]);
@@ -753,8 +768,9 @@ class GlassFrost {
       final reach =
           math.min(ice.reach(b.frond, frost) - b.from, b.alive * _Ice.step);
       if (reach <= 0) continue;
-      final wide = const [1.6, 1.0, 0.7][b.level] * (0.6 + 0.4 * frost);
-      paths[_depths - 1 - b.level].addPolygon(b.outline(reach, wide), true);
+      final wide = const [1.6, 1.1, 0.75, 0.55][b.level] * (0.6 + 0.4 * frost);
+      paths[_depths - 1 - math.min(b.level, _depths - 1)]
+          .addPolygon(b.outline(reach, wide), true);
     }
     return GlassFrost._([
       for (var k = 0; k < _depths; k++)
@@ -762,7 +778,7 @@ class GlassFrost {
     ]);
   }
 
-  /// How strongly ice of thickness [k] shows: stems most.
+  /// How strongly ice of thickness [k] shows: arms most.
   static double _strength(int k) => 0.55 + 0.45 * (k + 1) / _depths;
 }
 
@@ -770,17 +786,16 @@ class GlassFrost {
 /// branches, where each runs, and how far each got before it met another
 /// frond's ice. [reach] says how far along a frond it has got at a stage.
 class _Ice {
-  _Ice._(this.branches, this._appear, this._longest);
+  final branches = <_Branch>[];
 
-  final List<_Branch> branches;
+  /// For each crystal: the stage it starts at, how many stages it takes to
+  /// grow in full, its farthest point along it, and whether it is one of
+  /// the small ones between.
+  final _appear = <double>[], _span = <double>[], _longest = <double>[];
+  final _flake = <bool>[];
 
-  /// For each frond: the stage it starts at, and its farthest point, along
-  /// it.
-  final List<double> _appear;
-  final List<double> _longest;
-
-  /// How many stages a frond takes from its start to its fullest.
-  static const _span = 0.45;
+  /// For each crystal: how long its arms are.
+  final _radius = <double>[];
 
   /// Pixels between a branch's points.
   static const step = 2.0;
@@ -788,15 +803,15 @@ class _Ice {
   /// Ice keeps this far (a cell, in pixels) from another frond's.
   static const _cell = 3.0;
 
-  /// How far past the edges ice is kept track of: a frond may run out and
-  /// curl back in.
+  /// How far past the edges ice is kept track of: a crystal centred on one
+  /// spreads out past it too.
   static const _margin = 24.0;
 
   double reach(int frond, double stage) =>
-      (stage - _appear[frond]) / _span * _longest[frond];
+      (stage - _appear[frond]) / _span[frond] * _longest[frond];
 
   double _time(int frond, double along) =>
-      _appear[frond] + along / _longest[frond] * _span;
+      _appear[frond] + along / _longest[frond] * _span[frond];
 
   static final _grown = <(int, int, int), _Ice>{};
 
@@ -809,19 +824,21 @@ class _Ice {
 
   static _Ice _grow(Size size, int seed) {
     final w = size.width, h = size.height;
-    final branches = <_Branch>[];
-    final appear = <double>[], longest = <double>[];
-    if (w <= 0 || h <= 0) return _Ice._(branches, appear, longest);
+    final ice = _Ice();
+    if (w <= 0 || h <= 0) return ice;
     final rnd = math.Random(seed);
-    final count = ((w + h) * 2 / 70).clamp(3, 40).round();
-    final gap = (w + h) * 2 / count * 0.5;
-    final roots = <Offset>[];
+    final small = math.min(w, h);
+
+    // Big crystals centred on the edges, the frost creeping in.
+    final count = ((w + h) * 2 / 110).clamp(2, 24).round();
+    final gap = (w + h) * 2 / count * 0.6;
+    final centres = <Offset>[];
     for (var i = 0; i < count; i++) {
       // Somewhere along an edge — the bottom likeliest, the top seldom —
-      // and not too near another frond's root.
-      Offset? root;
+      // and not too near another.
+      Offset? centre;
       var inwards = 0.0;
-      for (var tries = 0; tries < 6 && root == null; tries++) {
+      for (var tries = 0; tries < 6 && centre == null; tries++) {
         final pick = rnd.nextDouble() * (1.9 * w + 2 * h);
         final along = rnd.nextDouble();
         final (p, n) = pick < 1.6 * w
@@ -831,31 +848,36 @@ class _Ice {
                 : pick < 1.9 * w + h
                     ? (Offset(0, along * h), 0.0)
                     : (Offset(w, along * h), math.pi);
-        if (roots.every((r) => (r - p).distance >= gap)) {
-          root = p;
+        if (centres.every((c) => (c - p).distance >= gap)) {
+          centre = p;
           inwards = n;
         }
       }
-      final heading = inwards + (rnd.nextDouble() - 0.5) * 1.4;
-      final length = math.min(140.0,
-          (0.55 + 0.45 * rnd.nextDouble()) * (30 + 0.6 * math.min(w, h)));
-      final curve = (rnd.nextDouble() - 0.5) * 0.05;
-      final curl = curve.sign * (0.06 + 0.1 * rnd.nextDouble());
-      if (root == null) continue;
-      roots.add(root);
-      final first = branches.length;
-      _feather(rnd, branches, appear.length, root, heading, length, curve, curl,
-          0, 0, -1, 0);
-      if (branches.length == first) continue;
-      appear.add(i / count * 0.5);
-      longest.add(
-          branches.skip(first).map((b) => b.from + b.length).reduce(math.max));
+      final radius = math.min(110.0, (0.45 + 0.35 * rnd.nextDouble()) * small);
+      final turn = rnd.nextDouble() * math.pi / 3;
+      final arm = _arm(rnd, radius);
+      if (centre == null) continue;
+      centres.add(centre);
+      ice._crystal(centre, turn, arm, i / count * 0.45, 0.4,
+          inwards: inwards, small: false);
     }
-    final ice = _Ice._(branches, appear, longest);
+
+    // Then smaller ones in the room left.
+    final flakes = (w * h / 3500).clamp(1, 40).round();
+    for (var i = 0; i < flakes; i++) {
+      final centre = Offset(rnd.nextDouble() * w, rnd.nextDouble() * h);
+      final radius =
+          math.min(50.0, (0.12 + 0.18 * rnd.nextDouble()) * small + 4);
+      final turn = rnd.nextDouble() * math.pi / 3;
+      ice._crystal(
+          centre, turn, _arm(rnd, radius), 0.4 + 0.45 * i / flakes, 0.15,
+          small: true);
+    }
 
     // Grow it all in the order it would grow. Where a step comes within a
-    // cell of another frond's ice, that branch stops; a barb that would
+    // cell of another frond's ice, that branch stops; a branch that would
     // spring from beyond where its parent stopped never grows.
+    final branches = ice.branches;
     final steps = <(double, int, int)>[
       for (var b = 0; b < branches.length; b++)
         for (var j = 0; j < branches[b].points.length - 1; j++)
@@ -892,10 +914,30 @@ class _Ice {
       }
     }
 
+    // A small crystal grows only where there is room for it whole — not a
+    // stray arm or two squeezed in between.
+    bool roomy(int crystal) {
+      final centre = branches.firstWhere((b) => b.frond == crystal).points[0];
+      final r = ice._radius[crystal] * 0.8;
+      for (var y = centre.dy - r; y <= centre.dy + r; y += _cell) {
+        for (var x = centre.dx - r; x <= centre.dx + r; x += _cell) {
+          final p = Offset(x, y);
+          if ((p - centre).distance <= r && !free(p, crystal)) return false;
+        }
+      }
+      return true;
+    }
+
+    final room = <int, bool>{};
     final stopped = List.filled(branches.length, false);
     for (final (_, b, j) in steps) {
       if (stopped[b]) continue;
       final branch = branches[b];
+      if (ice._flake[branch.frond] &&
+          !room.putIfAbsent(branch.frond, () => roomy(branch.frond))) {
+        stopped[b] = true;
+        continue;
+      }
       final a = branch.points[j], z = branch.points[j + 1];
       final mid = Offset.lerp(a, z, 0.5)!;
       final sprung = j > 0 ||
@@ -914,62 +956,98 @@ class _Ice {
     return ice;
   }
 
-  /// A branch of frond [frond] from [from] at [heading], [length] long,
-  /// bending by [curve] a pixel and over its last third curling by up to
-  /// [curl] more; [along] the frond from its root, [at] that far along
-  /// branch [parent]. Off it, barbs on alternate sides, leaning forward and
-  /// longest near its root — two levels of them.
-  static void _feather(
-      math.Random rnd,
-      List<_Branch> into,
-      int frond,
-      Offset from,
-      double heading,
-      double length,
-      double curve,
-      double curl,
-      int level,
-      double along,
-      int parent,
-      double at) {
-    final steps = (length / step).floor();
-    final points = [from], headings = [heading];
-    var p = from, bearing = heading;
-    for (var j = 0; j < steps; j++) {
-      final tip = math.max(0.0, (j / steps - 0.65) / 0.35);
-      bearing +=
-          (curve + curl * tip * tip) * step + (rnd.nextDouble() - 0.5) * 0.05;
-      p += Offset(math.cos(bearing), math.sin(bearing)) * step;
-      points.add(p);
-      headings.add(bearing);
-    }
-    if (steps < 2) return;
-    final index = into.length;
-    into.add(_Branch(frond, level, parent, at, along, points, headings));
-    if (level == 2) return;
-    final spacing =
-        level == 0 ? 3.0 + 2 * rnd.nextDouble() : 2.5 + 1.5 * rnd.nextDouble();
-    var side = rnd.nextBool() ? 1.0 : -1.0;
-    for (var s = spacing * 1.5;
-        s < steps * step - 3;
-        s += spacing * (0.8 + 0.4 * rnd.nextDouble())) {
-      final j = (s / step).round();
-      final barb = (steps * step - s) *
-          (level == 0 ? 0.4 : 0.45) *
-          (0.7 + 0.5 * rnd.nextDouble());
-      final lean = (level == 0 ? 0.8 : 0.7) + 0.3 * rnd.nextDouble();
-      if (barb >= 3) {
-        _feather(rnd, into, frond, points[j], headings[j] + side * lean, barb,
-            curve * 0.8, 0, level + 1, along + j * step, index, j * step);
+  /// A crystal of six [arm]s alike about [centre], the first at [turn],
+  /// starting at stage [appear] and grown in full [span] stages later. One
+  /// on an edge leaves out the arms that would point off the glass, away
+  /// from [inwards].
+  void _crystal(
+      Offset centre, double turn, List<_Shoot> arm, double appear, double span,
+      {double? inwards, required bool small}) {
+    final crystal = _appear.length, first = branches.length;
+    for (var a = 0; a < 6; a++) {
+      final angle = turn + a * math.pi / 3;
+      if (inwards != null && math.cos(angle - inwards) < -0.5) continue;
+      final (sin, cos) = (math.sin(angle), math.cos(angle));
+      Offset turned(Offset p) =>
+          Offset(p.dx * cos - p.dy * sin, p.dx * sin + p.dy * cos);
+      final base = branches.length;
+      for (final shoot in arm) {
+        final heading = shoot.heading + angle;
+        final from = centre + turned(shoot.from);
+        final along = Offset(math.cos(heading), math.sin(heading)) * step;
+        final steps = (shoot.length / step).floor();
+        branches.add(_Branch(
+            crystal,
+            shoot.level,
+            shoot.parent < 0 ? -1 : base + shoot.parent,
+            shoot.at,
+            shoot.along,
+            [for (var j = 0; j <= steps; j++) from + along * j.toDouble()],
+            List.filled(steps + 1, heading)));
       }
-      side = -side;
     }
+    if (branches.length == first) return;
+    _appear.add(appear);
+    _span.add(span);
+    _flake.add(small);
+    _radius.add(arm.first.length);
+    _longest.add(
+        branches.skip(first).map((b) => b.from + b.length).reduce(math.max));
+  }
+
+  /// One arm of a crystal, [length] long, laid out from the origin along
+  /// heading 0: off it, four pairs of branches at sixty degrees either side,
+  /// each pair shorter than the last, and each branch the same again,
+  /// smaller, down to level 3 or a few pixels. Short enough, for four to a
+  /// side, that no branch reaches the next one along.
+  static List<_Shoot> _arm(math.Random rnd, double length) {
+    final shoots = <_Shoot>[];
+    void grow(Offset from, double heading, double length, int level, int parent,
+        double at, double along) {
+      if (length < 4) return;
+      final index = shoots.length;
+      shoots.add((
+        from: from,
+        heading: heading,
+        length: length,
+        level: level,
+        parent: parent,
+        at: at,
+        along: along,
+      ));
+      if (level == 3 || length < 8) return;
+      final towards = Offset(math.cos(heading), math.sin(heading));
+      for (final f in const [0.25, 0.45, 0.65, 0.82]) {
+        final x = f + (rnd.nextDouble() - 0.5) * 0.04;
+        final at = (x * length / step).round() * step;
+        final child = length * 0.5 * (1 - x) * (0.85 + 0.3 * rnd.nextDouble());
+        for (final side in const [-1.0, 1.0]) {
+          grow(from + towards * at, heading + side * math.pi / 3, child,
+              level + 1, index, at, along + at);
+        }
+      }
+    }
+
+    grow(Offset.zero, 0, length, 0, -1, 0, 0);
+    return shoots;
   }
 }
 
-/// A branch of frost: a stem (level 0), a barb (1) or a barb's barb (2) of
-/// frond [frond], springing [at] that far along branch [parent], [from]
-/// that far along the frond; [points] a step apart, of which [alive] steps
+/// One branch of a crystal's arm, laid out from the origin along heading 0
+/// (see [_Ice._arm]).
+typedef _Shoot = ({
+  Offset from,
+  double heading,
+  double length,
+  int level,
+  int parent,
+  double at,
+  double along,
+});
+
+/// A branch of frost, [level] branchings from an arm, of crystal [frond];
+/// springing [at] that far along branch [parent], [from] that far from the
+/// crystal's centre along it; [points] a step apart, of which [alive] steps
 /// grew before it met other ice.
 class _Branch {
   _Branch(this.frond, this.level, this.parent, this.at, this.from, this.points,

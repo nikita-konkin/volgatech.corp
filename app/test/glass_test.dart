@@ -197,24 +197,45 @@ void main() {
       }
     });
 
-    test('it grows in from the edges', () {
+    test('crystals: six arms alike from one centre, big ones on an edge', () {
       for (final seed in [1, 2, 3]) {
-        // A frond's first branch is its stem.
-        final stems = <int, Offset>{};
-        for (final (frond, line) in GlassFrost.fronds(card, seed)) {
-          stems.putIfAbsent(frond, () => line.first);
+        final arms = <int, List<List<Offset>>>{};
+        final small = <int>{};
+        for (final f in GlassFrost.fronds(card, seed)) {
+          if (f.root) (arms[f.frond] ??= []).add(f.line);
+          if (f.flake) small.add(f.frond);
         }
-        expect(stems, isNotEmpty);
-        for (final root in stems.values) {
-          expect(
-              root.dx.abs() < 0.01 ||
-                  root.dy.abs() < 0.01 ||
-                  (root.dx - card.width).abs() < 0.01 ||
-                  (root.dy - card.height).abs() < 0.01,
-              isTrue,
-              reason: '$root');
+        expect(arms.keys.where((c) => !small.contains(c)), isNotEmpty);
+        for (final MapEntry(key: crystal, value: lines) in arms.entries) {
+          final centre = lines.first.first;
+          expect(lines.map((l) => l.first).toSet(), hasLength(1),
+              reason: 'one centre');
+          if (small.contains(crystal)) {
+            expect((Offset.zero & card).contains(centre), isTrue);
+          } else {
+            expect(
+                centre.dx.abs() < 0.01 ||
+                    centre.dy.abs() < 0.01 ||
+                    (centre.dx - card.width).abs() < 0.01 ||
+                    (centre.dy - card.height).abs() < 0.01,
+                isTrue,
+                reason: '$centre');
+          }
+          // Arms sixty degrees apart.
+          final first = (lines.first[1] - centre).direction;
+          for (final line in lines) {
+            final turn = ((line[1] - centre).direction - first) / (math.pi / 3);
+            expect(turn - turn.round(), closeTo(0, 1e-6), reason: '$turn');
+          }
         }
       }
+    });
+
+    test('a fractal: branches of branches of branches', () {
+      final levels = {
+        for (final f in GlassFrost.fronds(const Size(300, 900), 1)) f.level
+      };
+      expect(levels, containsAll([0, 1, 2, 3]));
     });
 
     test('fronds meet without crossing', () {
@@ -222,11 +243,11 @@ void main() {
         for (final seed in [1, 2, 3, 4]) {
           // As far as it shows: on the glass.
           final fronds = [
-            for (final (frond, line) in GlassFrost.fronds(size, seed))
+            for (final f in GlassFrost.fronds(size, seed))
               (
-                frond,
+                f.frond,
                 [
-                  for (final p in line)
+                  for (final p in f.line)
                     if ((Offset.zero & size).inflate(0.5).contains(p)) p
                 ]
               ),
