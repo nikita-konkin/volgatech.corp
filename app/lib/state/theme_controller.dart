@@ -8,12 +8,14 @@ class ThemeController extends ChangeNotifier {
       : _mode = _prefs.themeMode,
         _glass = _prefs.glass,
         _scuffed = _prefs.glassScuffed,
-        _strength = _prefs.glassStrength;
+        _strength = _prefs.glassStrength,
+        _wear = _prefs.glassWear;
   final Prefs _prefs;
   ThemeMode _mode;
   bool _glass;
   bool _scuffed;
   double _strength;
+  double _wear;
 
   ThemeMode get mode => _mode;
 
@@ -23,8 +25,12 @@ class ThemeController extends ChangeNotifier {
   /// The glass matte, frosted and scuffed, rather than clear.
   bool get scuffed => _scuffed;
 
-  /// How strong the glass is, 0 to 1; 1, as designed.
+  /// How strong the clear glass is, 0 to 1; 1, as designed.
   double get strength => _strength;
+
+  /// How worn the matte glass is, 0 to 1: deeper, more random scratches,
+  /// then cracks.
+  double get wear => _wear;
 
   Future<void> setMode(ThemeMode m) async {
     if (m == _mode) return;
@@ -48,6 +54,16 @@ class ThemeController extends ChangeNotifier {
       notifyListeners();
     }
     if (save) await _prefs.setGlassStrength(v);
+  }
+
+  /// As [setStrength], for the matte glass's wear.
+  Future<void> setWear(double v, {bool save = true}) async {
+    v = v.clamp(0.0, 1.0);
+    if (v != _wear) {
+      _wear = v;
+      notifyListeners();
+    }
+    if (save) await _prefs.setGlassWear(v);
   }
 
   Future<void> setScuffed(bool on) async {

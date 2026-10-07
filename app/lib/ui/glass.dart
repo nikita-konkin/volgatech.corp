@@ -30,7 +30,9 @@ class Glass extends ThemeExtension<Glass> {
     this.shadows = const [],
     this.wash = const [],
     this.grain = 0,
-    this.scuffs = 0,
+    this.wear = 0,
+    this.scratch = Colors.transparent,
+    this.glint = Colors.transparent,
     this.strength = 1,
   });
 
@@ -45,12 +47,18 @@ class Glass extends ThemeExtension<Glass> {
   final List<Color> blobs;
 
   /// Matte glass: how strongly the fine [grain] of frosting shows, on the
-  /// wallpaper and the glass, and the faint [scuffs] on the glass (0: none,
-  /// 1: as drawn).
+  /// wallpaper and the glass (0: none, 1: as drawn).
   final double grain;
-  final double scuffs;
 
-  bool get scuffed => grain > 0 || scuffs > 0;
+  /// Matte glass: how worn it is (0: as new, 1: scratched deep every which
+  /// way, and cracked; see [GlassWear]). A scratch is a groove: its wall
+  /// towards the light, at the top left, in the shade of [scratch], the far
+  /// one catching the light, [glint] — both as at the deepest.
+  final double wear;
+  final Color scratch;
+  final Color glint;
+
+  bool get scuffed => grain > 0 || wear > 0;
 
   /// How strong the effect is, as [scaled] made it: 1, the full design.
   final double strength;
@@ -89,7 +97,9 @@ class Glass extends ThemeExtension<Glass> {
         for (final s in shadows) s.copyWith(color: fade(s.color, 0.5)),
       ],
       grain: grain * t,
-      scuffs: scuffs * t,
+      wear: wear * t,
+      scratch: scratch,
+      glint: glint,
       strength: strength * t,
     );
   }
@@ -222,7 +232,8 @@ class Glass extends ThemeExtension<Glass> {
       BoxShadow(color: Color(0x0F20283F), offset: Offset(0, 1), blurRadius: 3),
     ],
     grain: 1,
-    scuffs: 1,
+    scratch: Color(0x660F1426),
+    glint: Color(0xE6FFFFFF),
   );
 
   static const scuffedDark = Glass(
@@ -248,7 +259,8 @@ class Glass extends ThemeExtension<Glass> {
           spreadRadius: -16),
     ],
     grain: 1,
-    scuffs: 0.4,
+    scratch: Color(0x99000000),
+    glint: Color(0x47FFFFFF),
   );
 
   /// Text on glass, and the quieter text under it.
@@ -270,8 +282,9 @@ class Glass extends ThemeExtension<Glass> {
         .withValues(alpha: c.a);
   }
 
+  /// [wear]: matte glass as worn as that.
   @override
-  Glass copyWith({bool? on}) => Glass(
+  Glass copyWith({bool? on, double? wear}) => Glass(
         on: on ?? this.on,
         base: base,
         blobs: blobs,
@@ -289,7 +302,9 @@ class Glass extends ThemeExtension<Glass> {
         shadows: shadows,
         wash: wash,
         grain: grain,
-        scuffs: scuffs,
+        wear: (wear ?? this.wear).clamp(0.0, 1.0),
+        scratch: scratch,
+        glint: glint,
         strength: strength,
       );
 
@@ -458,7 +473,9 @@ PageTransitionsTheme wallpaperTransitions() {
 /// and [shadows] (the glass's own by default) that fall only outside it, as
 /// a CSS box-shadow does — under see-through glass a whole shadow would show
 /// through as a grey haze. An [accent] stripe down the left side, or an
-/// [outline] all round, marks it as a plain card's border did.
+/// [outline] all round, marks it as a plain card's border did. On matte
+/// glass, [seed] picks this piece's own scratches and cracks (by default,
+/// its size's).
 @immutable
 class GlassDecoration extends Decoration {
   const GlassDecoration(
@@ -474,6 +491,7 @@ class GlassDecoration extends Decoration {
     this.rimmed = true,
     this.highlight,
     this.inset = EdgeInsets.zero,
+    this.seed,
   });
 
   final Glass glass;
@@ -493,6 +511,8 @@ class GlassDecoration extends Decoration {
 
   /// What the child keeps clear of, as a border would make it.
   final EdgeInsets inset;
+
+  final int? seed;
 
   @override
   EdgeInsetsGeometry get padding => inset;
@@ -514,11 +534,12 @@ class GlassDecoration extends Decoration {
       other.sheen == sheen &&
       other.rimmed == rimmed &&
       other.highlight == highlight &&
-      other.inset == inset;
+      other.inset == inset &&
+      other.seed == seed;
 
   @override
   int get hashCode => Object.hash(glass, fill, gradient, radius, accent,
-      accentWidth, outline, shadows, sheen, rimmed, highlight, inset);
+      accentWidth, outline, shadows, sheen, rimmed, highlight, inset, seed);
 }
 
 class _GlassPainter extends BoxPainter {
@@ -561,13 +582,14 @@ class _GlassPainter extends BoxPainter {
               stops: const [0, 0.46],
             ).createShader(rect));
     }
-    // Matte glass: frosted and lightly scuffed, the texture moving with it.
+    // Matte glass: frosted and worn, the texture moving with it.
     if (g.scuffed && d.sheen) {
       canvas
         ..save()
         ..clipRRect(shape);
       paintTexture(canvas, rect, GlassTexture.grain, rect.topLeft, g.grain);
-      paintTexture(canvas, rect, GlassTexture.scuffs, rect.topLeft, g.scuffs);
+      paintWear(canvas, rect, g,
+          d.seed ?? Object.hash(rect.width.round(), rect.height.round()));
       canvas.restore();
     }
     // The accent: a capsule standing just inside the left edge.
@@ -620,10 +642,9 @@ class _GlassPainter extends BoxPainter {
   }
 }
 
-/// The tiles of matte glass's texture, drawn once: [grain], fine specks
-/// of light and shade as frosting has (laid at half a logical pixel each:
-/// a device pixel on most screens), and [scuffs], faint scratches running
-/// mostly one way. Null where the renderer can't draw them.
+/// The tile of matte glass's texture, drawn once: [grain], fine specks of
+/// light and shade as frosting has (laid at half a logical pixel each: a
+/// device pixel on most screens). Null where the renderer can't draw it.
 abstract final class GlassTexture {
   static final ui.Image? grain = _draw(256, (canvas, rnd) {
     final light = <Offset>[], shade = <Offset>[];
@@ -648,28 +669,6 @@ abstract final class GlassTexture {
 
   /// Grain texture pixels per logical pixel.
   static const grainScale = 0.5;
-
-  static final ui.Image? scuffs = _draw(256, (canvas, rnd) {
-    final paint = Paint()
-      ..strokeWidth = 0.6
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 70; i++) {
-      final from = Offset(rnd.nextDouble() * 256, rnd.nextDouble() * 256);
-      final angle = -0.45 + (rnd.nextDouble() - 0.5) * 0.3;
-      final length = 6 + rnd.nextDouble() * 34;
-      final to = from + Offset(math.cos(angle), math.sin(angle)) * length;
-      paint.color = rnd.nextInt(3) == 0
-          ? const Color(0x0F000000)
-          : Color.fromRGBO(255, 255, 255, 0.08 + rnd.nextDouble() * 0.08);
-      // Across the tile's edge too, so the tiles meet without a seam.
-      for (final dx in const [-256.0, 0.0, 256.0]) {
-        for (final dy in const [-256.0, 0.0, 256.0]) {
-          final shift = Offset(dx, dy);
-          canvas.drawLine(from + shift, to + shift, paint);
-        }
-      }
-    }
-  });
 
   static ui.Image? _draw(int size, void Function(Canvas, math.Random) draw) {
     try {
@@ -703,10 +702,250 @@ void paintTexture(Canvas canvas, Rect rect, ui.Image? texture, Offset origin,
             BlendMode.modulate));
 }
 
+/// One kind of mark wear leaves: [path], in the shade of a groove's wall
+/// or, [lit], the light off the other one, at [depth] (0 to 1); filled, or
+/// a line [width] wide.
+typedef WearMark = ({Path path, bool lit, double depth, double? width});
+
+/// The marks wear leaves on a piece of matte glass, [GlassWear.of] its size
+/// and wear (0 to 1), to draw in order. Scratches: a few short ones running
+/// mostly one way, as from wiping; with wear, more of them, longer, deeper,
+/// bent and running every which way. Past half way, cracks: from the edge —
+/// more often near a corner, with a chip out where they start — growing
+/// inwards and branching. A piece's seed keeps its marks as the wear
+/// changes: a scratch only appears, deepens and turns; a crack only grows.
+@immutable
+class GlassWear {
+  const GlassWear._(this.marks);
+
+  final List<WearMark> marks;
+
+  /// Scratches at full wear, per square logical pixel.
+  static const _density = 1 / 700;
+
+  /// Groove depths, shallow to deep: one path each, to draw at once.
+  static const _depths = 3;
+
+  static final _made = <(int, int, int, int), GlassWear>{};
+
+  static GlassWear of(Size size, double wear, int seed) {
+    final key = (
+      seed,
+      size.width.round(),
+      size.height.round(),
+      (wear.clamp(0.0, 1.0) * 100).round(),
+    );
+    if (_made[key] case final made?) return made;
+    if (_made.length >= 128) _made.clear();
+    return _made[key] = _make(size, key.$4 / 100, seed);
+  }
+
+  static GlassWear _make(Size size, double wear, int seed) {
+    final w = size.width, h = size.height;
+    if (wear <= 0 || w <= 0 || h <= 0) return const GlassWear._([]);
+    final shade = [for (var i = 0; i < _depths; i++) Path()];
+    final lit = [for (var i = 0; i < _depths; i++) Path()];
+
+    // Every scratch is drawn up as at full wear, so each keeps its place;
+    // the wear says how many show, and how they lie.
+    final rnd = math.Random(seed);
+    final most = (w * h * _density).clamp(4, 160).round();
+    final shown = (most * wear).round();
+    for (var i = 0; i < most; i++) {
+      final from = Offset(rnd.nextDouble() * w, rnd.nextDouble() * h);
+      final turn = rnd.nextDouble() * 2 - 1;
+      final reach = rnd.nextDouble();
+      final bend = rnd.nextDouble() * 2 - 1;
+      final deep = rnd.nextDouble();
+      if (i >= shown) continue;
+      final angle = -0.45 + turn * (0.12 + 1.45 * wear);
+      final length = 6 + reach * reach * (24 + 80 * wear);
+      final along = Offset(math.cos(angle), math.sin(angle));
+      final to = from + along * length;
+      final mid = (from + to) / 2 +
+          Offset(-along.dy, along.dx) * (bend * wear * 0.1 * length);
+      final depth = (0.25 + 0.75 * deep) * (0.3 + 0.7 * wear);
+      final k = math.min(_depths - 1, (depth * _depths).floor());
+      final width = 0.45 + 1.1 * depth;
+      // The wall towards the light (top left) in shade, the far one lit.
+      final o = const Offset(1, 1) * (0.25 + 0.45 * depth);
+      _sliver(shade[k], from - o, mid - o, to - o, width);
+      _sliver(lit[k], from + o, mid + o, to + o, width * 0.8);
+    }
+
+    final marks = <WearMark>[
+      for (var k = 0; k < _depths; k++)
+        (path: shade[k], lit: false, depth: _strength(k), width: null),
+      for (var k = 0; k < _depths; k++)
+        (path: lit[k], lit: true, depth: _strength(k), width: null),
+    ];
+
+    final grow = (wear - 0.5) * 2;
+    if (grow > 0) marks.addAll(_cracks(w, h, grow, seed));
+    return GlassWear._(marks);
+  }
+
+  /// How strongly a groove of depth [k] shows: the deep ones most, but
+  /// mostly they are wider and their walls further apart — and none as
+  /// sharply as a crack, which shows the [Glass.scratch] and [Glass.glint]
+  /// in full.
+  static double _strength(int k) => 0.35 + 0.4 * (k + 1) / _depths;
+
+  /// A scratch from [a] to [b] bending through [mid]: a sliver [width]
+  /// across the middle, coming to a point at either end.
+  static void _sliver(Path path, Offset a, Offset mid, Offset b, double width) {
+    final d = b - a;
+    if (d.distance == 0) return;
+    final n = Offset(-d.dy, d.dx) / d.distance * width;
+    path
+      ..moveTo(a.dx, a.dy)
+      ..quadraticBezierTo(mid.dx + n.dx, mid.dy + n.dy, b.dx, b.dy)
+      ..quadraticBezierTo(mid.dx - n.dx, mid.dy - n.dy, a.dx, a.dy)
+      ..close();
+  }
+
+  /// Cracks in a [w] by [h] piece, [grow]n that far (0 to 1) of their
+  /// length: one, and one more for each 60 000 square pixels, up to four,
+  /// each later one starting later. Each is a star of two or three runs
+  /// from where the glass was struck, aimed roughly at the middle.
+  static List<WearMark> _cracks(double w, double h, double grow, int seed) {
+    final rnd = math.Random(seed ^ 0x2545F491);
+    final count = (1 + w * h / 60000).floor().clamp(1, 4);
+    final lines = [for (var i = 0; i < 3; i++) Path()];
+    final glints = [for (var i = 0; i < 3; i++) Path()];
+    final chips = Path();
+    for (var c = 0; c < count; c++) {
+      // Where it starts: on an edge, nearer a corner more often than not.
+      final side = rnd.nextInt(4);
+      final t = rnd.nextDouble();
+      final at = t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+      final origin = switch (side) {
+        0 => Offset(at * w, 0),
+        1 => Offset(w, at * h),
+        2 => Offset((1 - at) * w, h),
+        _ => Offset(0, (1 - at) * h),
+      };
+      final middle = Offset(w / 2, h / 2) - origin;
+      final aim = math.atan2(middle.dy, middle.dx) + (rnd.nextDouble() - 0.5);
+      final length = (0.35 + 0.45 * rnd.nextDouble()) * (w + h) / 2;
+      final segments = <(Offset, Offset, double, int)>[];
+      final runs = 2 + rnd.nextInt(2);
+      for (var r = 0; r < runs; r++) {
+        final spread = (r - (runs - 1) / 2) * (0.35 + 0.3 * rnd.nextDouble());
+        final reach = r == runs ~/ 2 ? 1.0 : 0.45 + 0.4 * rnd.nextDouble();
+        _crack(rnd, segments, origin, aim + spread, length * reach, 0, 0);
+      }
+      final chip = [
+        for (var i = 0; i < 6; i++)
+          (
+            i * math.pi / 3 + rnd.nextDouble() * 0.6,
+            0.6 + 0.4 * rnd.nextDouble()
+          )
+      ];
+      final size = 2.5 + 3 * rnd.nextDouble();
+
+      final starts = c / count * 0.6;
+      final g = (grow - starts) / (1 - starts);
+      if (g <= 0) continue;
+      final reach = g * length;
+      for (final (a, b, end, level) in segments) {
+        final begin = end - (b - a).distance;
+        if (begin >= reach) continue;
+        final stop = end <= reach
+            ? b
+            : Offset.lerp(a, b, (reach - begin) / (end - begin))!;
+        lines[level]
+          ..moveTo(a.dx - 0.5, a.dy - 0.5)
+          ..lineTo(stop.dx - 0.5, stop.dy - 0.5);
+        glints[level]
+          ..moveTo(a.dx + 0.5, a.dy + 0.5)
+          ..lineTo(stop.dx + 0.5, stop.dy + 0.5);
+      }
+      chips.addPolygon([
+        for (final (angle, r) in chip)
+          origin + Offset(math.cos(angle), math.sin(angle)) * (size * r),
+      ], true);
+    }
+    return [
+      for (var l = 0; l < 3; l++) ...[
+        (
+          path: lines[l],
+          lit: false,
+          depth: 1.0 - 0.15 * l,
+          width: 1.3 - 0.25 * l
+        ),
+        (
+          path: glints[l],
+          lit: true,
+          depth: 1.0 - 0.15 * l,
+          width: 0.9 - 0.2 * l
+        ),
+      ],
+      (path: chips, lit: false, depth: 0.4, width: null),
+      (path: chips, lit: true, depth: 0.8, width: 0.8),
+    ];
+  }
+
+  /// One run of a crack into [into] — (from, to, how far along at the end,
+  /// branch level) — from [from] at [angle] for [length], from [distance]
+  /// along: as glass cracks, straight stretches with a sharp turn now and
+  /// then, and a branch off to one side, two levels deep.
+  static void _crack(math.Random rnd, List<(Offset, Offset, double, int)> into,
+      Offset from, double angle, double length, double distance, int level) {
+    var at = from, run = 0.0;
+    while (run < length) {
+      final step = 10 + rnd.nextDouble() * 16;
+      final kink = rnd.nextDouble() < 0.18;
+      angle += (rnd.nextDouble() - 0.5) * (kink ? 0.9 : 0.25);
+      final next = at + Offset(math.cos(angle), math.sin(angle)) * step;
+      run += step;
+      into.add((at, next, distance + run, level));
+      if (level < 2 && rnd.nextDouble() < 0.25) {
+        final side = rnd.nextBool() ? 1 : -1;
+        _crack(
+            rnd,
+            into,
+            next,
+            angle + side * (0.35 + rnd.nextDouble() * 0.5),
+            (length - run) * (0.3 + rnd.nextDouble() * 0.35),
+            distance + run,
+            level + 1);
+      }
+      at = next;
+    }
+  }
+}
+
+/// [glass]'s wear on the piece of it at [rect], marked by [seed] (see
+/// [GlassWear]).
+void paintWear(Canvas canvas, Rect rect, Glass glass, int seed) {
+  if (glass.wear <= 0) return;
+  final wear = GlassWear.of(rect.size, glass.wear, seed);
+  if (wear.marks.isEmpty) return;
+  canvas
+    ..save()
+    ..translate(rect.left, rect.top);
+  for (final m in wear.marks) {
+    final c = m.lit ? glass.glint : glass.scratch;
+    final paint = Paint()..color = c.withValues(alpha: c.a * m.depth);
+    if (m.width case final width?) {
+      paint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+    }
+    canvas.drawPath(m.path, paint);
+  }
+  canvas.restore();
+}
+
 /// A card's decoration: [plain] without glass; on glass, glass that keeps
 /// its accent — the stripe down the left as a capsule inside the edge, or
-/// the outline all round — and room for it.
-Decoration cardDecoration(BuildContext context, BoxDecoration plain) {
+/// the outline all round — and room for it. [seed]: what the card shows,
+/// so that on matte glass each has scratches of its own.
+Decoration cardDecoration(BuildContext context, BoxDecoration plain,
+    {Object? seed}) {
   final glass = Glass.of(context);
   if (!glass.on) return plain;
   final border = plain.border;
@@ -716,10 +955,13 @@ Decoration cardDecoration(BuildContext context, BoxDecoration plain) {
     return GlassDecoration(glass,
         accent: Glass.tone(border.left.color),
         accentWidth: 4,
-        inset: inset.copyWith(left: 18));
+        inset: inset.copyWith(left: 18),
+        seed: seed?.hashCode);
   }
   return GlassDecoration(glass,
-      outline: border is Border ? border.top : null, inset: inset);
+      outline: border is Border ? border.top : null,
+      inset: inset,
+      seed: seed?.hashCode);
 }
 
 /// Glass's own saturation boost behind a blur: CSS's `saturate(180%)`.

@@ -219,7 +219,8 @@ class _ExamCard extends StatelessWidget {
                   blurRadius: 4,
                   offset: Offset(0, 2)),
             ],
-          )),
+          ),
+          seed: (e.examDate, e.subjectName, e.groupName)),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

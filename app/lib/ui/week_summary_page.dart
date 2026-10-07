@@ -201,7 +201,8 @@ class _WeekHeader extends StatelessWidget {
             color: Brand.card(context),
             borderRadius: BorderRadius.circular(10),
             border: Border(left: BorderSide(color: accent, width: 5)),
-          )),
+          ),
+          seed: range),
       child: Row(
         children: [
           if (onPrevious != null)
@@ -304,7 +305,8 @@ class _DayCard extends StatelessWidget {
                   blurRadius: 3,
                   offset: Offset(0, 1)),
             ],
-          )),
+          ),
+          seed: (weekdayLabel, dayNum)),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,

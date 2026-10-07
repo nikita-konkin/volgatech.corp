@@ -383,7 +383,8 @@ class _EntryTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               border:
                   const Border(left: BorderSide(color: Brand.blue, width: 4)),
-            )),
+            ),
+            seed: r.key),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

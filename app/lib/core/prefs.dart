@@ -18,6 +18,7 @@ class Prefs {
   static const _kGlass = 'theme_glass';
   static const _kScuffed = 'theme_glass_scuffed';
   static const _kGlassStrength = 'theme_glass_strength';
+  static const _kGlassWear = 'theme_glass_wear';
   static const _kLessonReminder = 'lesson_reminder_minutes';
   static const _kAppLock = 'app_lock_enabled';
   static const _kPinsFolded = 'mail_pins_folded';
@@ -132,6 +133,11 @@ class Prefs {
       (_p.getDouble(_kGlassStrength) ?? 1).clamp(0.0, 1.0);
   Future<void> setGlassStrength(double v) async =>
       _p.setDouble(_kGlassStrength, v);
+
+  /// How worn the matte glass is, 0 to 1 (the same slider, for matte):
+  /// scratches deeper and more random, then cracks.
+  double get glassWear => (_p.getDouble(_kGlassWear) ?? 0.4).clamp(0.0, 1.0);
+  Future<void> setGlassWear(double v) async => _p.setDouble(_kGlassWear, v);
 
   ThemeMode get themeMode {
     switch (_p.getString(_kTheme)) {

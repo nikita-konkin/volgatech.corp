@@ -140,7 +140,8 @@ class _ProfilePageState extends State<ProfilePage> {
               borderRadius: BorderRadius.circular(8),
               border:
                   const Border(left: BorderSide(color: Brand.coral, width: 5)),
-            )),
+            ),
+            seed: (title, value)),
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -139,7 +139,7 @@ class _Section extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: DecoratedBox(
-        decoration: GlassDecoration(glass),
+        decoration: GlassDecoration(glass, seed: title.hashCode),
         child: Material(
           type: MaterialType.transparency,
           shape:
@@ -193,7 +193,8 @@ class _GlassTile extends StatelessWidget {
               onSelectionChanged: (s) => theme.setScuffed(s.first),
             ),
           ),
-        // How strong: from nearly solid panels to the full effect.
+        // How strong: clear glass from nearly solid panels to the full
+        // effect; matte glass from as new to scratched deep and cracked.
         if (theme.glass)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
@@ -202,13 +203,17 @@ class _GlassTile extends StatelessWidget {
                 const Text('Сила эффекта'),
                 Expanded(
                   child: Slider(
-                    value: theme.strength,
+                    value: theme.scuffed ? theme.wear : theme.strength,
                     divisions: 20,
-                    label: '${(theme.strength * 100).round()} %',
+                    label:
+                        '${((theme.scuffed ? theme.wear : theme.strength) * 100).round()} %',
                     semanticFormatterCallback: (v) =>
                         'Сила эффекта ${(v * 100).round()} процентов',
-                    onChanged: (v) => theme.setStrength(v, save: false),
-                    onChangeEnd: theme.setStrength,
+                    onChanged: (v) => theme.scuffed
+                        ? theme.setWear(v, save: false)
+                        : theme.setStrength(v, save: false),
+                    onChangeEnd: (v) =>
+                        theme.scuffed ? theme.setWear(v) : theme.setStrength(v),
                   ),
                 ),
               ],

@@ -282,7 +282,8 @@ class _LessonCard extends StatelessWidget {
                   blurRadius: 4,
                   offset: Offset(0, 2)),
             ],
-          )),
+          ),
+          seed: (e.date, e.timeBegin, e.description)),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
