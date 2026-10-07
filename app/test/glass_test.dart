@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,7 +14,7 @@ void main() {
     for (final (dark, scuffed, strength) in [
       for (final dark in [false, true])
         for (final scuffed in [false, true])
-          // Matte glass is as thick however etched; see the spirals' tests.
+          // Matte glass is as thick however much frost; see its tests.
           for (final strength in scuffed ? [1.0] : [1.0, 0.75, 0.5, 0.25, 0.0])
             (dark, scuffed, strength),
     ]) {
@@ -110,7 +112,7 @@ void main() {
       expect(none.panel, g.solid);
       expect(none.bar, g.solid);
       expect(none.grain, 0);
-      expect(none.etch, 0);
+      expect(none.frost, 0);
       expect(none.blur, 0);
       expect(none.blobs.every((b) => b.a == 0), isTrue);
       final half = g.scaled(0.5);
@@ -132,13 +134,13 @@ void main() {
     }
   });
 
-  for (final etch in [0.0, 0.5, 1.0]) {
-    testWidgets('matte glass etched ${(etch * 100).round()} %: drawn',
+  for (final frost in [0.0, 0.5, 1.0]) {
+    testWidgets('matte glass, frost ${(frost * 100).round()} %: drawn',
         (tester) async {
       final theme = buildLightTheme(
-          browser: true, glass: true, scuffed: true, etch: etch);
+          browser: true, glass: true, scuffed: true, frost: frost);
       expect(theme.extension<Glass>()!.scuffed, isTrue);
-      expect(theme.extension<Glass>()!.etch, etch);
+      expect(theme.extension<Glass>()!.frost, frost);
       expect(GlassTexture.grain, isNotNull);
       await tester.pumpWidget(MaterialApp(
         theme: theme,
@@ -164,65 +166,105 @@ void main() {
     });
   }
 
-  group('spirals etched on matte glass', () {
+  group('frost on matte glass', () {
     const card = Size(360, 90);
-    Iterable<EtchMark> grooves(GlassEtching e) => e.marks.where((m) => !m.lit);
-    double length(GlassEtching e) => [
-          for (final m in grooves(e))
+    Iterable<FrostMark> ridges(GlassFrost f) => f.marks;
+    double length(GlassFrost f) => [
+          for (final m in ridges(f))
             for (final metric in m.path.computeMetrics()) metric.length
         ].fold(0.0, (a, b) => a + b);
-    Rect bounds(GlassEtching e) => grooves(e)
+    Rect bounds(GlassFrost f) => ridges(f)
         .map((m) => m.path.getBounds())
         .where((b) => !b.isEmpty)
         .reduce((a, b) => a.expandToInclude(b));
 
-    test('none at first; then more of them, and longer', () {
-      expect(GlassEtching.of(card, 0, 1).marks, isEmpty);
+    test('none at first; then more of it', () {
+      expect(GlassFrost.of(card, 0, 1).marks, isEmpty);
       var before = 0.0;
-      for (final etch in [0.1, 0.3, 0.5, 0.7, 0.9, 1.0]) {
-        final cut = length(GlassEtching.of(card, etch, 1));
-        expect(cut, greaterThan(before), reason: 'at $etch');
-        before = cut;
+      for (final frost in [0.1, 0.3, 0.5, 0.7, 0.9, 1.0]) {
+        final grown = length(GlassFrost.of(card, frost, 1));
+        expect(grown, greaterThan(before), reason: 'at $frost');
+        before = grown;
       }
     });
 
-    test('a spiral only grows: what was etched, still is', () {
+    test('frost only grows: what was there, still is', () {
       for (final seed in [1, 2, 3]) {
-        final some = bounds(GlassEtching.of(card, 0.4, seed));
-        final full = bounds(GlassEtching.of(card, 1, seed)).inflate(1);
+        final some = bounds(GlassFrost.of(card, 0.4, seed));
+        final full = bounds(GlassFrost.of(card, 1, seed)).inflate(1);
         expect(full.contains(some.topLeft), isTrue, reason: '$seed');
         expect(full.contains(some.bottomRight), isTrue, reason: '$seed');
       }
     });
 
-    test('they grow in from the edges', () {
-      // At the very start only tendrils show, each rooted on an edge.
-      final first = bounds(GlassEtching.of(card, 0.1, 5));
-      final edge = Offset.zero & card;
-      expect(
-          first.left <= edge.left + 2 ||
-              first.top <= edge.top + 2 ||
-              first.right >= edge.right - 2 ||
-              first.bottom >= edge.bottom - 2,
-          isTrue);
+    test('it grows in from the edges', () {
+      for (final seed in [1, 2, 3]) {
+        // A frond's first branch is its stem.
+        final stems = <int, Offset>{};
+        for (final (frond, line) in GlassFrost.fronds(card, seed)) {
+          stems.putIfAbsent(frond, () => line.first);
+        }
+        expect(stems, isNotEmpty);
+        for (final root in stems.values) {
+          expect(
+              root.dx.abs() < 0.01 ||
+                  root.dy.abs() < 0.01 ||
+                  (root.dx - card.width).abs() < 0.01 ||
+                  (root.dy - card.height).abs() < 0.01,
+              isTrue,
+              reason: '$root');
+        }
+      }
+    });
+
+    test('fronds meet without crossing', () {
+      for (final size in [card, const Size(300, 900), const Size(200, 60)]) {
+        for (final seed in [1, 2, 3, 4]) {
+          // As far as it shows: on the glass.
+          final fronds = [
+            for (final (frond, line) in GlassFrost.fronds(size, seed))
+              (
+                frond,
+                [
+                  for (final p in line)
+                    if ((Offset.zero & size).inflate(0.5).contains(p)) p
+                ]
+              ),
+          ];
+          expect(fronds.map((f) => f.$1).toSet().length, greaterThan(2),
+              reason: '$size, $seed: several fronds');
+          var nearest = double.infinity;
+          for (final (a, one) in fronds) {
+            for (final (b, other) in fronds) {
+              if (a >= b) continue;
+              for (final p in one) {
+                for (final q in other) {
+                  nearest = math.min(nearest, (p - q).distance);
+                }
+              }
+            }
+          }
+          expect(nearest, greaterThanOrEqualTo(2.9), reason: '$size, $seed');
+        }
+      }
     });
 
     test('each card its own, and the same each time', () {
-      final a = GlassEtching.of(card, 0.6, 'one'.hashCode);
-      final b = GlassEtching.of(card, 0.6, 'two'.hashCode);
+      final a = GlassFrost.of(card, 0.6, 'one'.hashCode);
+      final b = GlassFrost.of(card, 0.6, 'two'.hashCode);
       expect(bounds(a), isNot(bounds(b)));
-      expect(GlassEtching.of(card, 0.6, 'one'.hashCode), same(a));
+      expect(GlassFrost.of(card, 0.6, 'one'.hashCode), same(a));
     });
 
-    // Where a spiral runs under text, the text still reads.
+    // Where frost runs under text, the text still reads.
     for (final dark in [false, true]) {
-      test('${dark ? 'dark' : 'light'}: text over the deepest grooves', () {
+      test('${dark ? 'dark' : 'light'}: text over the thickest ice', () {
         final theme = (dark ? buildDarkTheme : buildLightTheme)(
-            browser: true, glass: true, scuffed: true, etch: 1);
+            browser: true, glass: true, scuffed: true, frost: 1);
         final glass = theme.extension<Glass>()!;
         for (final wall in wallpaperColors(glass)) {
           final under = composite(theme.colorScheme.surface, wall);
-          for (final mark in [glass.groove, glass.glint]) {
+          for (final mark in [glass.ice, glass.iceEdge]) {
             final marked = composite(mark, under);
             expect(
                 contrast(
@@ -235,16 +277,16 @@ void main() {
     }
   });
 
-  test('clear glass keeps its strength, matte its etching', () async {
+  test('clear glass keeps its strength, matte its frost', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = Prefs(await SharedPreferences.getInstance());
     final theme = ThemeController(prefs);
     expect(theme.strength, 1);
-    expect(theme.etch, 0.5);
-    await theme.setEtch(0.9);
+    expect(theme.frost, 0.5);
+    await theme.setFrost(0.9);
     await theme.setStrength(0.3);
     final again = ThemeController(prefs);
-    expect(again.etch, 0.9);
+    expect(again.frost, 0.9);
     expect(again.strength, 0.3);
   });
 

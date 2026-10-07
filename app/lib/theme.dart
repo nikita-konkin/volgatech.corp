@@ -64,25 +64,25 @@ class Brand {
 
 /// [browser]: the web build, which brings its own font (see pubspec.yaml).
 /// [glass]: «Liquid Glass» (glass.dart): clear, at [strength] (0 to 1; 1, as
-/// designed), or, [scuffed], matte, etched with spirals as richly as [etch]
-/// (0 to 1).
+/// designed), or, [scuffed], matte, with frost grown on it as far as
+/// [frost] (0 to 1).
 ThemeData buildLightTheme(
         {bool browser = kIsWeb,
         bool glass = false,
         bool scuffed = false,
         double strength = 1,
-        double etch = 0.5}) =>
-    _base(Brightness.light, browser, glass, scuffed, strength, etch);
+        double frost = 0.5}) =>
+    _base(Brightness.light, browser, glass, scuffed, strength, frost);
 ThemeData buildDarkTheme(
         {bool browser = kIsWeb,
         bool glass = false,
         bool scuffed = false,
         double strength = 1,
-        double etch = 0.5}) =>
-    _base(Brightness.dark, browser, glass, scuffed, strength, etch);
+        double frost = 0.5}) =>
+    _base(Brightness.dark, browser, glass, scuffed, strength, frost);
 
 ThemeData _base(Brightness b, bool browser, bool glass, bool scuffed,
-    double strength, double etch) {
+    double strength, double frost) {
   final dark = b == Brightness.dark;
   // In a browser on an iPhone the platform is iOS, whose system fonts the
   // web engine doesn't have: the Roboto bundled for it (pubspec.yaml). On
@@ -97,7 +97,8 @@ ThemeData _base(Brightness b, bool browser, bool glass, bool scuffed,
   final g = !glass
       ? Glass.off
       : scuffed
-          ? (dark ? Glass.scuffedDark : Glass.scuffedLight).copyWith(etch: etch)
+          ? (dark ? Glass.scuffedDark : Glass.scuffedLight)
+              .copyWith(frost: frost)
           : (dark ? Glass.dark : Glass.light).scaled(strength);
   final text = dark ? Glass.darkText : Glass.lightText;
   final scheme = (dark

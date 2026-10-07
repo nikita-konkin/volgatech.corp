@@ -194,7 +194,7 @@ class _GlassTile extends StatelessWidget {
             ),
           ),
         // How strong: clear glass from nearly solid panels to the full
-        // effect; matte glass from plain to richly etched with spirals.
+        // effect; matte glass from clear of frost to frosted over.
         if (theme.glass)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
@@ -203,17 +203,18 @@ class _GlassTile extends StatelessWidget {
                 const Text('Сила эффекта'),
                 Expanded(
                   child: Slider(
-                    value: theme.scuffed ? theme.etch : theme.strength,
+                    value: theme.scuffed ? theme.frost : theme.strength,
                     divisions: 20,
                     label:
-                        '${((theme.scuffed ? theme.etch : theme.strength) * 100).round()} %',
+                        '${((theme.scuffed ? theme.frost : theme.strength) * 100).round()} %',
                     semanticFormatterCallback: (v) =>
                         'Сила эффекта ${(v * 100).round()} процентов',
                     onChanged: (v) => theme.scuffed
-                        ? theme.setEtch(v, save: false)
+                        ? theme.setFrost(v, save: false)
                         : theme.setStrength(v, save: false),
-                    onChangeEnd: (v) =>
-                        theme.scuffed ? theme.setEtch(v) : theme.setStrength(v),
+                    onChangeEnd: (v) => theme.scuffed
+                        ? theme.setFrost(v)
+                        : theme.setStrength(v),
                   ),
                 ),
               ],

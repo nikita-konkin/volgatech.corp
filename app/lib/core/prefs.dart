@@ -18,7 +18,7 @@ class Prefs {
   static const _kGlass = 'theme_glass';
   static const _kScuffed = 'theme_glass_scuffed';
   static const _kGlassStrength = 'theme_glass_strength';
-  static const _kGlassEtch = 'theme_glass_etch';
+  static const _kGlassFrost = 'theme_glass_frost';
   static const _kLessonReminder = 'lesson_reminder_minutes';
   static const _kAppLock = 'app_lock_enabled';
   static const _kPinsFolded = 'mail_pins_folded';
@@ -134,10 +134,10 @@ class Prefs {
   Future<void> setGlassStrength(double v) async =>
       _p.setDouble(_kGlassStrength, v);
 
-  /// How richly the matte glass is etched with spirals, 0 to 1 (the same
-  /// slider, for matte).
-  double get glassEtch => (_p.getDouble(_kGlassEtch) ?? 0.5).clamp(0.0, 1.0);
-  Future<void> setGlassEtch(double v) async => _p.setDouble(_kGlassEtch, v);
+  /// How far frost has grown on the matte glass, 0 to 1 (the same slider,
+  /// for matte).
+  double get glassFrost => (_p.getDouble(_kGlassFrost) ?? 0.5).clamp(0.0, 1.0);
+  Future<void> setGlassFrost(double v) async => _p.setDouble(_kGlassFrost, v);
 
   ThemeMode get themeMode {
     switch (_p.getString(_kTheme)) {

@@ -9,13 +9,13 @@ class ThemeController extends ChangeNotifier {
         _glass = _prefs.glass,
         _scuffed = _prefs.glassScuffed,
         _strength = _prefs.glassStrength,
-        _etch = _prefs.glassEtch;
+        _frost = _prefs.glassFrost;
   final Prefs _prefs;
   ThemeMode _mode;
   bool _glass;
   bool _scuffed;
   double _strength;
-  double _etch;
+  double _frost;
 
   ThemeMode get mode => _mode;
 
@@ -28,8 +28,8 @@ class ThemeController extends ChangeNotifier {
   /// How strong the clear glass is, 0 to 1; 1, as designed.
   double get strength => _strength;
 
-  /// How richly the matte glass is etched with spirals, 0 to 1.
-  double get etch => _etch;
+  /// How far frost has grown on the matte glass, 0 to 1.
+  double get frost => _frost;
 
   Future<void> setMode(ThemeMode m) async {
     if (m == _mode) return;
@@ -55,14 +55,14 @@ class ThemeController extends ChangeNotifier {
     if (save) await _prefs.setGlassStrength(v);
   }
 
-  /// As [setStrength], for the matte glass's etching.
-  Future<void> setEtch(double v, {bool save = true}) async {
+  /// As [setStrength], for the frost on the matte glass.
+  Future<void> setFrost(double v, {bool save = true}) async {
     v = v.clamp(0.0, 1.0);
-    if (v != _etch) {
-      _etch = v;
+    if (v != _frost) {
+      _frost = v;
       notifyListeners();
     }
-    if (save) await _prefs.setGlassEtch(v);
+    if (save) await _prefs.setGlassFrost(v);
   }
 
   Future<void> setScuffed(bool on) async {

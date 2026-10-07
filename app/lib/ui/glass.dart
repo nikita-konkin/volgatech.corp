@@ -30,9 +30,9 @@ class Glass extends ThemeExtension<Glass> {
     this.shadows = const [],
     this.wash = const [],
     this.grain = 0,
-    this.etch = 0,
-    this.groove = Colors.transparent,
-    this.glint = Colors.transparent,
+    this.frost = 0,
+    this.ice = Colors.transparent,
+    this.iceEdge = Colors.transparent,
     this.strength = 1,
   });
 
@@ -50,15 +50,14 @@ class Glass extends ThemeExtension<Glass> {
   /// wallpaper and the glass (0: none, 1: as drawn).
   final double grain;
 
-  /// Matte glass: how richly it is etched with spirals (0: not at all, 1:
-  /// in full; see [GlassEtching]). Each is cut as a groove: its wall towards
-  /// the light, at the top left, in the shade of [groove], the far one
-  /// catching the light, [glint] — both as at the deepest.
-  final double etch;
-  final Color groove;
-  final Color glint;
+  /// Matte glass: how far frost has grown on it, as on a window in winter
+  /// (0: none, 1: in full; see [GlassFrost]): [ice], as on a stem, with its
+  /// [iceEdge] beside it (see [paintFrost]).
+  final double frost;
+  final Color ice;
+  final Color iceEdge;
 
-  bool get scuffed => grain > 0 || etch > 0;
+  bool get scuffed => grain > 0 || frost > 0;
 
   /// How strong the effect is, as [scaled] made it: 1, the full design.
   final double strength;
@@ -97,9 +96,9 @@ class Glass extends ThemeExtension<Glass> {
         for (final s in shadows) s.copyWith(color: fade(s.color, 0.5)),
       ],
       grain: grain * t,
-      etch: etch * t,
-      groove: groove,
-      glint: glint,
+      frost: frost * t,
+      ice: ice,
+      iceEdge: iceEdge,
       strength: strength * t,
     );
   }
@@ -232,8 +231,8 @@ class Glass extends ThemeExtension<Glass> {
       BoxShadow(color: Color(0x0F20283F), offset: Offset(0, 1), blurRadius: 3),
     ],
     grain: 1,
-    groove: Color(0x660F1426),
-    glint: Color(0xE6FFFFFF),
+    ice: Color(0x66334E70),
+    iceEdge: Color(0xE6FFFFFF),
   );
 
   static const scuffedDark = Glass(
@@ -259,8 +258,8 @@ class Glass extends ThemeExtension<Glass> {
           spreadRadius: -16),
     ],
     grain: 1,
-    groove: Color(0x99000000),
-    glint: Color(0x47FFFFFF),
+    ice: Color(0x47FFFFFF),
+    iceEdge: Color(0x66000000),
   );
 
   /// Text on glass, and the quieter text under it.
@@ -282,9 +281,9 @@ class Glass extends ThemeExtension<Glass> {
         .withValues(alpha: c.a);
   }
 
-  /// [etch]: matte glass etched as richly as that.
+  /// [frost]: matte glass with frost grown that far.
   @override
-  Glass copyWith({bool? on, double? etch}) => Glass(
+  Glass copyWith({bool? on, double? frost}) => Glass(
         on: on ?? this.on,
         base: base,
         blobs: blobs,
@@ -302,9 +301,9 @@ class Glass extends ThemeExtension<Glass> {
         shadows: shadows,
         wash: wash,
         grain: grain,
-        etch: (etch ?? this.etch).clamp(0.0, 1.0),
-        groove: groove,
-        glint: glint,
+        frost: (frost ?? this.frost).clamp(0.0, 1.0),
+        ice: ice,
+        iceEdge: iceEdge,
         strength: strength,
       );
 
@@ -474,7 +473,7 @@ PageTransitionsTheme wallpaperTransitions() {
 /// a CSS box-shadow does — under see-through glass a whole shadow would show
 /// through as a grey haze. An [accent] stripe down the left side, or an
 /// [outline] all round, marks it as a plain card's border did. On matte
-/// glass, [seed] picks this piece's own spirals (by default, its size's).
+/// glass, [seed] picks this piece's own frost (by default, its size's).
 @immutable
 class GlassDecoration extends Decoration {
   const GlassDecoration(
@@ -581,13 +580,13 @@ class _GlassPainter extends BoxPainter {
               stops: const [0, 0.46],
             ).createShader(rect));
     }
-    // Matte glass: frosted and etched, the pattern moving with it.
+    // Matte glass: frosted, with frost grown on it, moving with it.
     if (g.scuffed && d.sheen) {
       canvas
         ..save()
         ..clipRRect(shape);
       paintTexture(canvas, rect, GlassTexture.grain, rect.topLeft, g.grain);
-      paintEtching(canvas, rect, g,
+      paintFrost(canvas, rect, g,
           d.seed ?? Object.hash(rect.width.round(), rect.height.round()));
       canvas.restore();
     }
@@ -701,261 +700,334 @@ void paintTexture(Canvas canvas, Rect rect, ui.Image? texture, Offset origin,
             BlendMode.modulate));
 }
 
-/// One kind of mark etching leaves: [path], in the shade of a groove's wall
-/// or, [lit], the light off the other one, at [depth] (0 to 1).
-typedef EtchMark = ({Path path, bool lit, double depth});
+/// Ice of one thickness: [path], to draw at [depth] (0 to 1) of the ice's
+/// colour over its edge, which shows [lift] beside it (see [paintFrost]).
+typedef FrostMark = ({Path path, double depth, double lift});
 
-/// What is etched on a piece of matte glass, [GlassEtching.of] its size
-/// and how richly (0 to 1), as marks to draw in order: spiral flourishes
-/// cut in as grooves — a shaded wall towards the light at the top left, a
-/// lit one away from it. Tendrils grow in from the edges, more often near a
-/// corner, and wind up into a curl with a bead at its heart; the richer the
-/// etching, the more of them, longer and cut deeper, with side curls
-/// sprouting off them and small S-scrolls between. A piece's seed keeps its
-/// pattern as the etching changes: a tendril only grows and winds on.
+/// Frost on a piece of matte glass, as on a window in winter: [GlassFrost.of]
+/// its size and how far it has grown (0 to 1), as marks to draw in order.
+/// Fronds of ice grow in from the edges — most from the bottom, fewest from
+/// the top — each a stem curling a little at its tip, with barbs off either
+/// side, barbed in turn and shorter towards the tip, like a feather. Where
+/// one reaches ice another frond got to first, it stops: they meet but
+/// don't cross, and the middle stays clearest. A piece's seed keeps its
+/// frost as it grows: a frond only grows on.
 @immutable
-class GlassEtching {
-  const GlassEtching._(this.marks);
+class GlassFrost {
+  const GlassFrost._(this.marks);
 
-  final List<EtchMark> marks;
+  final List<FrostMark> marks;
 
-  /// Groove depths, shallow to deep: one path each, to draw at once.
+  /// Ridges by thickness, fine to thick — barbs of barbs, barbs, stems:
+  /// one path each, to draw at once.
   static const _depths = 3;
 
-  static final _made = <(int, int, int, int), GlassEtching>{};
+  static final _made = <(int, int, int, int), GlassFrost>{};
 
-  static GlassEtching of(Size size, double etch, int seed) {
+  static GlassFrost of(Size size, double frost, int seed) {
     final key = (
       seed,
       size.width.round(),
       size.height.round(),
-      (etch.clamp(0.0, 1.0) * 100).round(),
+      (frost.clamp(0.0, 1.0) * 100).round(),
     );
     if (_made[key] case final made?) return made;
     if (_made.length >= 128) _made.clear();
-    return _made[key] = _make(size, key.$4 / 100, seed);
+    return _made[key] = _make(
+        _Ice.of(Size(key.$2.toDouble(), key.$3.toDouble()), seed),
+        key.$4 / 100);
   }
 
-  static GlassEtching _make(Size size, double etch, int seed) {
-    final w = size.width, h = size.height;
-    if (etch <= 0 || w <= 0 || h <= 0) return const GlassEtching._([]);
-    final shade = [for (var i = 0; i < _depths; i++) Path()];
-    final lit = [for (var i = 0; i < _depths; i++) Path()];
+  /// The frost on a piece [size] across, grown in full: each branch as far
+  /// as it got, and which frond it belongs to.
+  @visibleForTesting
+  static List<(int, List<Offset>)> fronds(Size size, int seed) => [
+        for (final b in _Ice.of(size, seed).branches)
+          if (b.alive > 0) (b.frond, b.points.sublist(0, b.alive + 1)),
+      ];
 
-    // A groove along [curl] as far as [reach], [depth] deep; and, where it
-    // has wound all the way, its bead.
-    void cut(_Curl curl, double reach, double depth) {
-      if (reach <= 0) return;
-      final k = math.min(_depths - 1, (depth * _depths).floor());
-      final width = 0.8 + 1.8 * depth;
-      final o = const Offset(1, 1) * (0.25 + 0.45 * depth);
-      shade[k].addPolygon(curl.outline(reach, width, -o), true);
-      lit[k].addPolygon(curl.outline(reach, width * 0.8, o), true);
-      final r = 0.9 + 1.3 * depth;
-      for (final bead in curl.beads(reach)) {
-        shade[k].addOval(Rect.fromCircle(center: bead - o, radius: r));
-        lit[k].addOval(Rect.fromCircle(center: bead + o, radius: r * 0.8));
-      }
+  static GlassFrost _make(_Ice ice, double frost) {
+    if (frost <= 0) return const GlassFrost._([]);
+    final paths = [for (var i = 0; i < _depths; i++) Path()];
+    for (final b in ice.branches) {
+      final reach =
+          math.min(ice.reach(b.frond, frost) - b.from, b.alive * _Ice.step);
+      if (reach <= 0) continue;
+      final wide = const [1.6, 1.0, 0.7][b.level] * (0.6 + 0.4 * frost);
+      paths[_depths - 1 - b.level].addPolygon(b.outline(reach, wide), true);
     }
-
-    // Every flourish is drawn up as at its fullest, the same at any
-    // etching, so each keeps its place; the etching says which show and
-    // how far each has grown.
-    final rnd = math.Random(seed);
-    final tendrils = ((w + h) * 2 / 90).clamp(3, 28).round();
-    for (var i = 0; i < tendrils; i++) {
-      // From anywhere round the edge, setting off along it one way or the
-      // other, leaning in, and curling in.
-      var round = rnd.nextDouble() * 2 * (w + h);
-      final (origin, along, inwards) = round < w
-          ? (Offset(round, 0), 0.0, const Offset(0, 1))
-          : (round -= w) < h
-              ? (Offset(w, round), math.pi / 2, const Offset(-1, 0))
-              : (round -= h) < w
-                  ? (Offset(w - round, h), math.pi, const Offset(0, -1))
-                  : (
-                      Offset(0, h - (round - w)),
-                      -math.pi / 2,
-                      const Offset(1, 0)
-                    );
-      final base = rnd.nextBool() ? along : along + math.pi;
-      final inside =
-          -math.sin(base) * inwards.dx + math.cos(base) * inwards.dy > 0
-              ? 1.0
-              : -1.0;
-      final heading = base + inside * (0.25 + 0.55 * rnd.nextDouble());
-      final length =
-          (0.55 + 0.45 * rnd.nextDouble()) * (36 + 0.6 * math.min(w, h));
-      final turns = (1.3 + 0.9 * rnd.nextDouble()) * 2 * math.pi;
-      final deep = rnd.nextDouble();
-      // A side curl, the other way round, off the outer side.
-      final branchAt = 0.3 + 0.3 * rnd.nextDouble();
-      final branchLean = 0.5 + 0.4 * rnd.nextDouble();
-      final branchLength = (0.3 + 0.15 * rnd.nextDouble()) * length;
-      final branchTurns = (1 + 0.5 * rnd.nextDouble()) * 2 * math.pi;
-      final branches = rnd.nextDouble() < (etch - 0.35) * 1.6;
-
-      final appear = i / tendrils * 0.7;
-      final grown = ((etch - appear) / 0.3).clamp(0.0, 1.0);
-      if (grown <= 0) continue;
-      final depth = (0.45 + 0.55 * deep) * (0.35 + 0.65 * etch);
-      final curl = _Curl.tendril(origin, heading, length, inside * turns);
-      final reach = grown * length;
-      cut(curl, reach, depth);
-      if (branches) {
-        final from = branchAt * length;
-        cut(
-            _Curl.tendril(
-                curl.at(branchAt),
-                curl.headingAt(branchAt) - inside * branchLean,
-                branchLength,
-                -inside * branchTurns),
-            (reach - from) / (length - from) * branchLength,
-            depth * 0.8);
-      }
-    }
-
-    // Small S-scrolls between, from a third of the way on.
-    final scrolls = (w * h / 7000).clamp(1, 32).round();
-    for (var i = 0; i < scrolls; i++) {
-      final from = Offset(rnd.nextDouble() * w, rnd.nextDouble() * h);
-      final heading = rnd.nextDouble() * 2 * math.pi;
-      final length = 40 + 40 * rnd.nextDouble();
-      final turns = (1 + 0.5 * rnd.nextDouble()) * 2 * math.pi;
-      final way = rnd.nextBool() ? 1.0 : -1.0;
-      final deep = rnd.nextDouble();
-
-      final appear = 0.3 + 0.6 * i / scrolls;
-      final grown = ((etch - appear) / 0.15).clamp(0.0, 1.0);
-      if (grown <= 0) continue;
-      cut(_Curl.scroll(from, heading, length, way * turns), grown * length,
-          (0.3 + 0.4 * deep) * (0.35 + 0.65 * etch));
-    }
-
-    return GlassEtching._([
+    return GlassFrost._([
       for (var k = 0; k < _depths; k++)
-        (path: shade[k], lit: false, depth: _strength(k)),
-      for (var k = 0; k < _depths; k++)
-        (path: lit[k], lit: true, depth: _strength(k)),
+        (path: paths[k], depth: _strength(k), lift: 0.35 + 0.2 * k),
     ]);
   }
 
-  /// How strongly a groove of depth [k] shows: the deep ones most, but
-  /// mostly they are wider and their walls further apart.
-  static double _strength(int k) => 0.45 + 0.55 * (k + 1) / _depths;
+  /// How strongly ice of thickness [k] shows: stems most.
+  static double _strength(int k) => 0.55 + 0.45 * (k + 1) / _depths;
 }
 
-/// A flourish's centre line: from [from], setting off at a heading that
-/// [turning] (of how far along, 0 to 1) turns as it goes, [length] long;
-/// its groove as wide as [width] of that, with a bead at the heart of each
-/// curl.
-class _Curl {
-  _Curl(Offset from, double heading, this.length,
-      {required double Function(double u) turning,
-      required double wind,
-      required this.width,
-      required this.beadAtStart}) {
-    // Fine enough for the heading to turn no more than 0.22 a step where
-    // the curl is tightest ([wind]: the most it turns per whole length).
-    _steps = (length / 2 + wind / 0.22).ceil();
-    var at = from;
-    _points.add(at);
-    _headings.add(heading);
-    for (var j = 0; j < _steps; j++) {
-      final mid = heading + turning((j + 0.5) / _steps);
-      at += Offset(math.cos(mid), math.sin(mid)) * (length / _steps);
-      _points.add(at);
-      _headings.add(heading + turning((j + 1) / _steps));
-    }
+/// Frost on a piece of glass grown in full, the same at any stage: its
+/// branches, where each runs, and how far each got before it met another
+/// frond's ice. [reach] says how far along a frond it has got at a stage.
+class _Ice {
+  _Ice._(this.branches, this._appear, this._longest);
+
+  final List<_Branch> branches;
+
+  /// For each frond: the stage it starts at, and its farthest point, along
+  /// it.
+  final List<double> _appear;
+  final List<double> _longest;
+
+  /// How many stages a frond takes from its start to its fullest.
+  static const _span = 0.45;
+
+  /// Pixels between a branch's points.
+  static const step = 2.0;
+
+  /// Ice keeps this far (a cell, in pixels) from another frond's.
+  static const _cell = 3.0;
+
+  /// How far past the edges ice is kept track of: a frond may run out and
+  /// curl back in.
+  static const _margin = 24.0;
+
+  double reach(int frond, double stage) =>
+      (stage - _appear[frond]) / _span * _longest[frond];
+
+  double _time(int frond, double along) =>
+      _appear[frond] + along / _longest[frond] * _span;
+
+  static final _grown = <(int, int, int), _Ice>{};
+
+  static _Ice of(Size size, int seed) {
+    final key = (seed, size.width.round(), size.height.round());
+    if (_grown[key] case final ice?) return ice;
+    if (_grown.length >= 64) _grown.clear();
+    return _grown[key] = _grow(size, seed);
   }
 
-  /// A tendril: a gentle arc for its first [_tail], then a volute winding
-  /// [turns] (radians; the sign, which way) in to its heart; widest at its
-  /// root.
-  factory _Curl.tendril(
-          Offset from, double heading, double length, double turns) =>
-      _Curl(from, heading, length,
-          turning: (u) => u < _tail
-              ? turns.sign * 0.6 * (u / _tail) * (u / _tail)
-              : turns.sign * 0.6 + turns * _volute((u - _tail) / (1 - _tail)),
-          wind: _wind * turns.abs() / (1 - _tail),
-          width: (u) => 1 - 0.8 * u,
-          beadAtStart: false);
+  static _Ice _grow(Size size, int seed) {
+    final w = size.width, h = size.height;
+    final branches = <_Branch>[];
+    final appear = <double>[], longest = <double>[];
+    if (w <= 0 || h <= 0) return _Ice._(branches, appear, longest);
+    final rnd = math.Random(seed);
+    final count = ((w + h) * 2 / 70).clamp(3, 40).round();
+    final gap = (w + h) * 2 / count * 0.5;
+    final roots = <Offset>[];
+    for (var i = 0; i < count; i++) {
+      // Somewhere along an edge — the bottom likeliest, the top seldom —
+      // and not too near another frond's root.
+      Offset? root;
+      var inwards = 0.0;
+      for (var tries = 0; tries < 6 && root == null; tries++) {
+        final pick = rnd.nextDouble() * (1.9 * w + 2 * h);
+        final along = rnd.nextDouble();
+        final (p, n) = pick < 1.6 * w
+            ? (Offset(along * w, h), -math.pi / 2)
+            : pick < 1.9 * w
+                ? (Offset(along * w, 0), math.pi / 2)
+                : pick < 1.9 * w + h
+                    ? (Offset(0, along * h), 0.0)
+                    : (Offset(w, along * h), math.pi);
+        if (roots.every((r) => (r - p).distance >= gap)) {
+          root = p;
+          inwards = n;
+        }
+      }
+      final heading = inwards + (rnd.nextDouble() - 0.5) * 1.4;
+      final length = math.min(140.0,
+          (0.55 + 0.45 * rnd.nextDouble()) * (30 + 0.6 * math.min(w, h)));
+      final curve = (rnd.nextDouble() - 0.5) * 0.05;
+      final curl = curve.sign * (0.06 + 0.1 * rnd.nextDouble());
+      if (root == null) continue;
+      roots.add(root);
+      final first = branches.length;
+      _feather(rnd, branches, appear.length, root, heading, length, curve, curl,
+          0, 0, -1, 0);
+      if (branches.length == first) continue;
+      appear.add(i / count * 0.5);
+      longest.add(
+          branches.skip(first).map((b) => b.from + b.length).reduce(math.max));
+    }
+    final ice = _Ice._(branches, appear, longest);
 
-  /// An S-scroll: out of one volute and into another wound the other way,
-  /// [turns] each; widest in the middle.
-  factory _Curl.scroll(
-          Offset from, double heading, double length, double turns) =>
-      _Curl(from, heading, length,
-          turning: (u) => turns * (_volute((2 * u - 1).abs()) - 1),
-          wind: 2 * _wind * turns.abs(),
-          width: (u) => 0.3 + 0.7 * math.sin(math.pi * u),
-          beadAtStart: true);
+    // Grow it all in the order it would grow. Where a step comes within a
+    // cell of another frond's ice, that branch stops; a barb that would
+    // spring from beyond where its parent stopped never grows.
+    final steps = <(double, int, int)>[
+      for (var b = 0; b < branches.length; b++)
+        for (var j = 0; j < branches[b].points.length - 1; j++)
+          (
+            ice._time(branches[b].frond, branches[b].from + (j + 1) * step),
+            b,
+            j
+          ),
+    ]..sort((a, b) => a.$1.compareTo(b.$1));
+    final cols = ((w + 2 * _margin) / _cell).ceil() + 1,
+        rows = ((h + 2 * _margin) / _cell).ceil() + 1;
+    final owner = List<int>.filled(cols * rows, -1);
+    (int, int) cell(Offset p) => (
+          ((p.dx + _margin) / _cell).floor(),
+          ((p.dy + _margin) / _cell).floor()
+        );
+    bool free(Offset p, int frond) {
+      final (cx, cy) = cell(p);
+      for (var y = math.max(0, cy - 1); y <= math.min(rows - 1, cy + 1); y++) {
+        for (var x = math.max(0, cx - 1);
+            x <= math.min(cols - 1, cx + 1);
+            x++) {
+          final o = owner[y * cols + x];
+          if (o >= 0 && o != frond) return false;
+        }
+      }
+      return true;
+    }
 
-  /// How much of a tendril's length is the arc before its volute.
-  static const _tail = 0.35;
+    void take(Offset p, int frond) {
+      final (cx, cy) = cell(p);
+      if (cx >= 0 && cy >= 0 && cx < cols && cy < rows) {
+        owner[cy * cols + cx] = frond;
+      }
+    }
 
-  /// A volute's turning so far, 0 to 1, [x] of the way along it: a
-  /// logarithmic spiral, the radius shrinking by the same share each turn
-  /// to [_heart] of where it began — evenly spaced turns, to the eye, and
-  /// a heart for the bead.
-  static double _volute(double x) =>
-      math.log(1 - (1 - _heart) * x) / math.log(_heart);
-  static const _heart = 0.15;
+    final stopped = List.filled(branches.length, false);
+    for (final (_, b, j) in steps) {
+      if (stopped[b]) continue;
+      final branch = branches[b];
+      final a = branch.points[j], z = branch.points[j + 1];
+      final mid = Offset.lerp(a, z, 0.5)!;
+      final sprung = j > 0 ||
+          (branch.parent < 0
+              ? free(a, branch.frond)
+              : branches[branch.parent].alive * step >= branch.at);
+      if (!sprung || !free(mid, branch.frond) || !free(z, branch.frond)) {
+        stopped[b] = true;
+        continue;
+      }
+      if (j == 0) take(a, branch.frond);
+      take(mid, branch.frond);
+      take(z, branch.frond);
+      branch.alive = j + 1;
+    }
+    return ice;
+  }
 
-  /// The most a volute turns, per its length, for each radian it turns in
-  /// all: where it is tightest, at its heart.
-  static final _wind = (1 - _heart) / _heart / -math.log(_heart);
+  /// A branch of frond [frond] from [from] at [heading], [length] long,
+  /// bending by [curve] a pixel and over its last third curling by up to
+  /// [curl] more; [along] the frond from its root, [at] that far along
+  /// branch [parent]. Off it, barbs on alternate sides, leaning forward and
+  /// longest near its root — two levels of them.
+  static void _feather(
+      math.Random rnd,
+      List<_Branch> into,
+      int frond,
+      Offset from,
+      double heading,
+      double length,
+      double curve,
+      double curl,
+      int level,
+      double along,
+      int parent,
+      double at) {
+    final steps = (length / step).floor();
+    final points = [from], headings = [heading];
+    var p = from, bearing = heading;
+    for (var j = 0; j < steps; j++) {
+      final tip = math.max(0.0, (j / steps - 0.65) / 0.35);
+      bearing +=
+          (curve + curl * tip * tip) * step + (rnd.nextDouble() - 0.5) * 0.05;
+      p += Offset(math.cos(bearing), math.sin(bearing)) * step;
+      points.add(p);
+      headings.add(bearing);
+    }
+    if (steps < 2) return;
+    final index = into.length;
+    into.add(_Branch(frond, level, parent, at, along, points, headings));
+    if (level == 2) return;
+    final spacing =
+        level == 0 ? 3.0 + 2 * rnd.nextDouble() : 2.5 + 1.5 * rnd.nextDouble();
+    var side = rnd.nextBool() ? 1.0 : -1.0;
+    for (var s = spacing * 1.5;
+        s < steps * step - 3;
+        s += spacing * (0.8 + 0.4 * rnd.nextDouble())) {
+      final j = (s / step).round();
+      final barb = (steps * step - s) *
+          (level == 0 ? 0.4 : 0.45) *
+          (0.7 + 0.5 * rnd.nextDouble());
+      final lean = (level == 0 ? 0.8 : 0.7) + 0.3 * rnd.nextDouble();
+      if (barb >= 3) {
+        _feather(rnd, into, frond, points[j], headings[j] + side * lean, barb,
+            curve * 0.8, 0, level + 1, along + j * step, index, j * step);
+      }
+      side = -side;
+    }
+  }
+}
 
-  final double length;
-  final double Function(double u) width;
-  final bool beadAtStart;
-  late final int _steps;
-  final _points = <Offset>[];
-  final _headings = <double>[];
+/// A branch of frost: a stem (level 0), a barb (1) or a barb's barb (2) of
+/// frond [frond], springing [at] that far along branch [parent], [from]
+/// that far along the frond; [points] a step apart, of which [alive] steps
+/// grew before it met other ice.
+class _Branch {
+  _Branch(this.frond, this.level, this.parent, this.at, this.from, this.points,
+      this.headings);
 
-  Offset at(double u) => _points[(u * _steps).round()];
-  double headingAt(double u) => _headings[(u * _steps).round()];
+  final int frond, level, parent;
+  final double at, from;
+  final List<Offset> points;
+  final List<double> headings;
+  int alive = 0;
 
-  /// The groove's edge as far as [reach], [wide] at its widest, moved by
-  /// [shift]: tapering to a point where it is still growing.
-  List<Offset> outline(double reach, double wide, Offset shift) {
-    final last = (reach / length * _steps).round().clamp(1, _steps);
+  double get length => (points.length - 1) * _Ice.step;
+
+  /// Its ice as far as [reach], [wide] at its root and narrowing towards
+  /// its tip, which comes to a point.
+  List<Offset> outline(double reach, double wide) {
+    final last = (reach / _Ice.step).ceil().clamp(1, points.length - 1);
     final left = <Offset>[], right = <Offset>[];
     for (var j = 0; j <= last; j++) {
-      final u = j / _steps;
-      final tip =
-          reach >= length ? 1.0 : ((reach - u * length) / 6).clamp(0.0, 1.0);
-      final half = wide / 2 * width(u) * tip;
-      final h = _headings[j];
+      final s = math.min(j * _Ice.step, reach);
+      final tip = ((reach - s) / 3).clamp(0.2, 1.0);
+      final half = wide / 2 * (1 - 0.65 * s / length) * tip;
+      final h = headings[j];
       final across = Offset(-math.sin(h), math.cos(h)) * half;
-      left.add(_points[j] + across + shift);
-      right.add(_points[j] - across + shift);
+      final at = j * _Ice.step > reach
+          ? Offset.lerp(points[j - 1], points[j],
+              1 - (j * _Ice.step - reach) / _Ice.step)!
+          : points[j];
+      left.add(at + across);
+      right.add(at - across);
     }
     return [...left, ...right.reversed];
   }
-
-  /// Where the beads sit, grown as far as [reach]: at the heart of a curl
-  /// once it has wound all the way in.
-  List<Offset> beads(double reach) => [
-        if (beadAtStart) _points.first,
-        if (reach >= length) _points.last,
-      ];
 }
 
-/// What is etched on [glass] at [rect], picked by [seed] (see
-/// [GlassEtching]).
-void paintEtching(Canvas canvas, Rect rect, Glass glass, int seed) {
-  if (glass.etch <= 0) return;
-  final etching = GlassEtching.of(rect.size, glass.etch, seed);
-  if (etching.marks.isEmpty) return;
+/// The frost on [glass] at [rect], picked by [seed] (see [GlassFrost]):
+/// the ice in [Glass.ice], standing proud — its edge, [Glass.iceEdge], shows
+/// beside it as light on the side towards the light at the top left, or,
+/// if darker, as shade on the other.
+void paintFrost(Canvas canvas, Rect rect, Glass glass, int seed) {
+  if (glass.frost <= 0) return;
+  final frost = GlassFrost.of(rect.size, glass.frost, seed);
+  if (frost.marks.isEmpty) return;
+  final towards =
+      glass.iceEdge.computeLuminance() > glass.ice.computeLuminance()
+          ? -1.0
+          : 1.0;
+  Paint paint(Color c, double depth) =>
+      Paint()..color = c.withValues(alpha: c.a * depth);
   canvas
     ..save()
     ..translate(rect.left, rect.top);
-  for (final m in etching.marks) {
-    final c = m.lit ? glass.glint : glass.groove;
-    canvas.drawPath(
-        m.path, Paint()..color = c.withValues(alpha: c.a * m.depth));
+  for (final m in frost.marks) {
+    canvas.drawPath(m.path.shift(Offset(towards, towards) * m.lift),
+        paint(glass.iceEdge, m.depth));
+  }
+  for (final m in frost.marks) {
+    canvas.drawPath(m.path, paint(glass.ice, m.depth));
   }
   canvas.restore();
 }
@@ -963,7 +1035,7 @@ void paintEtching(Canvas canvas, Rect rect, Glass glass, int seed) {
 /// A card's decoration: [plain] without glass; on glass, glass that keeps
 /// its accent — the stripe down the left as a capsule inside the edge, or
 /// the outline all round — and room for it. [seed]: what the card shows,
-/// so that on matte glass each has spirals of its own.
+/// so that on matte glass each has frost of its own.
 Decoration cardDecoration(BuildContext context, BoxDecoration plain,
     {Object? seed}) {
   final glass = Glass.of(context);
