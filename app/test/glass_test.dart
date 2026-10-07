@@ -23,7 +23,7 @@ void main() {
           expect(contrast(composite(scheme.onSurfaceVariant, card), card),
               greaterThanOrEqualTo(4.5),
               reason: 'muted on $wall');
-          final room = dark ? Brand.roomBlueDark : Brand.roomBlueLight;
+          final room = Brand.roomFor(dark: dark, glass: true);
           expect(contrast(room, card), greaterThanOrEqualTo(4.5),
               reason: 'room on $wall');
         }
@@ -32,7 +32,8 @@ void main() {
       test('$name: the top bar', () {
         for (final wall in wallpaperColors(glass)) {
           final bar = composite(theme.appBarTheme.backgroundColor!, wall);
-          expect(contrast(Colors.white, bar), greaterThanOrEqualTo(4.5),
+          expect(contrast(theme.appBarTheme.foregroundColor!, bar),
+              greaterThanOrEqualTo(7),
               reason: '$wall');
         }
       });
@@ -43,8 +44,31 @@ void main() {
           expect(contrast(composite(scheme.onSurface, panel), panel),
               greaterThanOrEqualTo(7),
               reason: '$wall');
-          expect(contrast(scheme.primary, panel), greaterThanOrEqualTo(4.5),
-              reason: 'selected item on $wall');
+          expect(contrast(composite(scheme.onSurfaceVariant, panel), panel),
+              greaterThanOrEqualTo(4.5),
+              reason: 'a subtitle on $wall');
+          final lens = composite(glass.lens, panel);
+          expect(contrast(scheme.primary, lens), greaterThanOrEqualTo(4.5),
+              reason: 'the selected item on $wall');
+        }
+      });
+
+      // The day, the month, the study year.
+      test('$name: white on the coloured bars', () {
+        for (final colour in [
+          Brand.weekAccentFor(1, dark: dark),
+          Brand.weekAccentFor(2, dark: dark),
+          Brand.weekAccentFor(null, dark: dark),
+          Brand.blue,
+          Brand.coral,
+        ]) {
+          for (final wall in wallpaperColors(glass)) {
+            for (final end in AccentBar.pill(colour)) {
+              expect(contrast(Colors.white, composite(end, wall)),
+                  greaterThanOrEqualTo(4.5),
+                  reason: '$colour on $wall');
+            }
+          }
         }
       });
 

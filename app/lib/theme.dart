@@ -21,8 +21,11 @@ class Brand {
   static const surfaceDark = Color(0xFF1E1E1E);
 
   /// Accent for room/group text, adapted to the current brightness.
-  static Color room(BuildContext c) =>
-      Theme.of(c).brightness == Brightness.dark ? roomBlueDark : roomBlueLight;
+  static Color room(BuildContext c) => roomFor(
+      dark: Theme.of(c).brightness == Brightness.dark, glass: Glass.of(c).on);
+
+  static Color roomFor({required bool dark, bool glass = false}) =>
+      dark ? (glass ? Glass.darkAccent : roomBlueDark) : roomBlueLight;
 
   /// Card / tile background.
   static Color card(BuildContext c) => Theme.of(c).colorScheme.surface;
@@ -51,9 +54,12 @@ class Brand {
 
   /// Accent colour for a week, resolved against the current brightness.
   /// Shades are tuned per brightness so white text stays legible on top.
-  static Color weekAccent(int? weekNumber, BuildContext c) =>
-      weekAccentFor(weekNumber,
-          dark: Theme.of(c).brightness == Brightness.dark);
+  static Color weekAccent(int? weekNumber, BuildContext c) {
+    final accent = weekAccentFor(weekNumber,
+        dark: Theme.of(c).brightness == Brightness.dark);
+    // On glass, in the business palette's quieter tones.
+    return Glass.of(c).on ? Glass.tone(accent) : accent;
+  }
 }
 
 /// [browser]: the web build, which brings its own font (see pubspec.yaml).
@@ -75,7 +81,8 @@ ThemeData _base(Brightness b, bool browser, bool glass) {
       : defaultTargetPlatform == TargetPlatform.android
           ? 'sans-serif'
           : null;
-  final solid = dark ? Brand.surfaceDark : Brand.surfaceLight;
+  final g = glass ? (dark ? Glass.dark : Glass.light) : Glass.off;
+  final text = dark ? Glass.darkText : Glass.lightText;
   final scheme = (dark
           ? const ColorScheme.dark(
               primary: Brand.blueOnDark,
@@ -89,18 +96,30 @@ ThemeData _base(Brightness b, bool browser, bool glass) {
               surface: Brand.surfaceLight,
             ))
       .copyWith(
-    onSurfaceVariant: dark
-        ? const Color(0xFFB0B0B0)
-        // Black54 is a shade too faint on glass (test/glass_test.dart).
-        : Colors.black.withValues(alpha: glass ? 0.64 : 0.54),
-    // Cards and tiles are glass; dialogs, sheets and menus stay solid,
-    // as they come over the page with nothing to blur it.
-    surface: glass ? (dark ? Glass.darkSurface : Glass.lightSurface) : null,
-    surfaceContainerLowest: glass ? solid : null,
-    surfaceContainerLow: glass ? solid : null,
-    surfaceContainer: glass ? solid : null,
-    surfaceContainerHigh: glass ? solid : null,
-    surfaceContainerHighest: glass ? solid : null,
+    onSurfaceVariant: glass
+        ? (dark ? Glass.darkMuted : Glass.lightMuted)
+        : dark
+            ? const Color(0xFFB0B0B0)
+            : Colors.black54,
+    // Cards and tiles are glass; what comes over the page — dialogs,
+    // sheets, menus — is glass thick enough to read on anything.
+    primary: glass && dark ? Glass.darkAccent : null,
+    surface: glass ? g.card : null,
+    onSurface: glass ? text : null,
+    surfaceContainerLowest: glass ? g.solid : null,
+    surfaceContainerLow: glass ? g.solid : null,
+    surfaceContainer: glass ? g.solid : null,
+    surfaceContainerHigh: glass ? g.solid : null,
+    surfaceContainerHighest: glass ? g.solid : null,
+    outlineVariant: glass ? g.line : null,
+  );
+  // Glass's edge round what floats over the page.
+  RoundedRectangleBorder edged(double radius) => RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(radius),
+      side: BorderSide(color: g.stroke));
+  final fieldBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(glass ? 16 : 8),
+    borderSide: glass ? BorderSide(color: g.line) : BorderSide.none,
   );
 
   return ThemeData(
@@ -108,9 +127,7 @@ ThemeData _base(Brightness b, bool browser, bool glass) {
     brightness: b,
     fontFamily: font,
     colorScheme: scheme,
-    extensions: [
-      if (glass) dark ? Glass.dark : Glass.light else Glass.off,
-    ],
+    extensions: [g],
     // Each page lies on its Wallpaper (glass.dart), whether or not glass.
     pageTransitionsTheme: wallpaperTransitions(),
     scaffoldBackgroundColor: glass
@@ -118,25 +135,35 @@ ThemeData _base(Brightness b, bool browser, bool glass) {
         : dark
             ? Brand.bgDark
             : Brand.bgLight,
+    // A dropdown's menu, among others.
+    canvasColor: glass ? g.solid : null,
+    dividerColor: glass ? g.line : null,
     appBarTheme: AppBarTheme(
       backgroundColor: glass
-          ? (dark ? Glass.darkBar : Glass.lightBar)
+          ? g.bar
           : dark
               ? Brand.blueDark
               : Brand.blue,
       // No Material tint over the glass as the page scrolls under.
       surfaceTintColor: glass ? Colors.transparent : null,
-      foregroundColor: Colors.white,
+      foregroundColor: glass ? text : Colors.white,
+      shape: glass ? Border(bottom: BorderSide(color: g.line)) : null,
       elevation: 0,
       centerTitle: false,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: dark ? const Color(0xFF2A2A2A) : const Color(0xFFEDEDED),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
-      ),
+      fillColor: glass
+          ? g.field
+          : dark
+              ? const Color(0xFF2A2A2A)
+              : const Color(0xFFEDEDED),
+      border: fieldBorder,
+      enabledBorder: glass ? fieldBorder : null,
+      focusedBorder: glass
+          ? fieldBorder.copyWith(
+              borderSide: BorderSide(color: scheme.primary, width: 2))
+          : null,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -145,11 +172,36 @@ ThemeData _base(Brightness b, bool browser, bool glass) {
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(glass ? 16 : 8)),
         // Replaces the theme's text style rather than adding to it.
         textStyle: TextStyle(
             fontFamily: font, fontSize: 16, fontWeight: FontWeight.bold),
       ),
     ),
+    cardTheme: glass
+        ? CardThemeData(color: g.card, elevation: 0, shape: edged(18))
+        : null,
+    dialogTheme: glass
+        ? DialogThemeData(backgroundColor: g.solid, shape: edged(28))
+        : null,
+    popupMenuTheme:
+        glass ? PopupMenuThemeData(color: g.solid, shape: edged(16)) : null,
+    bottomSheetTheme: glass
+        ? BottomSheetThemeData(
+            backgroundColor: g.solid,
+            shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+          )
+        : null,
+    snackBarTheme: glass
+        ? SnackBarThemeData(
+            backgroundColor: g.solid,
+            contentTextStyle: TextStyle(fontFamily: font, color: text),
+            actionTextColor: scheme.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: edged(18),
+          )
+        : null,
   );
 }

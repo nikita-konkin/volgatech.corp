@@ -12,6 +12,7 @@ import '../state/auth_controller.dart';
 import '../state/exams_controller.dart';
 import '../theme.dart';
 import 'calendar_export.dart';
+import 'glass.dart';
 import 'layout.dart';
 import 'offline_banner.dart';
 
@@ -83,43 +84,41 @@ class _ExamsView extends StatelessWidget {
         color: Colors.white,
         fontWeight: FontWeight.bold,
         fontSize: 16);
-    return Container(
+    return AccentBar(
       color: Brand.coral,
-      child: ReadableWidth(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: Row(
-            children: [
-              const Text('Учебный год:',
-                  style: TextStyle(color: Colors.white, fontSize: 15)),
-              const SizedBox(width: 12),
-              DropdownButtonHideUnderline(
-                child: DropdownButton<int>(
-                  value: c.selectedYear?.value,
-                  dropdownColor: Colors.white,
-                  iconEnabledColor: Colors.white,
-                  style: year,
-                  selectedItemBuilder: (_) => c.years
-                      .map((y) => Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(y.name, style: year),
-                          ))
-                      .toList(),
-                  items: c.years
-                      .map((y) => DropdownMenuItem(
-                            value: y.value,
-                            child: Text(y.name,
-                                style: const TextStyle(color: Colors.black87)),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    final y = c.years.firstWhere((e) => e.value == v);
-                    unawaited(c.selectYear(y));
-                  },
-                ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(
+          children: [
+            const Text('Учебный год:',
+                style: TextStyle(color: Colors.white, fontSize: 15)),
+            const SizedBox(width: 12),
+            DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                value: c.selectedYear?.value,
+                dropdownColor: Colors.white,
+                iconEnabledColor: Colors.white,
+                style: year,
+                selectedItemBuilder: (_) => c.years
+                    .map((y) => Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(y.name, style: year),
+                        ))
+                    .toList(),
+                items: c.years
+                    .map((y) => DropdownMenuItem(
+                          value: y.value,
+                          child: Text(y.name,
+                              style: const TextStyle(color: Colors.black87)),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  final y = c.years.firstWhere((e) => e.value == v);
+                  unawaited(c.selectYear(y));
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -207,15 +206,20 @@ class _ExamCard extends StatelessWidget {
         e.examDate != null ? DateFormat('HH:mm').format(e.examDate!) : '';
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Brand.card(context),
-        borderRadius: BorderRadius.circular(8),
-        border: const Border(left: BorderSide(color: Brand.coral, width: 5)),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
-        ],
-      ),
+      decoration: cardDecoration(
+          context,
+          BoxDecoration(
+            color: Brand.card(context),
+            borderRadius: BorderRadius.circular(8),
+            border:
+                const Border(left: BorderSide(color: Brand.coral, width: 5)),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x11000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 2)),
+            ],
+          )),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

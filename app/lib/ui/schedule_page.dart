@@ -108,34 +108,32 @@ class _ScheduleView extends StatelessWidget {
         child: Column(
           children: [
             if (c.fromCache) OfflineBanner(savedAt: c.cacheSavedAt),
-            Container(
+            AccentBar(
               color: accent,
-              child: ReadableWidth(
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left,
-                          color: Colors.white, size: 30),
-                      onPressed: c.prevDay,
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          _dayMonth.format(c.selectedDay).toUpperCase(),
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold),
-                        ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left,
+                        color: Colors.white, size: 30),
+                    onPressed: c.prevDay,
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        _dayMonth.format(c.selectedDay).toUpperCase(),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right,
-                          color: Colors.white, size: 30),
-                      onPressed: c.nextDay,
-                    ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right,
+                        color: Colors.white, size: 30),
+                    onPressed: c.nextDay,
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
@@ -217,7 +215,8 @@ class _WeekTypeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final glass = Glass.of(context);
+    final chip = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
@@ -227,9 +226,22 @@ class _WeekTypeChip extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           number != null ? '$name · неделя $number' : name,
-          style: TextStyle(color: Brand.muted(context), fontSize: 13),
+          style: TextStyle(
+              color: glass.on
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Brand.muted(context),
+              fontSize: 13),
         ),
       ],
+    );
+    if (!glass.on) return chip;
+    // On glass: a capsule of its own.
+    return DecoratedBox(
+      decoration: GlassDecoration(glass, radius: 14, shadows: const []),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        child: chip,
+      ),
     );
   }
 }
@@ -258,15 +270,19 @@ class _LessonCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Brand.card(context),
-        borderRadius: BorderRadius.circular(8),
-        border: Border(left: BorderSide(color: accent, width: 5)),
-        boxShadow: cardShadow(context, const [
-          BoxShadow(
-              color: Color(0x11000000), blurRadius: 4, offset: Offset(0, 2)),
-        ]),
-      ),
+      decoration: cardDecoration(
+          context,
+          BoxDecoration(
+            color: Brand.card(context),
+            borderRadius: BorderRadius.circular(8),
+            border: Border(left: BorderSide(color: accent, width: 5)),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x11000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 2)),
+            ],
+          )),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

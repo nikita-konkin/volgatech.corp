@@ -13,6 +13,7 @@ import '../state/updater.dart';
 import '../web/a11y.dart';
 import 'crash_log_page.dart';
 import 'easter_egg.dart';
+import 'glass.dart';
 import 'layout.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -48,76 +49,110 @@ class SettingsPage extends StatelessWidget {
             ? null
             : sides.copyWith(bottom: MediaQuery.paddingOf(context).bottom),
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Тема оформления',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+          _Section(
+            title: 'Тема оформления',
+            first: true,
+            children: [
+              RadioGroup<ThemeMode>(
+                groupValue: theme.mode,
+                onChanged: (m) => theme.setMode(m!),
+                child: const Column(
+                  children: [
+                    RadioListTile<ThemeMode>(
+                      title: Text('Системная'),
+                      value: ThemeMode.system,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('Светлая'),
+                      value: ThemeMode.light,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('Тёмная'),
+                      value: ThemeMode.dark,
+                    ),
+                  ],
+                ),
+              ),
+              if (kIsWeb) const _GlassTile(),
+            ],
           ),
-          RadioGroup<ThemeMode>(
-            groupValue: theme.mode,
-            onChanged: (m) => theme.setMode(m!),
-            child: const Column(
+          // A browser can't ask for a fingerprint or Face ID.
+          if (!kIsWeb)
+            _Section(
+              title: 'Безопасность',
               children: [
-                RadioListTile<ThemeMode>(
-                  title: Text('Системная'),
-                  value: ThemeMode.system,
-                ),
-                RadioListTile<ThemeMode>(
-                  title: Text('Светлая'),
-                  value: ThemeMode.light,
-                ),
-                RadioListTile<ThemeMode>(
-                  title: Text('Тёмная'),
-                  value: ThemeMode.dark,
+                SwitchListTile(
+                  title: const Text('Блокировка при входе'),
+                  subtitle: const Text(
+                      'Спрашивать отпечаток, Face ID или PIN при открытии приложения'),
+                  value: lock.enabled,
+                  onChanged: (v) => _toggleLock(context, v),
                 ),
               ],
             ),
-          ),
-          if (kIsWeb) const _GlassTile(),
-          // A browser can't ask for a fingerprint or Face ID.
-          if (!kIsWeb) ...[
-            const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Безопасность',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+          if (LessonReminders.supported)
+            _Section(
+              title: 'Уведомления',
+              children: [
+                const _LessonReminderTile(),
+                if (MailAlerts.supported) const _MailAlertTile(),
+              ],
             ),
-            SwitchListTile(
-              title: const Text('Блокировка при входе'),
-              subtitle: const Text(
-                  'Спрашивать отпечаток, Face ID или PIN при открытии приложения'),
-              value: lock.enabled,
-              onChanged: (v) => _toggleLock(context, v),
-            ),
-          ],
-          if (LessonReminders.supported) ...[
-            const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Уведомления',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            const _LessonReminderTile(),
-            if (MailAlerts.supported) const _MailAlertTile(),
-          ],
-          if (context.read<Updater>().enabled) ...[
-            const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Обновления',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            const _UpdateTile(),
-          ],
-          const Divider(height: 1),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child:
-                Text('Ошибки', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          const CrashLogTile(),
+          if (context.read<Updater>().enabled)
+            const _Section(title: 'Обновления', children: [_UpdateTile()]),
+          const _Section(title: 'Ошибки', children: [CrashLogTile()]),
           const EasterEggFooter(),
         ],
+      ),
+    );
+  }
+}
+
+/// A titled group of settings, after a line; on glass, a card of its own.
+class _Section extends StatelessWidget {
+  const _Section(
+      {required this.title, required this.children, this.first = false});
+
+  final String title;
+  final List<Widget> children;
+
+  /// At the top: no line above it.
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final glass = Glass.of(context);
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+    );
+    if (!glass.on) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!first) const Divider(height: 1),
+          header,
+          ...children,
+        ],
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: DecoratedBox(
+        decoration: GlassDecoration(glass),
+        child: Material(
+          type: MaterialType.transparency,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [header, ...children],
+            ),
+          ),
+        ),
       ),
     );
   }
