@@ -28,15 +28,28 @@ class Glass extends ThemeExtension<Glass> {
     this.sheen = Colors.transparent,
     this.rim = const [Colors.transparent, Colors.transparent],
     this.shadows = const [],
+    this.wash = const [],
+    this.grain = 0,
+    this.scuffs = 0,
   });
 
   static const off = Glass(on: false);
 
   final bool on;
 
-  /// The wallpaper: [base], and over it soft round [blobs] of colour.
+  /// The wallpaper: [base], an even [wash] across it, and over it soft
+  /// round [blobs] of colour.
   final Color base;
+  final List<Color> wash;
   final List<Color> blobs;
+
+  /// Matte glass: how strongly the fine [grain] of frosting shows, on the
+  /// wallpaper and the glass, and the faint [scuffs] on the glass (0: none,
+  /// 1: as drawn).
+  final double grain;
+  final double scuffs;
+
+  bool get scuffed => grain > 0 || scuffs > 0;
 
   /// The menu and the drawer.
   final Color panel;
@@ -140,6 +153,61 @@ class Glass extends ThemeExtension<Glass> {
     ],
   );
 
+  /// Matte glass, frosted and lightly scuffed, on an even wash of steel
+  /// grey — no blobs to read as smudges behind it.
+  static const scuffedLight = Glass(
+    on: true,
+    base: Color(0xFFE6EAF0),
+    wash: [Color(0xFFDDE3EB), Color(0xFFECEFF4), Color(0xFFD6DDE7)],
+    panel: Color(0xA6FFFFFF),
+    bar: Color(0xD1F5F7FA),
+    card: Color(0xB8FFFFFF),
+    solid: Color(0xFFF5F7FA),
+    lens: Color(0xF5FFFFFF),
+    field: Color(0xCCFFFFFF),
+    stroke: Color(0xCCFFFFFF),
+    line: Color(0x1A0F1426),
+    highlight: Color(0xF2FFFFFF),
+    sheen: Color(0x59FFFFFF),
+    rim: [Color(0xFFFFFFFF), Color(0x66FFFFFF)],
+    shadows: [
+      BoxShadow(
+          color: Color(0x4720283F),
+          offset: Offset(0, 10),
+          blurRadius: 20,
+          spreadRadius: -12),
+      BoxShadow(color: Color(0x0F20283F), offset: Offset(0, 1), blurRadius: 3),
+    ],
+    grain: 1,
+    scuffs: 1,
+  );
+
+  static const scuffedDark = Glass(
+    on: true,
+    base: Color(0xFF0D1117),
+    wash: [Color(0xFF161C26), Color(0xFF0D1117), Color(0xFF141B25)],
+    panel: Color(0x991B212C),
+    bar: Color(0xE0121720),
+    card: Color(0x1AFFFFFF),
+    solid: Color(0xFF171C26),
+    lens: Color(0x2EFFFFFF),
+    field: Color(0x47000000),
+    stroke: Color(0x24FFFFFF),
+    line: Color(0x1FFFFFFF),
+    highlight: Color(0x2EFFFFFF),
+    sheen: Color(0x0FFFFFFF),
+    rim: [Color(0x66FFFFFF), Color(0x14FFFFFF)],
+    shadows: [
+      BoxShadow(
+          color: Color(0xB3000000),
+          offset: Offset(0, 14),
+          blurRadius: 26,
+          spreadRadius: -16),
+    ],
+    grain: 1,
+    scuffs: 0.4,
+  );
+
   /// Text on glass, and the quieter text under it.
   static const lightText = Color(0xFF0F1426);
   static const darkText = Color(0xFFFFFFFF);
@@ -176,6 +244,9 @@ class Glass extends ThemeExtension<Glass> {
         sheen: sheen,
         rim: rim,
         shadows: shadows,
+        wash: wash,
+        grain: grain,
+        scuffs: scuffs,
       );
 
   @override
@@ -197,6 +268,7 @@ double contrast(Color a, Color b) {
 /// blob at its middle, and where two of them overlap.
 List<Color> wallpaperColors(Glass glass) => [
       glass.base,
+      ...glass.wash,
       for (final b in glass.blobs) composite(b, glass.base),
       for (final a in glass.blobs)
         for (final b in glass.blobs)
@@ -266,6 +338,16 @@ class _RenderWallpaper extends RenderProxyBox {
     if (_glass.on) {
       final origin = offset - localToGlobal(Offset.zero);
       canvas.drawRect(box, Paint()..color = _glass.base);
+      if (_glass.wash.length > 1) {
+        canvas.drawRect(
+            box,
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _glass.wash,
+              ).createShader(origin & _window));
+      }
       final spots = blobSpots(_window);
       for (var i = 0; i < _glass.blobs.length && i < spots.length; i++) {
         final (centre, radius) = spots[i];
@@ -277,6 +359,8 @@ class _RenderWallpaper extends RenderProxyBox {
                   .createShader(Rect.fromCircle(
                       center: origin + centre, radius: radius)));
       }
+      // Frosting held still against the window, as the wash is.
+      paintTexture(canvas, box, GlassTexture.grain, origin, _glass.grain);
     } else if (_solid case final c?) {
       canvas.drawRect(box, Paint()..color = c);
     }
@@ -417,6 +501,15 @@ class _GlassPainter extends BoxPainter {
               stops: const [0, 0.46],
             ).createShader(rect));
     }
+    // Matte glass: frosted and lightly scuffed, the texture moving with it.
+    if (g.scuffed && d.sheen) {
+      canvas
+        ..save()
+        ..clipRRect(shape);
+      paintTexture(canvas, rect, GlassTexture.grain, rect.topLeft, g.grain);
+      paintTexture(canvas, rect, GlassTexture.scuffs, rect.topLeft, g.scuffs);
+      canvas.restore();
+    }
     // The accent: a capsule standing just inside the left edge.
     if (d.accent case final accent? when d.accentWidth > 0) {
       final inset = math.min(12.0, rect.height / 4);
@@ -465,6 +558,89 @@ class _GlassPainter extends BoxPainter {
             ..color = o.color);
     }
   }
+}
+
+/// The tiles of matte glass's texture, drawn once: [grain], fine specks
+/// of light and shade as frosting has (laid at half a logical pixel each:
+/// a device pixel on most screens), and [scuffs], faint scratches running
+/// mostly one way. Null where the renderer can't draw them.
+abstract final class GlassTexture {
+  static final ui.Image? grain = _draw(256, (canvas, rnd) {
+    final light = <Offset>[], shade = <Offset>[];
+    for (var i = 0; i < 12000; i++) {
+      (rnd.nextBool() ? light : shade)
+          .add(Offset(rnd.nextDouble() * 256, rnd.nextDouble() * 256));
+    }
+    canvas
+      ..drawPoints(
+          ui.PointMode.points,
+          light,
+          Paint()
+            ..color = const Color(0x12FFFFFF)
+            ..strokeWidth = 1)
+      ..drawPoints(
+          ui.PointMode.points,
+          shade,
+          Paint()
+            ..color = const Color(0x0B000000)
+            ..strokeWidth = 1);
+  });
+
+  /// Grain texture pixels per logical pixel.
+  static const grainScale = 0.5;
+
+  static final ui.Image? scuffs = _draw(256, (canvas, rnd) {
+    final paint = Paint()
+      ..strokeWidth = 0.6
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i < 70; i++) {
+      final from = Offset(rnd.nextDouble() * 256, rnd.nextDouble() * 256);
+      final angle = -0.45 + (rnd.nextDouble() - 0.5) * 0.3;
+      final length = 6 + rnd.nextDouble() * 34;
+      final to = from + Offset(math.cos(angle), math.sin(angle)) * length;
+      paint.color = rnd.nextInt(3) == 0
+          ? const Color(0x0F000000)
+          : Color.fromRGBO(255, 255, 255, 0.08 + rnd.nextDouble() * 0.08);
+      // Across the tile's edge too, so the tiles meet without a seam.
+      for (final dx in const [-256.0, 0.0, 256.0]) {
+        for (final dy in const [-256.0, 0.0, 256.0]) {
+          final shift = Offset(dx, dy);
+          canvas.drawLine(from + shift, to + shift, paint);
+        }
+      }
+    }
+  });
+
+  static ui.Image? _draw(int size, void Function(Canvas, math.Random) draw) {
+    try {
+      final recorder = ui.PictureRecorder();
+      draw(Canvas(recorder), math.Random(7));
+      return recorder.endRecording().toImageSync(size, size);
+    } on Object {
+      return null;
+    }
+  }
+}
+
+/// [texture] tiled over [rect] from [origin], at [strength] (0: not at all).
+void paintTexture(Canvas canvas, Rect rect, ui.Image? texture, Offset origin,
+    double strength) {
+  if (texture == null || strength <= 0) return;
+  final scale =
+      identical(texture, GlassTexture.grain) ? GlassTexture.grainScale : 1.0;
+  canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ImageShader(
+            texture,
+            TileMode.repeated,
+            TileMode.repeated,
+            (Matrix4.translationValues(origin.dx, origin.dy, 0)
+                  ..scaleByDouble(scale, scale, 1, 1))
+                .storage)
+        ..colorFilter = ColorFilter.mode(
+            Color.fromRGBO(255, 255, 255, strength.clamp(0.0, 1.0)),
+            BlendMode.modulate));
 }
 
 /// A card's decoration: [plain] without glass; on glass, glass that keeps

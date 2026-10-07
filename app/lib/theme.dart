@@ -63,13 +63,15 @@ class Brand {
 }
 
 /// [browser]: the web build, which brings its own font (see pubspec.yaml).
-/// [glass]: «Liquid Glass» (glass.dart).
-ThemeData buildLightTheme({bool browser = kIsWeb, bool glass = false}) =>
-    _base(Brightness.light, browser, glass);
-ThemeData buildDarkTheme({bool browser = kIsWeb, bool glass = false}) =>
-    _base(Brightness.dark, browser, glass);
+/// [glass]: «Liquid Glass» (glass.dart), clear or, [scuffed], matte.
+ThemeData buildLightTheme(
+        {bool browser = kIsWeb, bool glass = false, bool scuffed = false}) =>
+    _base(Brightness.light, browser, glass, scuffed);
+ThemeData buildDarkTheme(
+        {bool browser = kIsWeb, bool glass = false, bool scuffed = false}) =>
+    _base(Brightness.dark, browser, glass, scuffed);
 
-ThemeData _base(Brightness b, bool browser, bool glass) {
+ThemeData _base(Brightness b, bool browser, bool glass, bool scuffed) {
   final dark = b == Brightness.dark;
   // In a browser on an iPhone the platform is iOS, whose system fonts the
   // web engine doesn't have: the Roboto bundled for it (pubspec.yaml). On
@@ -81,7 +83,11 @@ ThemeData _base(Brightness b, bool browser, bool glass) {
       : defaultTargetPlatform == TargetPlatform.android
           ? 'sans-serif'
           : null;
-  final g = glass ? (dark ? Glass.dark : Glass.light) : Glass.off;
+  final g = !glass
+      ? Glass.off
+      : scuffed
+          ? (dark ? Glass.scuffedDark : Glass.scuffedLight)
+          : (dark ? Glass.dark : Glass.light);
   final text = dark ? Glass.darkText : Glass.lightText;
   final scheme = (dark
           ? const ColorScheme.dark(
@@ -192,6 +198,20 @@ ThemeData _base(Brightness b, bool browser, bool glass) {
             backgroundColor: g.solid,
             shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+          )
+        : null,
+    // The chosen segment: a drop of clearer glass, as the menu's.
+    segmentedButtonTheme: glass
+        ? SegmentedButtonThemeData(
+            style: ButtonStyle(
+              backgroundColor: WidgetStateProperty.resolveWith((s) =>
+                  s.contains(WidgetState.selected)
+                      ? g.lens
+                      : Colors.transparent),
+              foregroundColor: WidgetStateProperty.resolveWith((s) =>
+                  s.contains(WidgetState.selected) ? scheme.primary : text),
+              side: WidgetStatePropertyAll(BorderSide(color: g.line)),
+            ),
           )
         : null,
     snackBarTheme: glass

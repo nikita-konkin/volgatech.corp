@@ -166,15 +166,34 @@ class _GlassTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeController>();
     final solid = MediaQuery.highContrastOf(context) || prefersSolidSurfaces();
-    return SwitchListTile(
-      title: const Text('Liquid Glass'),
-      subtitle: Text(solid
-          ? 'Полупрозрачные панели на цветном фоне. Сейчас не действует: '
-              'в системе включено «Уменьшить прозрачность» или «Увеличить '
-              'контраст»'
-          : 'Полупрозрачные панели на цветном фоне'),
-      value: theme.glass,
-      onChanged: theme.setGlass,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          title: const Text('Liquid Glass'),
+          subtitle: Text(solid
+              ? 'Полупрозрачные панели на цветном фоне. Сейчас не действует: '
+                  'в системе включено «Уменьшить прозрачность» или «Увеличить '
+                  'контраст»'
+              : 'Полупрозрачные панели на цветном фоне'),
+          value: theme.glass,
+          onChanged: theme.setGlass,
+        ),
+        // Clear glass, or matte: frosted and lightly scuffed.
+        if (theme.glass)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: false, label: Text('Прозрачное')),
+                ButtonSegment(value: true, label: Text('Матовое')),
+              ],
+              selected: {theme.scuffed},
+              onSelectionChanged: (s) => theme.setScuffed(s.first),
+            ),
+          ),
+      ],
     );
   }
 }

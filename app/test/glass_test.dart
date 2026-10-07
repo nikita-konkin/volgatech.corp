@@ -6,13 +6,18 @@ import 'package:volgatech_pro/ui/glass.dart';
 void main() {
   // WCAG AA: 4.5 for text, AAA 7 for the main text where we can.
   group('glass text reads on every part of the wallpaper', () {
-    for (final dark in [false, true]) {
+    for (final (dark, scuffed) in [
+      (false, false),
+      (true, false),
+      (false, true),
+      (true, true),
+    ]) {
       final theme = dark
-          ? buildDarkTheme(browser: true, glass: true)
-          : buildLightTheme(browser: true, glass: true);
+          ? buildDarkTheme(browser: true, glass: true, scuffed: scuffed)
+          : buildLightTheme(browser: true, glass: true, scuffed: scuffed);
       final scheme = theme.colorScheme;
       final glass = theme.extension<Glass>()!;
-      final name = dark ? 'dark' : 'light';
+      final name = '${dark ? 'dark' : 'light'}${scuffed ? ', matte' : ''}';
 
       test('$name: cards', () {
         for (final wall in wallpaperColors(glass)) {
@@ -83,6 +88,33 @@ void main() {
         }
       });
     }
+  });
+
+  testWidgets('matte glass: frosted and scuffed, its texture drawn',
+      (tester) async {
+    final theme = buildLightTheme(browser: true, glass: true, scuffed: true);
+    expect(theme.extension<Glass>()!.scuffed, isTrue);
+    expect(GlassTexture.grain, isNotNull);
+    expect(GlassTexture.scuffs, isNotNull);
+    await tester.pumpWidget(MaterialApp(
+      theme: theme,
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => Container(
+            width: 200,
+            height: 80,
+            decoration: cardDecoration(
+                context,
+                const BoxDecoration(
+                    border:
+                        Border(left: BorderSide(color: Colors.red, width: 5)))),
+          ),
+        ),
+      ),
+    ));
+    expect(tester.takeException(), isNull);
+    final box = tester.widget<Container>(find.byType(Container).last);
+    expect(box.decoration, isA<GlassDecoration>());
   });
 
   test('without glass the theme is as before', () {

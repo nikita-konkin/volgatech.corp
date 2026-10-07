@@ -16,6 +16,7 @@ class Prefs {
   static const _kRemember = 'remember_login';
   static const _kTheme = 'theme_mode';
   static const _kGlass = 'theme_glass';
+  static const _kScuffed = 'theme_glass_scuffed';
   static const _kLessonReminder = 'lesson_reminder_minutes';
   static const _kAppLock = 'app_lock_enabled';
   static const _kPinsFolded = 'mail_pins_folded';
@@ -120,6 +121,10 @@ class Prefs {
   /// «Liquid Glass» (the browser's choice in Settings).
   bool get glass => _p.getBool(_kGlass) ?? false;
   Future<void> setGlass(bool on) async => _p.setBool(_kGlass, on);
+
+  /// The glass matte — frosted and scuffed — rather than clear.
+  bool get glassScuffed => _p.getBool(_kScuffed) ?? false;
+  Future<void> setGlassScuffed(bool on) async => _p.setBool(_kScuffed, on);
 
   ThemeMode get themeMode {
     switch (_p.getString(_kTheme)) {
