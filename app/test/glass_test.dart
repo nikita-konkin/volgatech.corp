@@ -12,7 +12,7 @@ void main() {
     for (final (dark, scuffed, strength) in [
       for (final dark in [false, true])
         for (final scuffed in [false, true])
-          // Matte glass is as thick at any wear; see the wear's own test.
+          // Matte glass is as thick however etched; see the spirals' tests.
           for (final strength in scuffed ? [1.0] : [1.0, 0.75, 0.5, 0.25, 0.0])
             (dark, scuffed, strength),
     ]) {
@@ -110,7 +110,7 @@ void main() {
       expect(none.panel, g.solid);
       expect(none.bar, g.solid);
       expect(none.grain, 0);
-      expect(none.wear, 0);
+      expect(none.etch, 0);
       expect(none.blur, 0);
       expect(none.blobs.every((b) => b.a == 0), isTrue);
       final half = g.scaled(0.5);
@@ -132,13 +132,13 @@ void main() {
     }
   });
 
-  for (final wear in [0.0, 0.4, 1.0]) {
-    testWidgets('matte glass worn to ${(wear * 100).round()} %: drawn',
+  for (final etch in [0.0, 0.5, 1.0]) {
+    testWidgets('matte glass etched ${(etch * 100).round()} %: drawn',
         (tester) async {
       final theme = buildLightTheme(
-          browser: true, glass: true, scuffed: true, wear: wear);
+          browser: true, glass: true, scuffed: true, etch: etch);
       expect(theme.extension<Glass>()!.scuffed, isTrue);
-      expect(theme.extension<Glass>()!.wear, wear);
+      expect(theme.extension<Glass>()!.etch, etch);
       expect(GlassTexture.grain, isNotNull);
       await tester.pumpWidget(MaterialApp(
         theme: theme,
@@ -164,63 +164,65 @@ void main() {
     });
   }
 
-  group('wear on matte glass', () {
+  group('spirals etched on matte glass', () {
     const card = Size(360, 90);
-    double length(Iterable<WearMark> marks) => [
-          for (final m in marks)
+    Iterable<EtchMark> grooves(GlassEtching e) => e.marks.where((m) => !m.lit);
+    double length(GlassEtching e) => [
+          for (final m in grooves(e))
             for (final metric in m.path.computeMetrics()) metric.length
         ].fold(0.0, (a, b) => a + b);
-    Iterable<WearMark> scratches(GlassWear w) =>
-        w.marks.where((m) => !m.lit && m.width == null);
-    Iterable<WearMark> cracks(GlassWear w) =>
-        w.marks.where((m) => !m.lit && m.width != null);
+    Rect bounds(GlassEtching e) => grooves(e)
+        .map((m) => m.path.getBounds())
+        .where((b) => !b.isEmpty)
+        .reduce((a, b) => a.expandToInclude(b));
 
-    test('as new, none; then more and longer scratches; cracks past half', () {
-      expect(GlassWear.of(card, 0, 1).marks, isEmpty);
-      var scratched = 0.0, cracked = 0.0;
-      for (final wear in [0.2, 0.4, 0.6, 0.8, 1.0]) {
-        final w = GlassWear.of(card, wear, 1);
-        final s = length(scratches(w)), c = length(cracks(w));
-        expect(s, greaterThan(scratched), reason: 'scratches at $wear');
-        if (wear <= 0.5) {
-          expect(c, 0, reason: 'no cracks yet at $wear');
-        } else {
-          expect(c, greaterThan(cracked), reason: 'cracks at $wear');
-        }
-        scratched = s;
-        cracked = c;
+    test('none at first; then more of them, and longer', () {
+      expect(GlassEtching.of(card, 0, 1).marks, isEmpty);
+      var before = 0.0;
+      for (final etch in [0.1, 0.3, 0.5, 0.7, 0.9, 1.0]) {
+        final cut = length(GlassEtching.of(card, etch, 1));
+        expect(cut, greaterThan(before), reason: 'at $etch');
+        before = cut;
       }
     });
 
-    test('a crack only grows: what it was, it still is', () {
-      Rect bounds(GlassWear w) => cracks(w)
-          .map((m) => m.path.getBounds())
-          .where((b) => !b.isEmpty)
-          .reduce((a, b) => a.expandToInclude(b));
-      final half = bounds(GlassWear.of(card, 0.75, 3));
-      final full = bounds(GlassWear.of(card, 1, 3));
-      expect(full.inflate(0.01).contains(half.topLeft), isTrue);
-      expect(full.inflate(0.01).contains(half.bottomRight), isTrue);
-      expect(full.width * full.height, greaterThan(half.width * half.height));
+    test('a spiral only grows: what was etched, still is', () {
+      for (final seed in [1, 2, 3]) {
+        final some = bounds(GlassEtching.of(card, 0.4, seed));
+        final full = bounds(GlassEtching.of(card, 1, seed)).inflate(1);
+        expect(full.contains(some.topLeft), isTrue, reason: '$seed');
+        expect(full.contains(some.bottomRight), isTrue, reason: '$seed');
+      }
+    });
+
+    test('they grow in from the edges', () {
+      // At the very start only tendrils show, each rooted on an edge.
+      final first = bounds(GlassEtching.of(card, 0.1, 5));
+      final edge = Offset.zero & card;
+      expect(
+          first.left <= edge.left + 2 ||
+              first.top <= edge.top + 2 ||
+              first.right >= edge.right - 2 ||
+              first.bottom >= edge.bottom - 2,
+          isTrue);
     });
 
     test('each card its own, and the same each time', () {
-      final a = GlassWear.of(card, 0.6, 'one'.hashCode);
-      final b = GlassWear.of(card, 0.6, 'two'.hashCode);
-      expect(scratches(a).last.path.getBounds(),
-          isNot(scratches(b).last.path.getBounds()));
-      expect(GlassWear.of(card, 0.6, 'one'.hashCode), same(a));
+      final a = GlassEtching.of(card, 0.6, 'one'.hashCode);
+      final b = GlassEtching.of(card, 0.6, 'two'.hashCode);
+      expect(bounds(a), isNot(bounds(b)));
+      expect(GlassEtching.of(card, 0.6, 'one'.hashCode), same(a));
     });
 
-    // Where a scratch or crack runs under text, the text still reads.
+    // Where a spiral runs under text, the text still reads.
     for (final dark in [false, true]) {
-      test('${dark ? 'dark' : 'light'}: text over the deepest marks', () {
+      test('${dark ? 'dark' : 'light'}: text over the deepest grooves', () {
         final theme = (dark ? buildDarkTheme : buildLightTheme)(
-            browser: true, glass: true, scuffed: true, wear: 1);
+            browser: true, glass: true, scuffed: true, etch: 1);
         final glass = theme.extension<Glass>()!;
         for (final wall in wallpaperColors(glass)) {
           final under = composite(theme.colorScheme.surface, wall);
-          for (final mark in [glass.scratch, glass.glint]) {
+          for (final mark in [glass.groove, glass.glint]) {
             final marked = composite(mark, under);
             expect(
                 contrast(
@@ -233,16 +235,16 @@ void main() {
     }
   });
 
-  test('clear glass keeps its strength, matte its wear', () async {
+  test('clear glass keeps its strength, matte its etching', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = Prefs(await SharedPreferences.getInstance());
     final theme = ThemeController(prefs);
     expect(theme.strength, 1);
-    expect(theme.wear, 0.4);
-    await theme.setWear(0.9);
+    expect(theme.etch, 0.5);
+    await theme.setEtch(0.9);
     await theme.setStrength(0.3);
     final again = ThemeController(prefs);
-    expect(again.wear, 0.9);
+    expect(again.etch, 0.9);
     expect(again.strength, 0.3);
   });
 

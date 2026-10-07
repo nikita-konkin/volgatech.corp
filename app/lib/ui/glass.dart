@@ -30,8 +30,8 @@ class Glass extends ThemeExtension<Glass> {
     this.shadows = const [],
     this.wash = const [],
     this.grain = 0,
-    this.wear = 0,
-    this.scratch = Colors.transparent,
+    this.etch = 0,
+    this.groove = Colors.transparent,
     this.glint = Colors.transparent,
     this.strength = 1,
   });
@@ -50,15 +50,15 @@ class Glass extends ThemeExtension<Glass> {
   /// wallpaper and the glass (0: none, 1: as drawn).
   final double grain;
 
-  /// Matte glass: how worn it is (0: as new, 1: scratched deep every which
-  /// way, and cracked; see [GlassWear]). A scratch is a groove: its wall
-  /// towards the light, at the top left, in the shade of [scratch], the far
-  /// one catching the light, [glint] — both as at the deepest.
-  final double wear;
-  final Color scratch;
+  /// Matte glass: how richly it is etched with spirals (0: not at all, 1:
+  /// in full; see [GlassEtching]). Each is cut as a groove: its wall towards
+  /// the light, at the top left, in the shade of [groove], the far one
+  /// catching the light, [glint] — both as at the deepest.
+  final double etch;
+  final Color groove;
   final Color glint;
 
-  bool get scuffed => grain > 0 || wear > 0;
+  bool get scuffed => grain > 0 || etch > 0;
 
   /// How strong the effect is, as [scaled] made it: 1, the full design.
   final double strength;
@@ -97,8 +97,8 @@ class Glass extends ThemeExtension<Glass> {
         for (final s in shadows) s.copyWith(color: fade(s.color, 0.5)),
       ],
       grain: grain * t,
-      wear: wear * t,
-      scratch: scratch,
+      etch: etch * t,
+      groove: groove,
       glint: glint,
       strength: strength * t,
     );
@@ -232,7 +232,7 @@ class Glass extends ThemeExtension<Glass> {
       BoxShadow(color: Color(0x0F20283F), offset: Offset(0, 1), blurRadius: 3),
     ],
     grain: 1,
-    scratch: Color(0x660F1426),
+    groove: Color(0x660F1426),
     glint: Color(0xE6FFFFFF),
   );
 
@@ -259,7 +259,7 @@ class Glass extends ThemeExtension<Glass> {
           spreadRadius: -16),
     ],
     grain: 1,
-    scratch: Color(0x99000000),
+    groove: Color(0x99000000),
     glint: Color(0x47FFFFFF),
   );
 
@@ -282,9 +282,9 @@ class Glass extends ThemeExtension<Glass> {
         .withValues(alpha: c.a);
   }
 
-  /// [wear]: matte glass as worn as that.
+  /// [etch]: matte glass etched as richly as that.
   @override
-  Glass copyWith({bool? on, double? wear}) => Glass(
+  Glass copyWith({bool? on, double? etch}) => Glass(
         on: on ?? this.on,
         base: base,
         blobs: blobs,
@@ -302,8 +302,8 @@ class Glass extends ThemeExtension<Glass> {
         shadows: shadows,
         wash: wash,
         grain: grain,
-        wear: (wear ?? this.wear).clamp(0.0, 1.0),
-        scratch: scratch,
+        etch: (etch ?? this.etch).clamp(0.0, 1.0),
+        groove: groove,
         glint: glint,
         strength: strength,
       );
@@ -474,8 +474,7 @@ PageTransitionsTheme wallpaperTransitions() {
 /// a CSS box-shadow does — under see-through glass a whole shadow would show
 /// through as a grey haze. An [accent] stripe down the left side, or an
 /// [outline] all round, marks it as a plain card's border did. On matte
-/// glass, [seed] picks this piece's own scratches and cracks (by default,
-/// its size's).
+/// glass, [seed] picks this piece's own spirals (by default, its size's).
 @immutable
 class GlassDecoration extends Decoration {
   const GlassDecoration(
@@ -582,13 +581,13 @@ class _GlassPainter extends BoxPainter {
               stops: const [0, 0.46],
             ).createShader(rect));
     }
-    // Matte glass: frosted and worn, the texture moving with it.
+    // Matte glass: frosted and etched, the pattern moving with it.
     if (g.scuffed && d.sheen) {
       canvas
         ..save()
         ..clipRRect(shape);
       paintTexture(canvas, rect, GlassTexture.grain, rect.topLeft, g.grain);
-      paintWear(canvas, rect, g,
+      paintEtching(canvas, rect, g,
           d.seed ?? Object.hash(rect.width.round(), rect.height.round()));
       canvas.restore();
     }
@@ -702,240 +701,261 @@ void paintTexture(Canvas canvas, Rect rect, ui.Image? texture, Offset origin,
             BlendMode.modulate));
 }
 
-/// One kind of mark wear leaves: [path], in the shade of a groove's wall
-/// or, [lit], the light off the other one, at [depth] (0 to 1); filled, or
-/// a line [width] wide.
-typedef WearMark = ({Path path, bool lit, double depth, double? width});
+/// One kind of mark etching leaves: [path], in the shade of a groove's wall
+/// or, [lit], the light off the other one, at [depth] (0 to 1).
+typedef EtchMark = ({Path path, bool lit, double depth});
 
-/// The marks wear leaves on a piece of matte glass, [GlassWear.of] its size
-/// and wear (0 to 1), to draw in order. Scratches: a few short ones running
-/// mostly one way, as from wiping; with wear, more of them, longer, deeper,
-/// bent and running every which way. Past half way, cracks: from the edge —
-/// more often near a corner, with a chip out where they start — growing
-/// inwards and branching. A piece's seed keeps its marks as the wear
-/// changes: a scratch only appears, deepens and turns; a crack only grows.
+/// What is etched on a piece of matte glass, [GlassEtching.of] its size
+/// and how richly (0 to 1), as marks to draw in order: spiral flourishes
+/// cut in as grooves — a shaded wall towards the light at the top left, a
+/// lit one away from it. Tendrils grow in from the edges, more often near a
+/// corner, and wind up into a curl with a bead at its heart; the richer the
+/// etching, the more of them, longer and cut deeper, with side curls
+/// sprouting off them and small S-scrolls between. A piece's seed keeps its
+/// pattern as the etching changes: a tendril only grows and winds on.
 @immutable
-class GlassWear {
-  const GlassWear._(this.marks);
+class GlassEtching {
+  const GlassEtching._(this.marks);
 
-  final List<WearMark> marks;
-
-  /// Scratches at full wear, per square logical pixel.
-  static const _density = 1 / 700;
+  final List<EtchMark> marks;
 
   /// Groove depths, shallow to deep: one path each, to draw at once.
   static const _depths = 3;
 
-  static final _made = <(int, int, int, int), GlassWear>{};
+  static final _made = <(int, int, int, int), GlassEtching>{};
 
-  static GlassWear of(Size size, double wear, int seed) {
+  static GlassEtching of(Size size, double etch, int seed) {
     final key = (
       seed,
       size.width.round(),
       size.height.round(),
-      (wear.clamp(0.0, 1.0) * 100).round(),
+      (etch.clamp(0.0, 1.0) * 100).round(),
     );
     if (_made[key] case final made?) return made;
     if (_made.length >= 128) _made.clear();
     return _made[key] = _make(size, key.$4 / 100, seed);
   }
 
-  static GlassWear _make(Size size, double wear, int seed) {
+  static GlassEtching _make(Size size, double etch, int seed) {
     final w = size.width, h = size.height;
-    if (wear <= 0 || w <= 0 || h <= 0) return const GlassWear._([]);
+    if (etch <= 0 || w <= 0 || h <= 0) return const GlassEtching._([]);
     final shade = [for (var i = 0; i < _depths; i++) Path()];
     final lit = [for (var i = 0; i < _depths; i++) Path()];
 
-    // Every scratch is drawn up as at full wear, so each keeps its place;
-    // the wear says how many show, and how they lie.
-    final rnd = math.Random(seed);
-    final most = (w * h * _density).clamp(4, 160).round();
-    final shown = (most * wear).round();
-    for (var i = 0; i < most; i++) {
-      final from = Offset(rnd.nextDouble() * w, rnd.nextDouble() * h);
-      final turn = rnd.nextDouble() * 2 - 1;
-      final reach = rnd.nextDouble();
-      final bend = rnd.nextDouble() * 2 - 1;
-      final deep = rnd.nextDouble();
-      if (i >= shown) continue;
-      final angle = -0.45 + turn * (0.12 + 1.45 * wear);
-      final length = 6 + reach * reach * (24 + 80 * wear);
-      final along = Offset(math.cos(angle), math.sin(angle));
-      final to = from + along * length;
-      final mid = (from + to) / 2 +
-          Offset(-along.dy, along.dx) * (bend * wear * 0.1 * length);
-      final depth = (0.25 + 0.75 * deep) * (0.3 + 0.7 * wear);
+    // A groove along [curl] as far as [reach], [depth] deep; and, where it
+    // has wound all the way, its bead.
+    void cut(_Curl curl, double reach, double depth) {
+      if (reach <= 0) return;
       final k = math.min(_depths - 1, (depth * _depths).floor());
-      final width = 0.45 + 1.1 * depth;
-      // The wall towards the light (top left) in shade, the far one lit.
+      final width = 0.8 + 1.8 * depth;
       final o = const Offset(1, 1) * (0.25 + 0.45 * depth);
-      _sliver(shade[k], from - o, mid - o, to - o, width);
-      _sliver(lit[k], from + o, mid + o, to + o, width * 0.8);
+      shade[k].addPolygon(curl.outline(reach, width, -o), true);
+      lit[k].addPolygon(curl.outline(reach, width * 0.8, o), true);
+      final r = 0.9 + 1.3 * depth;
+      for (final bead in curl.beads(reach)) {
+        shade[k].addOval(Rect.fromCircle(center: bead - o, radius: r));
+        lit[k].addOval(Rect.fromCircle(center: bead + o, radius: r * 0.8));
+      }
     }
 
-    final marks = <WearMark>[
-      for (var k = 0; k < _depths; k++)
-        (path: shade[k], lit: false, depth: _strength(k), width: null),
-      for (var k = 0; k < _depths; k++)
-        (path: lit[k], lit: true, depth: _strength(k), width: null),
-    ];
+    // Every flourish is drawn up as at its fullest, the same at any
+    // etching, so each keeps its place; the etching says which show and
+    // how far each has grown.
+    final rnd = math.Random(seed);
+    final tendrils = ((w + h) * 2 / 90).clamp(3, 28).round();
+    for (var i = 0; i < tendrils; i++) {
+      // From anywhere round the edge, setting off along it one way or the
+      // other, leaning in, and curling in.
+      var round = rnd.nextDouble() * 2 * (w + h);
+      final (origin, along, inwards) = round < w
+          ? (Offset(round, 0), 0.0, const Offset(0, 1))
+          : (round -= w) < h
+              ? (Offset(w, round), math.pi / 2, const Offset(-1, 0))
+              : (round -= h) < w
+                  ? (Offset(w - round, h), math.pi, const Offset(0, -1))
+                  : (
+                      Offset(0, h - (round - w)),
+                      -math.pi / 2,
+                      const Offset(1, 0)
+                    );
+      final base = rnd.nextBool() ? along : along + math.pi;
+      final inside =
+          -math.sin(base) * inwards.dx + math.cos(base) * inwards.dy > 0
+              ? 1.0
+              : -1.0;
+      final heading = base + inside * (0.25 + 0.55 * rnd.nextDouble());
+      final length =
+          (0.55 + 0.45 * rnd.nextDouble()) * (36 + 0.6 * math.min(w, h));
+      final turns = (1.3 + 0.9 * rnd.nextDouble()) * 2 * math.pi;
+      final deep = rnd.nextDouble();
+      // A side curl, the other way round, off the outer side.
+      final branchAt = 0.3 + 0.3 * rnd.nextDouble();
+      final branchLean = 0.5 + 0.4 * rnd.nextDouble();
+      final branchLength = (0.3 + 0.15 * rnd.nextDouble()) * length;
+      final branchTurns = (1 + 0.5 * rnd.nextDouble()) * 2 * math.pi;
+      final branches = rnd.nextDouble() < (etch - 0.35) * 1.6;
 
-    final grow = (wear - 0.5) * 2;
-    if (grow > 0) marks.addAll(_cracks(w, h, grow, seed));
-    return GlassWear._(marks);
+      final appear = i / tendrils * 0.7;
+      final grown = ((etch - appear) / 0.3).clamp(0.0, 1.0);
+      if (grown <= 0) continue;
+      final depth = (0.45 + 0.55 * deep) * (0.35 + 0.65 * etch);
+      final curl = _Curl.tendril(origin, heading, length, inside * turns);
+      final reach = grown * length;
+      cut(curl, reach, depth);
+      if (branches) {
+        final from = branchAt * length;
+        cut(
+            _Curl.tendril(
+                curl.at(branchAt),
+                curl.headingAt(branchAt) - inside * branchLean,
+                branchLength,
+                -inside * branchTurns),
+            (reach - from) / (length - from) * branchLength,
+            depth * 0.8);
+      }
+    }
+
+    // Small S-scrolls between, from a third of the way on.
+    final scrolls = (w * h / 7000).clamp(1, 32).round();
+    for (var i = 0; i < scrolls; i++) {
+      final from = Offset(rnd.nextDouble() * w, rnd.nextDouble() * h);
+      final heading = rnd.nextDouble() * 2 * math.pi;
+      final length = 40 + 40 * rnd.nextDouble();
+      final turns = (1 + 0.5 * rnd.nextDouble()) * 2 * math.pi;
+      final way = rnd.nextBool() ? 1.0 : -1.0;
+      final deep = rnd.nextDouble();
+
+      final appear = 0.3 + 0.6 * i / scrolls;
+      final grown = ((etch - appear) / 0.15).clamp(0.0, 1.0);
+      if (grown <= 0) continue;
+      cut(_Curl.scroll(from, heading, length, way * turns), grown * length,
+          (0.3 + 0.4 * deep) * (0.35 + 0.65 * etch));
+    }
+
+    return GlassEtching._([
+      for (var k = 0; k < _depths; k++)
+        (path: shade[k], lit: false, depth: _strength(k)),
+      for (var k = 0; k < _depths; k++)
+        (path: lit[k], lit: true, depth: _strength(k)),
+    ]);
   }
 
   /// How strongly a groove of depth [k] shows: the deep ones most, but
-  /// mostly they are wider and their walls further apart — and none as
-  /// sharply as a crack, which shows the [Glass.scratch] and [Glass.glint]
-  /// in full.
-  static double _strength(int k) => 0.35 + 0.4 * (k + 1) / _depths;
-
-  /// A scratch from [a] to [b] bending through [mid]: a sliver [width]
-  /// across the middle, coming to a point at either end.
-  static void _sliver(Path path, Offset a, Offset mid, Offset b, double width) {
-    final d = b - a;
-    if (d.distance == 0) return;
-    final n = Offset(-d.dy, d.dx) / d.distance * width;
-    path
-      ..moveTo(a.dx, a.dy)
-      ..quadraticBezierTo(mid.dx + n.dx, mid.dy + n.dy, b.dx, b.dy)
-      ..quadraticBezierTo(mid.dx - n.dx, mid.dy - n.dy, a.dx, a.dy)
-      ..close();
-  }
-
-  /// Cracks in a [w] by [h] piece, [grow]n that far (0 to 1) of their
-  /// length: one, and one more for each 60 000 square pixels, up to four,
-  /// each later one starting later. Each is a star of two or three runs
-  /// from where the glass was struck, aimed roughly at the middle.
-  static List<WearMark> _cracks(double w, double h, double grow, int seed) {
-    final rnd = math.Random(seed ^ 0x2545F491);
-    final count = (1 + w * h / 60000).floor().clamp(1, 4);
-    final lines = [for (var i = 0; i < 3; i++) Path()];
-    final glints = [for (var i = 0; i < 3; i++) Path()];
-    final chips = Path();
-    for (var c = 0; c < count; c++) {
-      // Where it starts: on an edge, nearer a corner more often than not.
-      final side = rnd.nextInt(4);
-      final t = rnd.nextDouble();
-      final at = t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
-      final origin = switch (side) {
-        0 => Offset(at * w, 0),
-        1 => Offset(w, at * h),
-        2 => Offset((1 - at) * w, h),
-        _ => Offset(0, (1 - at) * h),
-      };
-      final middle = Offset(w / 2, h / 2) - origin;
-      final aim = math.atan2(middle.dy, middle.dx) + (rnd.nextDouble() - 0.5);
-      final length = (0.35 + 0.45 * rnd.nextDouble()) * (w + h) / 2;
-      final segments = <(Offset, Offset, double, int)>[];
-      final runs = 2 + rnd.nextInt(2);
-      for (var r = 0; r < runs; r++) {
-        final spread = (r - (runs - 1) / 2) * (0.35 + 0.3 * rnd.nextDouble());
-        final reach = r == runs ~/ 2 ? 1.0 : 0.45 + 0.4 * rnd.nextDouble();
-        _crack(rnd, segments, origin, aim + spread, length * reach, 0, 0);
-      }
-      final chip = [
-        for (var i = 0; i < 6; i++)
-          (
-            i * math.pi / 3 + rnd.nextDouble() * 0.6,
-            0.6 + 0.4 * rnd.nextDouble()
-          )
-      ];
-      final size = 2.5 + 3 * rnd.nextDouble();
-
-      final starts = c / count * 0.6;
-      final g = (grow - starts) / (1 - starts);
-      if (g <= 0) continue;
-      final reach = g * length;
-      for (final (a, b, end, level) in segments) {
-        final begin = end - (b - a).distance;
-        if (begin >= reach) continue;
-        final stop = end <= reach
-            ? b
-            : Offset.lerp(a, b, (reach - begin) / (end - begin))!;
-        lines[level]
-          ..moveTo(a.dx - 0.5, a.dy - 0.5)
-          ..lineTo(stop.dx - 0.5, stop.dy - 0.5);
-        glints[level]
-          ..moveTo(a.dx + 0.5, a.dy + 0.5)
-          ..lineTo(stop.dx + 0.5, stop.dy + 0.5);
-      }
-      chips.addPolygon([
-        for (final (angle, r) in chip)
-          origin + Offset(math.cos(angle), math.sin(angle)) * (size * r),
-      ], true);
-    }
-    return [
-      for (var l = 0; l < 3; l++) ...[
-        (
-          path: lines[l],
-          lit: false,
-          depth: 1.0 - 0.15 * l,
-          width: 1.3 - 0.25 * l
-        ),
-        (
-          path: glints[l],
-          lit: true,
-          depth: 1.0 - 0.15 * l,
-          width: 0.9 - 0.2 * l
-        ),
-      ],
-      (path: chips, lit: false, depth: 0.4, width: null),
-      (path: chips, lit: true, depth: 0.8, width: 0.8),
-    ];
-  }
-
-  /// One run of a crack into [into] — (from, to, how far along at the end,
-  /// branch level) — from [from] at [angle] for [length], from [distance]
-  /// along: as glass cracks, straight stretches with a sharp turn now and
-  /// then, and a branch off to one side, two levels deep.
-  static void _crack(math.Random rnd, List<(Offset, Offset, double, int)> into,
-      Offset from, double angle, double length, double distance, int level) {
-    var at = from, run = 0.0;
-    while (run < length) {
-      final step = 10 + rnd.nextDouble() * 16;
-      final kink = rnd.nextDouble() < 0.18;
-      angle += (rnd.nextDouble() - 0.5) * (kink ? 0.9 : 0.25);
-      final next = at + Offset(math.cos(angle), math.sin(angle)) * step;
-      run += step;
-      into.add((at, next, distance + run, level));
-      if (level < 2 && rnd.nextDouble() < 0.25) {
-        final side = rnd.nextBool() ? 1 : -1;
-        _crack(
-            rnd,
-            into,
-            next,
-            angle + side * (0.35 + rnd.nextDouble() * 0.5),
-            (length - run) * (0.3 + rnd.nextDouble() * 0.35),
-            distance + run,
-            level + 1);
-      }
-      at = next;
-    }
-  }
+  /// mostly they are wider and their walls further apart.
+  static double _strength(int k) => 0.45 + 0.55 * (k + 1) / _depths;
 }
 
-/// [glass]'s wear on the piece of it at [rect], marked by [seed] (see
-/// [GlassWear]).
-void paintWear(Canvas canvas, Rect rect, Glass glass, int seed) {
-  if (glass.wear <= 0) return;
-  final wear = GlassWear.of(rect.size, glass.wear, seed);
-  if (wear.marks.isEmpty) return;
+/// A flourish's centre line: from [from], setting off at a heading that
+/// [turning] (of how far along, 0 to 1) turns as it goes, [length] long;
+/// its groove as wide as [width] of that, with a bead at the heart of each
+/// curl.
+class _Curl {
+  _Curl(Offset from, double heading, this.length,
+      {required double Function(double u) turning,
+      required double wind,
+      required this.width,
+      required this.beadAtStart}) {
+    // Fine enough for the heading to turn no more than 0.22 a step where
+    // the curl is tightest ([wind]: the most it turns per whole length).
+    _steps = (length / 2 + wind / 0.22).ceil();
+    var at = from;
+    _points.add(at);
+    _headings.add(heading);
+    for (var j = 0; j < _steps; j++) {
+      final mid = heading + turning((j + 0.5) / _steps);
+      at += Offset(math.cos(mid), math.sin(mid)) * (length / _steps);
+      _points.add(at);
+      _headings.add(heading + turning((j + 1) / _steps));
+    }
+  }
+
+  /// A tendril: a gentle arc for its first [_tail], then a volute winding
+  /// [turns] (radians; the sign, which way) in to its heart; widest at its
+  /// root.
+  factory _Curl.tendril(
+          Offset from, double heading, double length, double turns) =>
+      _Curl(from, heading, length,
+          turning: (u) => u < _tail
+              ? turns.sign * 0.6 * (u / _tail) * (u / _tail)
+              : turns.sign * 0.6 + turns * _volute((u - _tail) / (1 - _tail)),
+          wind: _wind * turns.abs() / (1 - _tail),
+          width: (u) => 1 - 0.8 * u,
+          beadAtStart: false);
+
+  /// An S-scroll: out of one volute and into another wound the other way,
+  /// [turns] each; widest in the middle.
+  factory _Curl.scroll(
+          Offset from, double heading, double length, double turns) =>
+      _Curl(from, heading, length,
+          turning: (u) => turns * (_volute((2 * u - 1).abs()) - 1),
+          wind: 2 * _wind * turns.abs(),
+          width: (u) => 0.3 + 0.7 * math.sin(math.pi * u),
+          beadAtStart: true);
+
+  /// How much of a tendril's length is the arc before its volute.
+  static const _tail = 0.35;
+
+  /// A volute's turning so far, 0 to 1, [x] of the way along it: a
+  /// logarithmic spiral, the radius shrinking by the same share each turn
+  /// to [_heart] of where it began — evenly spaced turns, to the eye, and
+  /// a heart for the bead.
+  static double _volute(double x) =>
+      math.log(1 - (1 - _heart) * x) / math.log(_heart);
+  static const _heart = 0.15;
+
+  /// The most a volute turns, per its length, for each radian it turns in
+  /// all: where it is tightest, at its heart.
+  static final _wind = (1 - _heart) / _heart / -math.log(_heart);
+
+  final double length;
+  final double Function(double u) width;
+  final bool beadAtStart;
+  late final int _steps;
+  final _points = <Offset>[];
+  final _headings = <double>[];
+
+  Offset at(double u) => _points[(u * _steps).round()];
+  double headingAt(double u) => _headings[(u * _steps).round()];
+
+  /// The groove's edge as far as [reach], [wide] at its widest, moved by
+  /// [shift]: tapering to a point where it is still growing.
+  List<Offset> outline(double reach, double wide, Offset shift) {
+    final last = (reach / length * _steps).round().clamp(1, _steps);
+    final left = <Offset>[], right = <Offset>[];
+    for (var j = 0; j <= last; j++) {
+      final u = j / _steps;
+      final tip =
+          reach >= length ? 1.0 : ((reach - u * length) / 6).clamp(0.0, 1.0);
+      final half = wide / 2 * width(u) * tip;
+      final h = _headings[j];
+      final across = Offset(-math.sin(h), math.cos(h)) * half;
+      left.add(_points[j] + across + shift);
+      right.add(_points[j] - across + shift);
+    }
+    return [...left, ...right.reversed];
+  }
+
+  /// Where the beads sit, grown as far as [reach]: at the heart of a curl
+  /// once it has wound all the way in.
+  List<Offset> beads(double reach) => [
+        if (beadAtStart) _points.first,
+        if (reach >= length) _points.last,
+      ];
+}
+
+/// What is etched on [glass] at [rect], picked by [seed] (see
+/// [GlassEtching]).
+void paintEtching(Canvas canvas, Rect rect, Glass glass, int seed) {
+  if (glass.etch <= 0) return;
+  final etching = GlassEtching.of(rect.size, glass.etch, seed);
+  if (etching.marks.isEmpty) return;
   canvas
     ..save()
     ..translate(rect.left, rect.top);
-  for (final m in wear.marks) {
-    final c = m.lit ? glass.glint : glass.scratch;
-    final paint = Paint()..color = c.withValues(alpha: c.a * m.depth);
-    if (m.width case final width?) {
-      paint
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = width
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-    }
-    canvas.drawPath(m.path, paint);
+  for (final m in etching.marks) {
+    final c = m.lit ? glass.glint : glass.groove;
+    canvas.drawPath(
+        m.path, Paint()..color = c.withValues(alpha: c.a * m.depth));
   }
   canvas.restore();
 }
@@ -943,7 +963,7 @@ void paintWear(Canvas canvas, Rect rect, Glass glass, int seed) {
 /// A card's decoration: [plain] without glass; on glass, glass that keeps
 /// its accent — the stripe down the left as a capsule inside the edge, or
 /// the outline all round — and room for it. [seed]: what the card shows,
-/// so that on matte glass each has scratches of its own.
+/// so that on matte glass each has spirals of its own.
 Decoration cardDecoration(BuildContext context, BoxDecoration plain,
     {Object? seed}) {
   final glass = Glass.of(context);
