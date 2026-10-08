@@ -118,8 +118,10 @@ but:
   to foreign students (groups with a 3-digit number, e.g. ИСТ-110), built from
   your schedule and shared as a .docx in the portal's own template.
 - **Настройки** — theme (system / light / dark, and in the browser Liquid
-  Glass: clear or matte, with frost that grows on it as fractal crystals —
-  «Сила эффекта» and «Иней»), an optional fingerprint / PIN **app-lock**,
+  Glass: clear or matte, with a pattern of the season growing on it — autumn
+  leaves, frost as fractal crystals, spring flowers, schoolchildren on kick
+  scooters; picked by the date or in «Узор», with «Сила эффекта» and a slider
+  for how much of it), an optional fingerprint / PIN **app-lock**,
   notifications, and **«Отчёты об ошибках»** kept on the device to send by
   hand.
 - **Обновления** — a new release on GitHub shows up as a banner in the app;
@@ -138,7 +140,7 @@ but:
 
 ## What's new — v0.5.2
 
-<img src="docs/screenshots/widget.webp" width="15%" alt="Виджет «Ближайшая пара»"> <img src="docs/screenshots/reminder.webp" width="15%" alt="Напоминание о занятии"> <img src="docs/screenshots/mail-notify.webp" width="15%" alt="Уведомления о новых письмах"> <img src="docs/screenshots/mail-pick.webp" width="15%" alt="Почта: несколько писем выбрано"> <img src="docs/screenshots/crash-reports.webp" width="15%" alt="Отчёты об ошибках"> <img src="docs/screenshots/glass.webp" width="15%" alt="Liquid Glass в браузере">
+<img src="docs/screenshots/widget.webp" width="15%" alt="Виджет «Ближайшая пара»"> <img src="docs/screenshots/reminder.webp" width="15%" alt="Напоминание о занятии"> <img src="docs/screenshots/mail-notify.webp" width="15%" alt="Уведомления о новых письмах"> <img src="docs/screenshots/mail-pick.webp" width="15%" alt="Почта: несколько писем выбрано"> <img src="docs/screenshots/crash-reports.webp" width="15%" alt="Отчёты об ошибках"> <img src="docs/screenshots/glass.webp" width="15%" alt="Liquid Glass в браузере"> <img src="docs/screenshots/glass-seasons.webp" width="15%" alt="Узор по времени года: осенние листья">
 
 **Schedule**
 
@@ -181,8 +183,10 @@ but:
 **In the browser** (the site is updated with every change)
 
 - **Liquid Glass** — **Настройки → Тема оформления**: translucent panels
-  over a coloured background, on top of the light or dark theme. Solid
-  again by itself when the system asks to reduce transparency or increase
+  over a coloured background, on top of the light or dark theme, clear or
+  matte, with a pattern of the season growing on it (**Узор**): leaves in
+  autumn, frost in winter, flowers in spring, schoolchildren on kick
+  scooters in summer. Solid again by itself when the system asks to reduce transparency or increase
   contrast.
 - A layout for computers (see [On a computer](#on-a-computer)).
 - A logo and a progress bar while the app loads, with a way to reload if

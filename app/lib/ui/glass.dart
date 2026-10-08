@@ -4,7 +4,10 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../core/season.dart';
 import 'layout.dart';
+
+export '../core/season.dart';
 
 /// «Liquid Glass», the browser's optional look: panels you see through to
 /// soft colour blobs behind them, each with a bright rim, a sheen along the
@@ -30,9 +33,10 @@ class Glass extends ThemeExtension<Glass> {
     this.shadows = const [],
     this.wash = const [],
     this.grain = 0,
-    this.frost = 0,
-    this.ice = Colors.transparent,
-    this.iceEdge = Colors.transparent,
+    this.ornament = 0,
+    this.season = Season.winter,
+    this.ink = Colors.transparent,
+    this.inkEdge = Colors.transparent,
     this.strength = 1,
   });
 
@@ -50,12 +54,14 @@ class Glass extends ThemeExtension<Glass> {
   /// wallpaper and the glass (0: none, 1: as drawn).
   final double grain;
 
-  /// How far frost has grown on the glass, clear or matte, as on a window
-  /// in winter (0: none, 1: in full; see [GlassFrost]): [ice], as on an arm,
-  /// with its [iceEdge] beside it (see [paintFrost]).
-  final double frost;
-  final Color ice;
-  final Color iceEdge;
+  /// How far the ornament has grown on the glass, clear or matte, as frost
+  /// on a window in winter (0: none, 1: in full; see [GlassOrnament]): what
+  /// the [season] brings — frost, leaves, flowers or children on scooters —
+  /// in [ink], with its [inkEdge] beside it (see [paintOrnament]).
+  final double ornament;
+  final Season season;
+  final Color ink;
+  final Color inkEdge;
 
   /// Matte: frosted.
   bool get scuffed => grain > 0;
@@ -69,7 +75,7 @@ class Glass extends ThemeExtension<Glass> {
   /// This glass at [t] of its strength (0 to 1): the panels, cards and bars
   /// thicken towards [solid], the wallpaper's colour fades towards [base],
   /// and the rim, sheen, shadows and grain soften — the shape stays, and
-  /// the frost is as it was. At 1
+  /// the ornament is as it was. At 1
   /// it is this glass as designed, the one the contrast tests hold to the
   /// most see-through; anything less is thicker, so reads at least as well.
   Glass scaled(double t) {
@@ -98,9 +104,10 @@ class Glass extends ThemeExtension<Glass> {
         for (final s in shadows) s.copyWith(color: fade(s.color, 0.5)),
       ],
       grain: grain * t,
-      frost: frost,
-      ice: ice,
-      iceEdge: iceEdge,
+      ornament: ornament,
+      season: season,
+      ink: ink,
+      inkEdge: inkEdge,
       strength: strength * t,
     );
   }
@@ -158,8 +165,8 @@ class Glass extends ThemeExtension<Glass> {
     solid: Color(0xFFF7F8FD),
     lens: Color(0xF0FFFFFF),
     field: Color(0xBFFFFFFF),
-    ice: Color(0xD9FFFFFF),
-    iceEdge: Color(0x4D334E70),
+    ink: Color(0xD9FFFFFF),
+    inkEdge: Color(0x4D334E70),
     stroke: Color(0xB8FFFFFF),
     line: Color(0x170F1426),
     highlight: Color(0xF2FFFFFF),
@@ -195,8 +202,8 @@ class Glass extends ThemeExtension<Glass> {
     solid: Color(0xFF14182A),
     lens: Color(0x26FFFFFF),
     field: Color(0x3D000000),
-    ice: Color(0x47FFFFFF),
-    iceEdge: Color(0x66000000),
+    ink: Color(0x47FFFFFF),
+    inkEdge: Color(0x66000000),
     stroke: Color(0x21FFFFFF),
     line: Color(0x1AFFFFFF),
     highlight: Color(0x33FFFFFF),
@@ -237,8 +244,8 @@ class Glass extends ThemeExtension<Glass> {
       BoxShadow(color: Color(0x0F20283F), offset: Offset(0, 1), blurRadius: 3),
     ],
     grain: 1,
-    ice: Color(0x66334E70),
-    iceEdge: Color(0xE6FFFFFF),
+    ink: Color(0x66334E70),
+    inkEdge: Color(0xE6FFFFFF),
   );
 
   static const scuffedDark = Glass(
@@ -264,8 +271,8 @@ class Glass extends ThemeExtension<Glass> {
           spreadRadius: -16),
     ],
     grain: 1,
-    ice: Color(0x47FFFFFF),
-    iceEdge: Color(0x66000000),
+    ink: Color(0x47FFFFFF),
+    inkEdge: Color(0x66000000),
   );
 
   /// Text on glass, and the quieter text under it.
@@ -287,9 +294,9 @@ class Glass extends ThemeExtension<Glass> {
         .withValues(alpha: c.a);
   }
 
-  /// [frost]: matte glass with frost grown that far.
+  /// [ornament]: glass with its ornament grown that far, of [season].
   @override
-  Glass copyWith({bool? on, double? frost}) => Glass(
+  Glass copyWith({bool? on, double? ornament, Season? season}) => Glass(
         on: on ?? this.on,
         base: base,
         blobs: blobs,
@@ -307,9 +314,10 @@ class Glass extends ThemeExtension<Glass> {
         shadows: shadows,
         wash: wash,
         grain: grain,
-        frost: (frost ?? this.frost).clamp(0.0, 1.0),
-        ice: ice,
-        iceEdge: iceEdge,
+        ornament: (ornament ?? this.ornament).clamp(0.0, 1.0),
+        season: season ?? this.season,
+        ink: ink,
+        inkEdge: inkEdge,
         strength: strength,
       );
 
@@ -479,7 +487,7 @@ PageTransitionsTheme wallpaperTransitions() {
 /// a CSS box-shadow does — under see-through glass a whole shadow would show
 /// through as a grey haze. An [accent] stripe down the left side, or an
 /// [outline] all round, marks it as a plain card's border did. On matte
-/// glass, [seed] picks this piece's own frost (by default, its size's).
+/// glass, [seed] picks this piece's own ornament (by default, its size's).
 @immutable
 class GlassDecoration extends Decoration {
   const GlassDecoration(
@@ -586,13 +594,14 @@ class _GlassPainter extends BoxPainter {
               stops: const [0, 0.46],
             ).createShader(rect));
     }
-    // Matte glass's frosting, and frost grown on the glass, moving with it.
-    if ((g.scuffed || g.frost > 0) && d.sheen) {
+    // Matte glass's frosting, and the ornament grown on the glass, moving
+    // with it.
+    if ((g.scuffed || g.ornament > 0) && d.sheen) {
       canvas
         ..save()
         ..clipRRect(shape);
       paintTexture(canvas, rect, GlassTexture.grain, rect.topLeft, g.grain);
-      paintFrost(canvas, rect, g,
+      paintOrnament(canvas, rect, g,
           d.seed ?? Object.hash(rect.width.round(), rect.height.round()));
       canvas.restore();
     }
@@ -706,133 +715,162 @@ void paintTexture(Canvas canvas, Rect rect, ui.Image? texture, Offset origin,
             BlendMode.modulate));
 }
 
-/// Ice of one thickness: [path], to draw at [depth] (0 to 1) of the ice's
-/// colour over its edge, which shows [lift] beside it (see [paintFrost]).
-typedef FrostMark = ({Path path, double depth, double lift});
+/// Ink of one weight: [path], to draw at [depth] (0 to 1) of the ink's
+/// colour over its edge, which shows [lift] beside it (see
+/// [paintOrnament]).
+typedef OrnamentMark = ({Path path, double depth, double lift});
 
-/// Frost on a piece of matte glass, as on a window in winter, grown as
-/// fractal crystals: [GlassFrost.of] its size and how far it has grown (0
-/// to 1), as marks to draw in order. Each crystal is a snowflake of six
-/// arms alike; off each arm, pairs of branches at sixty degrees, as ice
-/// branches, shorter towards its tip; each branch the same again, smaller,
-/// three times over. Big ones grow first from the edges — most from the
-/// bottom, seldom from the top — then smaller ones fill the room left.
-/// Where ice reaches ice another crystal got to first, it stops: they meet
-/// but don't cross. A piece's seed keeps its frost as it grows: it only
-/// grows on.
+/// The ornament on a piece of glass, in fine raised lines as frost draws
+/// them on a window, for the time of year ([Season]):
+///
+/// * winter — frost, grown as fractal crystals. Each is a snowflake of six
+///   arms alike; off each arm, pairs of branches at sixty degrees, shorter
+///   towards its tip; each branch the same again, smaller, three times
+///   over. Big ones grow first from the edges — most from the bottom,
+///   seldom from the top — then smaller ones fill the room left. Where ice
+///   reaches ice another crystal got to first, it stops: they meet but
+///   don't cross;
+/// * autumn — maple, birch and oak leaves, veined, fallen into a pile along
+///   the bottom and still falling above it;
+/// * spring — a meadow along the bottom, daisies, blossoms and tulips on
+///   stems with leaves among the grass, and blossoms drifting above;
+/// * summer — schoolchildren with backpacks riding kick scooters along the
+///   bottom, and in a tall panel along lanes above it.
+///
+/// [GlassOrnament.of] its size, how far it has grown (0 to 1) and the
+/// season, as marks to draw in order. Leaves, flowers and riders keep clear
+/// of each other, each drawn line by line as a pen would. A piece's seed
+/// keeps its ornament as it grows: it only grows on.
 @immutable
-class GlassFrost {
-  const GlassFrost._(this.marks);
+class GlassOrnament {
+  const GlassOrnament._(this.marks);
 
-  final List<FrostMark> marks;
+  final List<OrnamentMark> marks;
 
-  /// Ice by thickness, fine to thick — twigs, branches, arms: one path
-  /// each, to draw at once.
+  /// Ink by weight, fine to bold — for frost: twigs, branches, arms — one
+  /// path each, to draw at once.
   static const _depths = 3;
 
-  static final _made = <(int, int, int, int), GlassFrost>{};
+  static final _made = <(Season, int, int, int, int), GlassOrnament>{};
 
-  static GlassFrost of(Size size, double frost, int seed) {
+  static GlassOrnament of(Size size, double grown, int seed, Season season) {
     final key = (
+      season,
       seed,
       size.width.round(),
       size.height.round(),
-      (frost.clamp(0.0, 1.0) * 100).round(),
+      (grown.clamp(0.0, 1.0) * 100).round(),
     );
     if (_made[key] case final made?) return made;
     if (_made.length >= 128) _made.clear();
     return _made[key] = _make(
-        _Ice.of(Size(key.$2.toDouble(), key.$3.toDouble()), seed),
-        key.$4 / 100);
+        _Sketch.of(Size(key.$3.toDouble(), key.$4.toDouble()), seed, season),
+        key.$5 / 100);
   }
 
-  /// The frost on a piece [size] across, grown in full: each branch as far
-  /// as it got — of which crystal, whether one of the small ones between,
-  /// whether an arm, and how many branchings from one.
+  /// The ornament on a piece [size] across, drawn in full: each line as
+  /// far as it got — of which crystal, leaf, flower or rider; whether one
+  /// of the small ones between; whether it springs from no other line;
+  /// and its weight, 0 the boldest (for frost, how many branchings from an
+  /// arm).
   @visibleForTesting
   static List<
-          ({int frond, bool flake, bool root, int level, List<Offset> line})>
-      fronds(Size size, int seed) {
-    final ice = _Ice.of(size, seed);
+          ({int group, bool small, bool root, int level, List<Offset> line})>
+      strokes(Size size, int seed, Season season) {
+    final sketch = _Sketch.of(size, seed, season);
     return [
-      for (final b in ice.branches)
-        if (b.alive > 0)
+      for (final s in sketch.strokes)
+        if (s.alive > 0)
           (
-            frond: b.frond,
-            flake: ice._flake[b.frond],
-            root: b.parent < 0,
-            level: b.level,
-            line: b.points.sublist(0, b.alive + 1),
+            group: s.group,
+            small: sketch._small[s.group],
+            root: s.parent < 0,
+            level: s.level,
+            line: s.points.sublist(0, s.alive + 1),
           ),
     ];
   }
 
-  static GlassFrost _make(_Ice ice, double frost) {
-    if (frost <= 0) return const GlassFrost._([]);
+  static GlassOrnament _make(_Sketch sketch, double grown) {
+    if (grown <= 0) return const GlassOrnament._([]);
     final paths = [for (var i = 0; i < _depths; i++) Path()];
-    for (final b in ice.branches) {
-      final reach =
-          math.min(ice.reach(b.frond, frost) - b.from, b.alive * _Ice.step);
+    for (final s in sketch.strokes) {
+      final reach = math.min(
+          sketch.reach(s.group, grown) - s.from, s.alive * _Sketch.step);
       if (reach <= 0) continue;
-      final wide = const [1.6, 1.1, 0.75, 0.55][b.level] * (0.6 + 0.4 * frost);
-      paths[_depths - 1 - math.min(b.level, _depths - 1)]
-          .addPolygon(b.outline(reach, wide), true);
+      final wide = const [1.6, 1.1, 0.75, 0.55][s.level] * (0.6 + 0.4 * grown);
+      paths[_depths - 1 - math.min(s.level, _depths - 1)]
+          .addPolygon(s.outline(reach, wide), true);
     }
-    return GlassFrost._([
+    return GlassOrnament._([
       for (var k = 0; k < _depths; k++)
         (path: paths[k], depth: _strength(k), lift: 0.35 + 0.2 * k),
     ]);
   }
 
-  /// How strongly ice of thickness [k] shows: arms most.
+  /// How strongly ink of weight [k] shows: the boldest most.
   static double _strength(int k) => 0.55 + 0.45 * (k + 1) / _depths;
 }
 
-/// Frost on a piece of glass grown in full, the same at any stage: its
-/// branches, where each runs, and how far each got before it met another
-/// frond's ice. [reach] says how far along a frond it has got at a stage.
-class _Ice {
-  final branches = <_Branch>[];
+/// An ornament on a piece of glass drawn in full, the same at any stage:
+/// its strokes, where each runs, and how far each got. Strokes come in
+/// groups — a crystal, a leaf, a flower, a rider — each drawn from a stage
+/// of its own on; [reach] says how far along a group it has got at a stage.
+class _Sketch {
+  final strokes = <_Stroke>[];
 
-  /// For each crystal: the stage it starts at, how many stages it takes to
-  /// grow in full, its farthest point along it, and whether it is one of
-  /// the small ones between.
+  /// For each group: the stage it starts at, how many stages it takes to
+  /// draw in full, how far it runs along it, and whether it is one of the
+  /// small ones between.
   final _appear = <double>[], _span = <double>[], _longest = <double>[];
-  final _flake = <bool>[];
+  final _small = <bool>[];
 
   /// For each crystal: how long its arms are.
   final _radius = <double>[];
 
-  /// Pixels between a branch's points.
+  /// Pixels between a stroke's points.
   static const step = 2.0;
 
-  /// Ice keeps this far (a cell, in pixels) from another frond's.
+  /// Ice keeps this far (a cell, in pixels) from another crystal's; a
+  /// drawing, two cells from another (a tuft of grass, one).
   static const _cell = 3.0;
 
-  /// How far past the edges ice is kept track of: a crystal centred on one
-  /// spreads out past it too.
+  /// How far past the edges the ornament is kept track of: a crystal
+  /// centred on one spreads out past it too.
   static const _margin = 24.0;
 
-  double reach(int frond, double stage) =>
-      (stage - _appear[frond]) / _span[frond] * _longest[frond];
+  double reach(int group, double stage) =>
+      (stage - _appear[group]) / _span[group] * _longest[group];
 
-  double _time(int frond, double along) =>
-      _appear[frond] + along / _longest[frond] * _span[frond];
+  double _time(int group, double along) =>
+      _appear[group] + along / _longest[group] * _span[group];
 
-  static final _grown = <(int, int, int), _Ice>{};
+  static final _drawn = <(Season, int, int, int), _Sketch>{};
 
-  static _Ice of(Size size, int seed) {
-    final key = (seed, size.width.round(), size.height.round());
-    if (_grown[key] case final ice?) return ice;
-    if (_grown.length >= 64) _grown.clear();
-    return _grown[key] = _grow(size, seed);
+  static _Sketch of(Size size, int seed, Season season) {
+    final key = (season, seed, size.width.round(), size.height.round());
+    if (_drawn[key] case final sketch?) return sketch;
+    if (_drawn.length >= 64) _drawn.clear();
+    final sketch = _Sketch();
+    if (size.width > 0 && size.height > 0) {
+      final rnd = math.Random(seed);
+      switch (season) {
+        case Season.winter:
+          sketch._frost(size, rnd);
+        case Season.autumn:
+          sketch._leaves(size, rnd);
+        case Season.spring:
+          sketch._flowers(size, rnd);
+        case Season.summer:
+          sketch._riders(size, rnd);
+      }
+    }
+    return _drawn[key] = sketch;
   }
 
-  static _Ice _grow(Size size, int seed) {
+  /// Winter: frost grown as fractal crystals (see [GlassOrnament]).
+  void _frost(Size size, math.Random rnd) {
     final w = size.width, h = size.height;
-    final ice = _Ice();
-    if (w <= 0 || h <= 0) return ice;
-    final rnd = math.Random(seed);
     final small = math.min(w, h);
 
     // Big crystals centred on the edges, the frost creeping in.
@@ -864,7 +902,7 @@ class _Ice {
       final arm = _arm(rnd, radius);
       if (centre == null) continue;
       centres.add(centre);
-      ice._crystal(centre, turn, arm, i / count * 0.45, 0.4,
+      _crystal(centre, turn, arm, i / count * 0.45, 0.4,
           inwards: inwards, small: false);
     }
 
@@ -875,23 +913,17 @@ class _Ice {
       final radius =
           math.min(50.0, (0.12 + 0.18 * rnd.nextDouble()) * small + 4);
       final turn = rnd.nextDouble() * math.pi / 3;
-      ice._crystal(
-          centre, turn, _arm(rnd, radius), 0.4 + 0.45 * i / flakes, 0.15,
+      _crystal(centre, turn, _arm(rnd, radius), 0.4 + 0.45 * i / flakes, 0.15,
           small: true);
     }
 
     // Grow it all in the order it would grow. Where a step comes within a
-    // cell of another frond's ice, that branch stops; a branch that would
+    // cell of another crystal's ice, that branch stops; a branch that would
     // spring from beyond where its parent stopped never grows.
-    final branches = ice.branches;
     final steps = <(double, int, int)>[
-      for (var b = 0; b < branches.length; b++)
-        for (var j = 0; j < branches[b].points.length - 1; j++)
-          (
-            ice._time(branches[b].frond, branches[b].from + (j + 1) * step),
-            b,
-            j
-          ),
+      for (var b = 0; b < strokes.length; b++)
+        for (var j = 0; j < strokes[b].points.length - 1; j++)
+          (_time(strokes[b].group, strokes[b].from + (j + 1) * step), b, j),
     ]..sort((a, b) => a.$1.compareTo(b.$1));
     final cols = ((w + 2 * _margin) / _cell).ceil() + 1,
         rows = ((h + 2 * _margin) / _cell).ceil() + 1;
@@ -900,31 +932,31 @@ class _Ice {
           ((p.dx + _margin) / _cell).floor(),
           ((p.dy + _margin) / _cell).floor()
         );
-    bool free(Offset p, int frond) {
+    bool free(Offset p, int group) {
       final (cx, cy) = cell(p);
       for (var y = math.max(0, cy - 1); y <= math.min(rows - 1, cy + 1); y++) {
         for (var x = math.max(0, cx - 1);
             x <= math.min(cols - 1, cx + 1);
             x++) {
           final o = owner[y * cols + x];
-          if (o >= 0 && o != frond) return false;
+          if (o >= 0 && o != group) return false;
         }
       }
       return true;
     }
 
-    void take(Offset p, int frond) {
+    void take(Offset p, int group) {
       final (cx, cy) = cell(p);
       if (cx >= 0 && cy >= 0 && cx < cols && cy < rows) {
-        owner[cy * cols + cx] = frond;
+        owner[cy * cols + cx] = group;
       }
     }
 
     // A small crystal grows only where there is room for it whole — not a
     // stray arm or two squeezed in between.
     bool roomy(int crystal) {
-      final centre = branches.firstWhere((b) => b.frond == crystal).points[0];
-      final r = ice._radius[crystal] * 0.8;
+      final centre = strokes.firstWhere((s) => s.group == crystal).points[0];
+      final r = _radius[crystal] * 0.8;
       for (var y = centre.dy - r; y <= centre.dy + r; y += _cell) {
         for (var x = centre.dx - r; x <= centre.dx + r; x += _cell) {
           final p = Offset(x, y);
@@ -935,31 +967,30 @@ class _Ice {
     }
 
     final room = <int, bool>{};
-    final stopped = List.filled(branches.length, false);
+    final stopped = List.filled(strokes.length, false);
     for (final (_, b, j) in steps) {
       if (stopped[b]) continue;
-      final branch = branches[b];
-      if (ice._flake[branch.frond] &&
-          !room.putIfAbsent(branch.frond, () => roomy(branch.frond))) {
+      final stroke = strokes[b];
+      if (_small[stroke.group] &&
+          !room.putIfAbsent(stroke.group, () => roomy(stroke.group))) {
         stopped[b] = true;
         continue;
       }
-      final a = branch.points[j], z = branch.points[j + 1];
+      final a = stroke.points[j], z = stroke.points[j + 1];
       final mid = Offset.lerp(a, z, 0.5)!;
       final sprung = j > 0 ||
-          (branch.parent < 0
-              ? free(a, branch.frond)
-              : branches[branch.parent].alive * step >= branch.at);
-      if (!sprung || !free(mid, branch.frond) || !free(z, branch.frond)) {
+          (stroke.parent < 0
+              ? free(a, stroke.group)
+              : strokes[stroke.parent].alive * step >= stroke.at);
+      if (!sprung || !free(mid, stroke.group) || !free(z, stroke.group)) {
         stopped[b] = true;
         continue;
       }
-      if (j == 0) take(a, branch.frond);
-      take(mid, branch.frond);
-      take(z, branch.frond);
-      branch.alive = j + 1;
+      if (j == 0) take(a, stroke.group);
+      take(mid, stroke.group);
+      take(z, stroke.group);
+      stroke.alive = j + 1;
     }
-    return ice;
   }
 
   /// A crystal of six [arm]s alike about [centre], the first at [turn],
@@ -969,20 +1000,20 @@ class _Ice {
   void _crystal(
       Offset centre, double turn, List<_Shoot> arm, double appear, double span,
       {double? inwards, required bool small}) {
-    final crystal = _appear.length, first = branches.length;
+    final crystal = _appear.length, first = strokes.length;
     for (var a = 0; a < 6; a++) {
       final angle = turn + a * math.pi / 3;
       if (inwards != null && math.cos(angle - inwards) < -0.5) continue;
       final (sin, cos) = (math.sin(angle), math.cos(angle));
       Offset turned(Offset p) =>
           Offset(p.dx * cos - p.dy * sin, p.dx * sin + p.dy * cos);
-      final base = branches.length;
+      final base = strokes.length;
       for (final shoot in arm) {
         final heading = shoot.heading + angle;
         final from = centre + turned(shoot.from);
         final along = Offset(math.cos(heading), math.sin(heading)) * step;
         final steps = (shoot.length / step).floor();
-        branches.add(_Branch(
+        strokes.add(_Stroke(
             crystal,
             shoot.level,
             shoot.parent < 0 ? -1 : base + shoot.parent,
@@ -992,13 +1023,13 @@ class _Ice {
             List.filled(steps + 1, heading)));
       }
     }
-    if (branches.length == first) return;
+    if (strokes.length == first) return;
     _appear.add(appear);
     _span.add(span);
-    _flake.add(small);
+    _small.add(small);
     _radius.add(arm.first.length);
     _longest.add(
-        branches.skip(first).map((b) => b.from + b.length).reduce(math.max));
+        strokes.skip(first).map((s) => s.from + s.length).reduce(math.max));
   }
 
   /// One arm of a crystal, [length] long, laid out from the origin along
@@ -1037,10 +1068,535 @@ class _Ice {
     grow(Offset.zero, 0, length, 0, -1, 0, 0);
     return shoots;
   }
+
+  /// A drawing: [lines] in the order a pen draws them, one group from
+  /// stage [appear] on, drawn in full [span] stages later.
+  void _draw(List<_Line> lines, double appear, double span,
+      {bool small = false}) {
+    final group = _appear.length;
+    var along = 0.0;
+    for (final line in lines) {
+      if (line.points.length < 2) continue;
+      final stroke = _Stroke(
+          group, line.level, -1, 0, along, line.points, _headings(line.points),
+          pen: !line.taper)
+        ..alive = line.points.length - 1;
+      strokes.add(stroke);
+      along += stroke.length;
+    }
+    if (along == 0) return;
+    _appear.add(appear);
+    _span.add(span);
+    _small.add(small);
+    _radius.add(0);
+    _longest.add(along);
+  }
+
+  /// [drawings] one after another, from [first] to [last] of the stages,
+  /// each drawn in [span].
+  void _drawAll(
+      List<List<_Line>> drawings, double first, double last, double span,
+      {bool small = false}) {
+    for (final (i, lines) in drawings.indexed) {
+      _draw(lines, first + (last - first) * i / drawings.length, span,
+          small: small);
+    }
+  }
+
+  /// Which way [points] head at each: from the one before to the one
+  /// after; at the ends of a closed line, across where they meet.
+  static List<double> _headings(List<Offset> points) {
+    final n = points.length;
+    final closed = n > 2 && (points.first - points.last).distance < 0.5;
+    return [
+      for (var j = 0; j < n; j++)
+        closed && (j == 0 || j == n - 1)
+            ? (points[1] - points[n - 2]).direction
+            : (points[math.min(j + 1, n - 1)] - points[math.max(j - 1, 0)])
+                .direction,
+    ];
+  }
+
+  /// Autumn: leaves fallen into a pile along the bottom and still falling
+  /// above it, the lowest drawn first.
+  void _leaves(Size size, math.Random rnd) {
+    final w = size.width, h = size.height;
+    final room = _Room(size);
+    final short = math.min(w, h);
+    final fallen = <(double, List<_Line>)>[];
+    final count = (w * h / 1600).clamp(2, 64).round();
+    for (var i = 0; i < count; i++) {
+      // How far up it lies — low down likeliest: they fall. Where there is
+      // no room left at that height, it doesn't land higher up instead:
+      // they pile up.
+      final up = _pow(rnd.nextDouble(), 2.2);
+      for (var tries = 0; tries < 8; tries++) {
+        final length =
+            math.min(46.0, (0.26 + 0.22 * rnd.nextDouble()) * short + 8);
+        final drop = h + 0.15 * length;
+        final at = Offset(rnd.nextDouble() * w, drop - drop * up);
+        final leaf = switch (rnd.nextInt(3)) {
+          0 => _maple(rnd),
+          1 => _birch(rnd),
+          _ => _oak(rnd),
+        };
+        final lines = _lay(
+            leaf,
+            _place(at, length,
+                turn: rnd.nextDouble() * 2 * math.pi,
+                flip: rnd.nextBool(),
+                from: const Offset(0, -0.5)));
+        if (!room.fits(lines, at, 0.5 * length)) continue;
+        room.take(lines, at, 0.5 * length);
+        fallen.add((at.dy, lines));
+        break;
+      }
+    }
+    fallen.sort((a, b) => b.$1.compareTo(a.$1));
+    _drawAll([for (final (_, lines) in fallen) lines], 0, 0.92, 0.08);
+  }
+
+  /// A maple leaf, a unit long from its stalk at the origin up to its tip:
+  /// five pointed lobes, toothed, a vein to each.
+  static List<_Line> _maple(math.Random rnd) {
+    const centre = Offset(0, -0.36);
+    Offset polar(double degrees, double r) {
+      final a = degrees * math.pi / 180;
+      return centre + Offset(math.sin(a), -math.cos(a)) * r;
+    }
+
+    // Each lobe: where it points (degrees from up), half as wide, how far
+    // out its tip is.
+    final lobes = [
+      for (final (mid, half, tip) in const [
+        (-108.0, 24.0, 0.34),
+        (-56.0, 26.0, 0.54),
+        (0.0, 28.0, 0.62),
+        (56.0, 26.0, 0.54),
+        (108.0, 24.0, 0.34),
+      ])
+        (mid, half, tip * (0.9 + 0.2 * rnd.nextDouble())),
+    ];
+    double radius(double degrees) {
+      for (final (mid, half, tip) in lobes) {
+        final t = (degrees - mid).abs() / half;
+        if (t > 1) continue;
+        final r = 0.2 + (tip - 0.2) * _pow(1 - t, 1.3);
+        // Teeth along its sides.
+        final tooth = (degrees - mid).abs() / 10 % 1;
+        return t > 0.15 && t < 0.8 ? r * (1 + 0.08 * tooth) : r;
+      }
+      // Between the lowest lobes, in to the stalk.
+      return 0.2 - 0.13 * ((degrees.abs() - 132) / 48).clamp(0.0, 1.0);
+    }
+
+    final bend = (rnd.nextDouble() - 0.5) * 0.12;
+    return _bent(bend, [
+      _pen([
+        for (var d = -178.0; d <= 178; d += 2) polar(d, radius(d)),
+        polar(-178, radius(-178)),
+      ]),
+      _pen(
+          _smooth([
+            polar(180, 0.07),
+            const Offset(0.01, -0.15),
+            const Offset(0.03, 0)
+          ]),
+          1),
+      for (final (mid, _, tip) in lobes)
+        _pen([const Offset(0, -0.32), polar(mid, tip * 0.8)], 2),
+    ]);
+  }
+
+  /// A birch leaf, a unit long from its stalk at the origin up to its tip:
+  /// broad near the stalk, pointed, finely toothed; a midrib and veins off
+  /// it in pairs.
+  static List<_Line> _birch(math.Random rnd) {
+    final wide = 0.32 + 0.08 * rnd.nextDouble();
+    double y(double t) => -0.1 - 0.9 * t;
+    double half(double t) {
+      final h = wide * _pow(math.sin(math.pi * _pow(t, 0.7)), 0.9);
+      return t > 0.08 && t < 0.94 ? h * (1 + 0.06 * (t * 18 % 1)) : h;
+    }
+
+    return _bent((rnd.nextDouble() - 0.5) * 0.25, [
+      _pen(_outline(half, y)),
+      _pen(
+          _smooth([
+            Offset(0, y(0)),
+            const Offset(0.01, 0),
+            const Offset(0.03, 0.1)
+          ]),
+          1),
+      _pen([for (var t = 0.0; t <= 0.96; t += 0.08) Offset(0, y(t))], 1),
+      for (final t in const [0.16, 0.3, 0.44, 0.58, 0.72])
+        for (final side in const [-1.0, 1.0])
+          _pen([
+            Offset(0, y(t)),
+            Offset(side * 0.78 * half(t + 0.09), y(t + 0.09))
+          ], 2),
+    ]);
+  }
+
+  /// An oak leaf, a unit long from its stalk at the origin up to its tip:
+  /// round lobes, a midrib and a vein out to each.
+  static List<_Line> _oak(math.Random rnd) {
+    final wide = 0.3 + 0.06 * rnd.nextDouble();
+    const lobes = 4.5;
+    double y(double t) => -0.08 - 0.92 * t;
+    double half(double t) =>
+        wide *
+        math.sin(math.pi * _pow(t, 0.85)) *
+        (0.58 + 0.42 * _pow(math.sin(math.pi * lobes * t).abs(), 0.6));
+
+    return _bent((rnd.nextDouble() - 0.5) * 0.25, [
+      _pen(_outline(half, y)),
+      _pen([Offset(0, y(0)), const Offset(0.01, 0.05)], 1),
+      _pen([for (var t = 0.0; t <= 0.94; t += 0.08) Offset(0, y(t))], 1),
+      for (var k = 0; k < 4; k++)
+        for (final side in const [-1.0, 1.0])
+          _pen([
+            Offset(0, y((k + 0.5) / lobes - 0.06)),
+            Offset(side * 0.75 * half((k + 0.5) / lobes), y((k + 0.5) / lobes)),
+          ], 2),
+    ]);
+  }
+
+  /// A leaf's outline, [half] as wide at each [y] along it (0 the stalk, 1
+  /// the tip): up the right side and down the left.
+  static List<Offset> _outline(
+      double Function(double) half, double Function(double) y) {
+    const n = 72;
+    return [
+      for (var i = 0; i <= n; i++) Offset(half(i / n), y(i / n)),
+      for (var i = n - 1; i >= 0; i--) Offset(-half(i / n), y(i / n)),
+    ];
+  }
+
+  /// [lines] bent sideways by [bend], the more the farther up.
+  static List<_Line> _bent(double bend, List<_Line> lines) => [
+        for (final l in lines)
+          (
+            points: [
+              for (final p in l.points) Offset(p.dx + bend * p.dy * p.dy, p.dy)
+            ],
+            level: l.level,
+            taper: l.taper,
+          ),
+      ];
+
+  /// Spring: a meadow along the bottom — daisies, blossoms and tulips on
+  /// stems with leaves, grass between — then blossoms drifting above.
+  void _flowers(Size size, math.Random rnd) {
+    final w = size.width, h = size.height;
+    final room = _Room(size);
+    final tall = math.min(h, 150.0);
+
+    final meadow = <List<_Line>>[];
+    for (var x = 4 + 10 * rnd.nextDouble(); x < w - 4;) {
+      var grown = false;
+      for (var tries = 0; tries < 5 && !grown; tries++) {
+        var height = (0.4 + 0.4 * rnd.nextDouble()) * tall + 6;
+        final head = (0.17 * height).clamp(5.0, 16.0);
+        // Its head on the glass, whole.
+        height = math.min(height, h - 3 - 2 * head);
+        if (height < 2 * head) continue;
+        final lines = _flower(rnd, Offset(x, h + 2), height, head);
+        final top = Offset(x, h - height);
+        if (!room.fits(lines, top, head)) continue;
+        room.take(lines, top, head);
+        meadow.add(lines);
+        grown = true;
+      }
+      x += grown ? 8 + 14 * rnd.nextDouble() : 6;
+    }
+    meadow.shuffle(rnd);
+
+    final grass = <List<_Line>>[];
+    for (var x = 6 * rnd.nextDouble(); x < w; x += 5 + 6 * rnd.nextDouble()) {
+      final lines = _tuft(
+          rnd, Offset(x, h + 1), (0.1 + 0.1 * rnd.nextDouble()) * tall + 4);
+      if (!room.fits(lines, Offset(x, h), 0, gap: 1)) continue;
+      room.take(lines, Offset(x, h), 0);
+      grass.add(lines);
+    }
+    grass.shuffle(rnd);
+
+    final drifting = <List<_Line>>[];
+    final count = (w * h / 4000).clamp(1, 36).round();
+    for (var i = 0; i < count; i++) {
+      for (var tries = 0; tries < 6; tries++) {
+        final r = math.min(12.0, (0.03 + 0.05 * rnd.nextDouble()) * tall + 4);
+        final at = Offset(rnd.nextDouble() * w, rnd.nextDouble() * h * 0.9);
+        final lines = r < 8 || rnd.nextDouble() < 0.6
+            ? _blossom(rnd, at, r)
+            : _daisy(rnd, at, r);
+        if (!room.fits(lines, at, r)) continue;
+        room.take(lines, at, r);
+        drifting.add(lines);
+        break;
+      }
+    }
+
+    _drawAll(meadow, 0, 0.5, 0.12);
+    _drawAll(grass, 0.05, 0.55, 0.08);
+    _drawAll(drifting, 0.55, 0.92, 0.08, small: true);
+  }
+
+  /// A flower on a stem from [ground], [height] tall, its head [head]
+  /// across: a daisy, a blossom or a tulip, a leaf or two on the stem.
+  static List<_Line> _flower(
+      math.Random rnd, Offset ground, double height, double head) {
+    final lean = (rnd.nextDouble() - 0.5) * 0.35 * height;
+    final top = ground + Offset(lean, -height);
+    final stem = _even(_smooth([
+      ground,
+      ground +
+          Offset(lean * 0.2 + (rnd.nextDouble() - 0.5) * 0.1 * height,
+              -0.5 * height),
+      top,
+    ]));
+    final lines = <_Line>[_pen(stem, 1)];
+    final side = rnd.nextBool() ? 1.0 : -1.0;
+    for (var k = 0, n = 1 + rnd.nextInt(2); k < n; k++) {
+      final i = ((0.18 + 0.2 * rnd.nextDouble() + 0.18 * k) * (stem.length - 1))
+          .round()
+          .clamp(1, stem.length - 2);
+      final along = (stem[i + 1] - stem[i - 1]).direction;
+      lines.add(_pen(
+          _blade(
+              stem[i],
+              along +
+                  (k.isEven ? side : -side) * (0.6 + 0.3 * rnd.nextDouble()),
+              math.min(0.3 * height, 24.0),
+              0.24),
+          1));
+    }
+    final kind = rnd.nextDouble();
+    lines.addAll(head >= 8 && kind < 0.4
+        ? _daisy(rnd, top - Offset(0, head), head)
+        : kind < 0.7
+            ? _blossom(rnd, top - Offset(0, head), head, turn: math.pi / 2)
+            : _tulip(top, head));
+    return lines;
+  }
+
+  /// A leaf's outline from [base], [length] long towards [heading], at its
+  /// widest [wide] of its length across.
+  static List<Offset> _blade(
+      Offset base, double heading, double length, double wide) {
+    final along = Offset(math.cos(heading), math.sin(heading)),
+        across = Offset(-along.dy, along.dx);
+    Offset at(double t, double side) =>
+        base +
+        along * (t * length) +
+        across * (side * wide * length / 2 * math.sin(math.pi * _pow(t, 0.8)));
+    return [
+      for (var i = 0; i <= 12; i++) at(i / 12, 1),
+      for (var i = 11; i >= 0; i--) at(i / 12, -1),
+    ];
+  }
+
+  /// A daisy [r] across about [centre]: slim petals round a round heart.
+  static List<_Line> _daisy(math.Random rnd, Offset centre, double r) {
+    final n = 8 + rnd.nextInt(5);
+    final heart = 0.3 * r, turn = rnd.nextDouble() * 2 * math.pi;
+    final inner = heart * 1.35, length = r - inner, mid = (inner + r) / 2;
+    final slim = math.min(0.32 * length, mid * math.pi / n * 0.7);
+    // Petal [k]: a slim loop out from the heart.
+    _Line petal(int k) {
+      final a = turn + 2 * math.pi * k / n;
+      final along = Offset(math.cos(a), math.sin(a)),
+          across = Offset(-along.dy, along.dx);
+      return _pen([
+        for (var i = 0; i <= 16; i++)
+          centre +
+              along * (mid - length / 2 * math.cos(2 * math.pi * i / 16)) +
+              across * (slim * math.sin(2 * math.pi * i / 16)),
+      ], 1);
+    }
+
+    return [
+      _pen(_ring(centre, heart), 1),
+      for (var k = 0; k < n; k++) petal(k)
+    ];
+  }
+
+  /// A blossom [r] across about [centre]: five round petals in one line,
+  /// the first towards [turn], and a small heart.
+  static List<_Line> _blossom(math.Random rnd, Offset centre, double r,
+      {double? turn}) {
+    final from = turn ?? rnd.nextDouble() * 2 * math.pi;
+    Offset edge(double a) {
+      // 1 across a petal's middle, 0 between two.
+      final petal = _pow(math.cos(2.5 * a).abs(), 0.5);
+      return centre +
+          Offset(math.cos(a + from), math.sin(a + from)) *
+              (r * (0.42 + 0.58 * petal));
+    }
+
+    return [
+      _pen([for (var i = 0; i <= 80; i++) edge(2 * math.pi * i / 80)], 1),
+      _pen(_ring(centre, 0.2 * r), 1),
+    ];
+  }
+
+  /// A tulip's cup, [r] across, on [base]: three pointed petals.
+  static List<_Line> _tulip(Offset base, double r) {
+    Offset p(double x, double y) => base + Offset(x, y) * r;
+    return [
+      _pen([
+        ..._smooth([p(0, 0), p(-0.45, -0.25), p(-0.58, -0.75), p(-0.45, -1.3)]),
+        p(-0.22, -0.85),
+        p(0, -1.4),
+        p(0.22, -0.85),
+        ..._smooth([p(0.45, -1.3), p(0.58, -0.75), p(0.45, -0.25), p(0, 0)]),
+      ], 1),
+      _pen(_smooth([p(-0.22, -0.85), p(-0.1, -0.45), p(0.02, -0.15)]), 2),
+    ];
+  }
+
+  /// A tuft of grass from [ground]: two or three blades, [height] tall at
+  /// most, fanning out.
+  static List<_Line> _tuft(math.Random rnd, Offset ground, double height) {
+    final n = 2 + rnd.nextInt(2);
+    _Line blade(int k) {
+      final lean = (k - (n - 1) / 2) * 0.35 * height +
+          (rnd.nextDouble() - 0.5) * 0.2 * height;
+      final tall = height * (0.7 + 0.3 * rnd.nextDouble());
+      final root = ground + Offset(k * 1.5, 0);
+      return (
+        points: _smooth([
+          root,
+          root + Offset(lean * 0.25, -0.55 * tall),
+          root + Offset(lean, -tall),
+        ]),
+        level: 2,
+        taper: true,
+      );
+    }
+
+    return [for (var k = 0; k < n; k++) blade(k)];
+  }
+
+  /// Summer: schoolchildren with backpacks riding kick scooters along the
+  /// bottom, and in a tall panel along lanes above it.
+  void _riders(Size size, math.Random rnd) {
+    final w = size.width, h = size.height;
+    final room = _Room(size);
+    final tall = (0.62 * h).clamp(26.0, 64.0);
+    final riders = <List<_Line>>[];
+    // Above the bottom, lanes far apart and riders few.
+    for (var ground = h - 1; ground - tall >= 2; ground -= tall * 2.2) {
+      final bottom = ground == h - 1;
+      for (var x = (0.2 + 0.6 * rnd.nextDouble()) * tall; x < w;) {
+        final unit = tall * (0.85 + 0.15 * rnd.nextDouble());
+        final rightwards = rnd.nextBool();
+        // From the speed lines behind to the cap's brim in front.
+        final origin = x + (rightwards ? 0.42 : 0.26) * unit;
+        final end = x + 0.68 * unit;
+        if (end > w - 2) break;
+        final lines = _lay(_rider(rnd),
+            _place(Offset(origin, ground), unit, flip: !rightwards));
+        final centre = Offset(origin, ground - 0.45 * unit);
+        if (room.fits(lines, centre, 0.35 * unit)) {
+          room.take(lines, centre, 0.35 * unit);
+          riders.add(lines);
+          x = end +
+              (bottom
+                      ? 0.15 + 0.9 * rnd.nextDouble()
+                      : 0.8 + 2 * rnd.nextDouble()) *
+                  tall;
+        } else {
+          x += 0.2 * tall;
+        }
+      }
+    }
+    riders.shuffle(rnd);
+    _drawAll(riders, 0, 0.92, 0.08);
+  }
+
+  /// A schoolchild with a backpack on a kick scooter, a unit tall, riding
+  /// rightwards along the ground at the origin: in a cap, or with a
+  /// ponytail and a skirt; the free foot kicked back, or down pushing off.
+  static List<_Line> _rider(math.Random rnd) {
+    final girl = rnd.nextBool(), push = rnd.nextDouble();
+    Offset pose(Offset back, Offset down) => Offset.lerp(back, down, push)!;
+    const hip = Offset(-0.03, -0.42), shoulder = Offset(0.05, -0.67);
+    const bar = Offset(0.18, -0.62);
+    final up = (shoulder - hip) / (shoulder - hip).distance;
+    final behind = Offset(up.dy, -up.dx);
+    // The backpack: a rounded box on the back, [a] up it and [b] out
+    // behind; its flap across.
+    Offset pack(double a, double b) => hip + up * a + behind * b;
+    Offset box(double t) {
+      double round(double v) => v.sign * _pow(v.abs(), 0.35);
+      return pack(
+          0.16 + 0.09 * round(math.cos(t)), 0.05 + 0.05 * round(math.sin(t)));
+    }
+
+    return [
+      // The scooter: wheels, deck, the stem up to the handlebar.
+      _pen(_ring(const Offset(-0.22, -0.045), 0.045)),
+      _pen(_ring(const Offset(0.24, -0.045), 0.045)),
+      _pen([const Offset(-0.27, -0.1), const Offset(0.23, -0.1)]),
+      _pen([const Offset(0.24, -0.045), bar]),
+      _pen([const Offset(0.13, -0.64), const Offset(0.22, -0.605)], 1),
+      // Standing on the deck; the other leg kicking.
+      _pen([
+        hip,
+        const Offset(0.05, -0.25),
+        const Offset(0.0, -0.11),
+        const Offset(0.07, -0.105),
+      ]),
+      _pen([
+        hip,
+        pose(const Offset(-0.13, -0.28), const Offset(-0.0, -0.24)),
+        pose(const Offset(-0.3, -0.16), const Offset(-0.05, -0.03)),
+        pose(const Offset(-0.35, -0.11), const Offset(0.02, -0.015)),
+      ]),
+      if (girl)
+        _pen([
+          const Offset(-0.01, -0.5),
+          const Offset(-0.11, -0.36),
+          const Offset(0.07, -0.36),
+          const Offset(-0.01, -0.5),
+        ], 1),
+      // Body, arm to the handlebar, head.
+      _pen([hip, const Offset(0.065, -0.71)]),
+      _pen([
+        shoulder,
+        const Offset(0.125, -0.55),
+        bar + const Offset(-0.005, 0.005)
+      ]),
+      _pen(_ring(const Offset(0.09, -0.81), 0.095)),
+      if (girl)
+        _pen(
+            _smooth([
+              const Offset(0.005, -0.85),
+              const Offset(-0.07, -0.885),
+              const Offset(-0.12, -0.82),
+              const Offset(-0.095, -0.75),
+            ]),
+            1)
+      else
+        _pen([
+          const Offset(-0.003, -0.835),
+          const Offset(0.175, -0.865),
+          const Offset(0.255, -0.845),
+        ], 1),
+      _pen([for (var i = 0; i <= 32; i++) box(2 * math.pi * i / 32)], 1),
+      _pen([pack(0.2, 0), pack(0.2, 0.1)], 2),
+      // Speed lines behind.
+      _pen([const Offset(-0.36, -0.55), const Offset(-0.24, -0.55)], 3),
+      _pen([const Offset(-0.4, -0.42), const Offset(-0.26, -0.42)], 3),
+      _pen([const Offset(-0.42, -0.03), const Offset(-0.31, -0.03)], 3),
+    ];
+  }
 }
 
 /// One branch of a crystal's arm, laid out from the origin along heading 0
-/// (see [_Ice._arm]).
+/// (see [_Sketch._arm]).
 typedef _Shoot = ({
   Offset from,
   double heading,
@@ -1051,36 +1607,179 @@ typedef _Shoot = ({
   double along,
 });
 
-/// A branch of frost, [level] branchings from an arm, of crystal [frond];
-/// springing [at] that far along branch [parent], [from] that far from the
-/// crystal's centre along it; [points] a step apart, of which [alive] steps
-/// grew before it met other ice.
-class _Branch {
-  _Branch(this.frond, this.level, this.parent, this.at, this.from, this.points,
-      this.headings);
+/// A line of a drawing: its [points], of [level] weight (0 the boldest),
+/// narrowing to its end as ice does ([taper]) or even, as a pen draws.
+typedef _Line = ({List<Offset> points, int level, bool taper});
 
-  final int frond, level, parent;
+_Line _pen(List<Offset> points, [int level = 0]) =>
+    (points: points, level: level, taper: false);
+
+double _pow(double x, double e) => math.pow(x, e).toDouble();
+
+/// [lines] laid out on the glass by [place], with points put in between so
+/// that none is farther than a step from the next.
+List<_Line> _lay(List<_Line> lines, Offset Function(Offset) place) => [
+      for (final l in lines)
+        (
+          points: _even([for (final p in l.points) place(p)]),
+          level: l.level,
+          taper: l.taper,
+        ),
+    ];
+
+/// Where a drawing [unit] pixels to its unit goes: its point [from] at
+/// [at], turned by [turn] and, [flip]ped, mirrored.
+Offset Function(Offset) _place(Offset at, double unit,
+    {double turn = 0, bool flip = false, Offset from = Offset.zero}) {
+  final (sin, cos) = (math.sin(turn), math.cos(turn));
+  return (p) {
+    final x = (flip ? from.dx - p.dx : p.dx - from.dx) * unit,
+        y = (p.dy - from.dy) * unit;
+    return at + Offset(x * cos - y * sin, x * sin + y * cos);
+  };
+}
+
+/// [line] with points put in between so that none is farther than a step
+/// from the next, keeping its corners; any too near the last left out.
+List<Offset> _even(List<Offset> line) {
+  final out = <Offset>[];
+  for (final p in line) {
+    if (out.isEmpty) {
+      out.add(p);
+      continue;
+    }
+    final from = out.last, d = (p - from).distance;
+    if (d < 0.4) continue;
+    final n = (d / _Sketch.step).ceil();
+    for (var k = 1; k <= n; k++) {
+      out.add(Offset.lerp(from, p, k / n)!);
+    }
+  }
+  return out;
+}
+
+/// A smooth curve through [knots], [per] points from each to the next.
+List<Offset> _smooth(List<Offset> knots, {int per = 8}) {
+  final n = knots.length;
+  Offset k(int i) => knots[i.clamp(0, n - 1)];
+  // A Catmull-Rom spline: [t] of the way from knot [i] to the next.
+  Offset at(int i, double t) {
+    final p0 = k(i - 1), p1 = k(i), p2 = k(i + 1), p3 = k(i + 2);
+    final t2 = t * t, t3 = t2 * t;
+    return (p1 * 2 +
+            (p2 - p0) * t +
+            (p0 * 2 - p1 * 5 + p2 * 4 - p3) * t2 +
+            (p1 * 3 - p0 - p2 * 3 + p3) * t3) *
+        0.5;
+  }
+
+  return [
+    for (var i = 0; i < n - 1; i++)
+      for (var s = 0; s < per; s++) at(i, s / per),
+    knots.last,
+  ];
+}
+
+/// A circle [r] across about [centre], round to where it started.
+List<Offset> _ring(Offset centre, double r) => [
+      for (var i = 0; i <= 24; i++)
+        centre +
+            Offset(math.cos(2 * math.pi * i / 24),
+                    math.sin(2 * math.pi * i / 24)) *
+                r,
+    ];
+
+/// Where on a piece of glass is drawn on: cells a few pixels across,
+/// reaching a little past its edges, and each drawing's middle and size.
+class _Room {
+  _Room(Size size)
+      : cols = ((size.width + 2 * _Sketch._margin) / _Sketch._cell).ceil() + 1,
+        rows = ((size.height + 2 * _Sketch._margin) / _Sketch._cell).ceil() + 1;
+
+  final int cols, rows;
+  late final _taken = List<bool>.filled(cols * rows, false);
+  final _drawings = <(Offset, double)>[];
+
+  (int, int) _cell(Offset p) => (
+        ((p.dx + _Sketch._margin) / _Sketch._cell).floor(),
+        ((p.dy + _Sketch._margin) / _Sketch._cell).floor()
+      );
+
+  /// Whether [lines] keep [gap] cells clear of all drawn so far, and,
+  /// [centre]d [radius] across, sit neither inside another drawing nor
+  /// round one.
+  bool fits(List<_Line> lines, Offset centre, double radius, {int gap = 2}) {
+    for (final (c, r) in _drawings) {
+      if ((c - centre).distance < 0.5 * (r + radius)) return false;
+    }
+    for (final line in lines) {
+      for (final p in line.points) {
+        final (cx, cy) = _cell(p);
+        for (var y = math.max(0, cy - gap);
+            y <= math.min(rows - 1, cy + gap);
+            y++) {
+          for (var x = math.max(0, cx - gap);
+              x <= math.min(cols - 1, cx + gap);
+              x++) {
+            if (_taken[y * cols + x]) return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  void take(List<_Line> lines, Offset centre, double radius) {
+    _drawings.add((centre, radius));
+    for (final line in lines) {
+      for (final p in line.points) {
+        final (cx, cy) = _cell(p);
+        if (cx >= 0 && cy >= 0 && cx < cols && cy < rows) {
+          _taken[cy * cols + cx] = true;
+        }
+      }
+    }
+  }
+}
+
+/// A stroke of the ornament, of group [group], [level] — for frost,
+/// branchings from an arm — springing [at] that far along stroke [parent]
+/// (none, for a drawing's); [from] that far along its group; [points] a
+/// step apart, of which [alive] steps were drawn — for frost, before it
+/// met other ice. Ice narrows from its root to its tip; a [pen]'s line is
+/// even, thinning a little at its ends.
+class _Stroke {
+  _Stroke(this.group, this.level, this.parent, this.at, this.from, this.points,
+      this.headings,
+      {this.pen = false});
+
+  final int group, level, parent;
   final double at, from;
   final List<Offset> points;
   final List<double> headings;
+  final bool pen;
   int alive = 0;
 
-  double get length => (points.length - 1) * _Ice.step;
+  double get length => (points.length - 1) * _Sketch.step;
 
-  /// Its ice as far as [reach], [wide] at its root and narrowing towards
-  /// its tip, which comes to a point.
+  /// Its line as far as [reach], [wide] at its widest; while still being
+  /// drawn, it comes to a point.
   List<Offset> outline(double reach, double wide) {
-    final last = (reach / _Ice.step).ceil().clamp(1, points.length - 1);
+    final last = (reach / _Sketch.step).ceil().clamp(1, points.length - 1);
+    final done = pen && reach >= length;
     final left = <Offset>[], right = <Offset>[];
     for (var j = 0; j <= last; j++) {
-      final s = math.min(j * _Ice.step, reach);
-      final tip = ((reach - s) / 3).clamp(0.2, 1.0);
-      final half = wide / 2 * (1 - 0.65 * s / length) * tip;
+      final s = math.min(j * _Sketch.step, reach);
+      final tip = done ? 1.0 : ((reach - s) / 3).clamp(0.2, 1.0);
+      final shape = pen
+          ? 0.6 + 0.4 * math.sin(math.pi * s / length)
+          : 1 - 0.65 * s / length;
+      final half = wide / 2 * shape * tip;
       final h = headings[j];
       final across = Offset(-math.sin(h), math.cos(h)) * half;
-      final at = j * _Ice.step > reach
+      final at = j * _Sketch.step > reach
           ? Offset.lerp(points[j - 1], points[j],
-              1 - (j * _Ice.step - reach) / _Ice.step)!
+              1 - (j * _Sketch.step - reach) / _Sketch.step)!
           : points[j];
       left.add(at + across);
       right.add(at - across);
@@ -1089,16 +1788,17 @@ class _Branch {
   }
 }
 
-/// The frost on [glass] at [rect], picked by [seed] (see [GlassFrost]):
-/// the ice in [Glass.ice], standing proud — its edge, [Glass.iceEdge], shows
-/// beside it as light on the side towards the light at the top left, or,
-/// if darker, as shade on the other.
-void paintFrost(Canvas canvas, Rect rect, Glass glass, int seed) {
-  if (glass.frost <= 0) return;
-  final frost = GlassFrost.of(rect.size, glass.frost, seed);
-  if (frost.marks.isEmpty) return;
+/// The ornament on [glass] at [rect], picked by [seed] (see
+/// [GlassOrnament]): its lines in [Glass.ink], standing proud — their
+/// edge, [Glass.inkEdge], shows beside them as light on the side towards
+/// the light at the top left, or, if darker, as shade on the other.
+void paintOrnament(Canvas canvas, Rect rect, Glass glass, int seed) {
+  if (glass.ornament <= 0) return;
+  final ornament =
+      GlassOrnament.of(rect.size, glass.ornament, seed, glass.season);
+  if (ornament.marks.isEmpty) return;
   final towards =
-      glass.iceEdge.computeLuminance() > glass.ice.computeLuminance()
+      glass.inkEdge.computeLuminance() > glass.ink.computeLuminance()
           ? -1.0
           : 1.0;
   Paint paint(Color c, double depth) =>
@@ -1106,12 +1806,12 @@ void paintFrost(Canvas canvas, Rect rect, Glass glass, int seed) {
   canvas
     ..save()
     ..translate(rect.left, rect.top);
-  for (final m in frost.marks) {
+  for (final m in ornament.marks) {
     canvas.drawPath(m.path.shift(Offset(towards, towards) * m.lift),
-        paint(glass.iceEdge, m.depth));
+        paint(glass.inkEdge, m.depth));
   }
-  for (final m in frost.marks) {
-    canvas.drawPath(m.path, paint(glass.ice, m.depth));
+  for (final m in ornament.marks) {
+    canvas.drawPath(m.path, paint(glass.ink, m.depth));
   }
   canvas.restore();
 }
@@ -1119,7 +1819,7 @@ void paintFrost(Canvas canvas, Rect rect, Glass glass, int seed) {
 /// A card's decoration: [plain] without glass; on glass, glass that keeps
 /// its accent — the stripe down the left as a capsule inside the edge, or
 /// the outline all round — and room for it. [seed]: what the card shows,
-/// so that on matte glass each has frost of its own.
+/// so that on glass each has an ornament of its own.
 Decoration cardDecoration(BuildContext context, BoxDecoration plain,
     {Object? seed}) {
   final glass = Glass.of(context);

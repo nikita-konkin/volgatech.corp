@@ -64,25 +64,28 @@ class Brand {
 
 /// [browser]: the web build, which brings its own font (see pubspec.yaml).
 /// [glass]: «Liquid Glass» (glass.dart): clear, at [strength] (0 to 1; 1, as
-/// designed), or, [scuffed], matte; either with frost grown on it as far as
-/// [frost] (0 to 1).
+/// designed), or, [scuffed], matte; either with the [season]'s ornament
+/// grown on it as far as [ornament] (0 to 1).
 ThemeData buildLightTheme(
         {bool browser = kIsWeb,
         bool glass = false,
         bool scuffed = false,
         double strength = 1,
-        double frost = 0.5}) =>
-    _base(Brightness.light, browser, glass, scuffed, strength, frost);
+        double ornament = 0.5,
+        Season season = Season.winter}) =>
+    _base(
+        Brightness.light, browser, glass, scuffed, strength, ornament, season);
 ThemeData buildDarkTheme(
         {bool browser = kIsWeb,
         bool glass = false,
         bool scuffed = false,
         double strength = 1,
-        double frost = 0.5}) =>
-    _base(Brightness.dark, browser, glass, scuffed, strength, frost);
+        double ornament = 0.5,
+        Season season = Season.winter}) =>
+    _base(Brightness.dark, browser, glass, scuffed, strength, ornament, season);
 
 ThemeData _base(Brightness b, bool browser, bool glass, bool scuffed,
-    double strength, double frost) {
+    double strength, double ornament, Season season) {
   final dark = b == Brightness.dark;
   // In a browser on an iPhone the platform is iOS, whose system fonts the
   // web engine doesn't have: the Roboto bundled for it (pubspec.yaml). On
@@ -98,10 +101,10 @@ ThemeData _base(Brightness b, bool browser, bool glass, bool scuffed,
       ? Glass.off
       : scuffed
           ? (dark ? Glass.scuffedDark : Glass.scuffedLight)
-              .copyWith(frost: frost)
+              .copyWith(ornament: ornament, season: season)
           : (dark ? Glass.dark : Glass.light)
               .scaled(strength)
-              .copyWith(frost: frost);
+              .copyWith(ornament: ornament, season: season);
   final text = dark ? Glass.darkText : Glass.lightText;
   final scheme = (dark
           ? const ColorScheme.dark(
