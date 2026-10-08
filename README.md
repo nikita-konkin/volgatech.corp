@@ -117,9 +117,11 @@ but:
 - **Иностранные группы** — the monthly «служебная записка» about classes taught
   to foreign students (groups with a 3-digit number, e.g. ИСТ-110), built from
   your schedule and shared as a .docx in the portal's own template.
-- **Настройки** — theme (system / light / dark, and Liquid Glass in the
-  browser), an optional fingerprint / PIN **app-lock**, notifications, and
-  **«Отчёты об ошибках»** kept on the device to send by hand.
+- **Настройки** — theme (system / light / dark, and in the browser Liquid
+  Glass: clear or matte, with frost that grows on it as fractal crystals —
+  «Сила эффекта» and «Иней»), an optional fingerprint / PIN **app-lock**,
+  notifications, and **«Отчёты об ошибках»** kept on the device to send by
+  hand.
 - **Обновления** — a new release on GitHub shows up as a banner in the app;
   «Обновить» downloads the right APK for the phone, checks it and opens the
   Android installer.
