@@ -98,10 +98,12 @@ Future<void> setUpScreens() async {
 }
 
 /// The app around [home], signed in unless [status] says otherwise, with
-/// three lessons every day; [insets] are Safari's on an iPhone.
+/// three lessons every day; [insets] are Safari's on an iPhone; in [theme],
+/// or the plain light one.
 Future<Widget> screensApp(Widget home,
     {EdgeInsets insets = EdgeInsets.zero,
-    AuthStatus status = AuthStatus.authenticated}) async {
+    AuthStatus status = AuthStatus.authenticated,
+    ThemeData? theme}) async {
   SharedPreferences.setMockInitialValues({});
   FlutterSecureStorage.setMockInitialValues({});
   final prefs = await Prefs.load();
@@ -147,7 +149,7 @@ Future<Widget> screensApp(Widget home,
                 channel: const MethodChannel('test/lesson_widget'))),
       ],
       child: MaterialApp(
-        theme: buildLightTheme(browser: true),
+        theme: theme ?? buildLightTheme(browser: true),
         locale: const Locale('ru'),
         supportedLocales: const [Locale('ru')],
         localizationsDelegates: const [

@@ -109,10 +109,11 @@ class _AutoReplyPageState extends State<AutoReplyPage> {
           IconButton(
             tooltip: 'Сохранить',
             icon: _saving
-                ? const SizedBox.square(
+                ? SizedBox.square(
                     dimension: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
+                        strokeWidth: 2,
+                        color: Theme.of(context).appBarTheme.foregroundColor))
                 : const Icon(Icons.check),
             onPressed: _saving ? null : () => unawaited(_save()),
           ),

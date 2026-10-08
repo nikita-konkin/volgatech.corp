@@ -9,7 +9,7 @@ import 'layout.dart';
 
 export '../core/season.dart';
 
-/// «Liquid Glass», the browser's optional look: panels you see through to
+/// «Liquid Glass», the optional look: panels you see through to
 /// soft colour blobs behind them, each with a bright rim, a sheen along the
 /// top and a shadow that falls only outside it. What it needs beyond
 /// ThemeData; [Glass.off] (the default) changes nothing.

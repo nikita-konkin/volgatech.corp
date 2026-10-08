@@ -78,17 +78,19 @@ class _SearchPageState extends State<SearchPage> {
               textAlign: TextAlign.center, style: TextStyle(color: muted)),
         );
     final found = _found;
+    // The bar's own ink: white on blue, dark on light glass.
+    final ink = Theme.of(context).appBarTheme.foregroundColor ?? Colors.white;
     return Scaffold(
       appBar: AppBar(
         title: TextField(
           controller: _query,
           autofocus: true,
           textInputAction: TextInputAction.search,
-          cursorColor: Colors.white,
-          style: const TextStyle(color: Colors.white, fontSize: 18),
+          cursorColor: ink,
+          style: TextStyle(color: ink, fontSize: 18),
           decoration: InputDecoration(
             hintText: 'Поиск: ${folder.title}',
-            hintStyle: const TextStyle(color: Colors.white70),
+            hintStyle: TextStyle(color: ink.withValues(alpha: 0.7)),
             filled: false,
             border: InputBorder.none,
           ),
