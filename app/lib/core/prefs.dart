@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'season.dart';
+
 /// Non-secret preferences (remembered username, theme). Secrets live in
 /// [Session] (secure storage); this is plain, and survives logout on purpose.
 class Prefs {
@@ -18,7 +20,9 @@ class Prefs {
   static const _kGlass = 'theme_glass';
   static const _kScuffed = 'theme_glass_scuffed';
   static const _kGlassStrength = 'theme_glass_strength';
-  static const _kGlassFrost = 'theme_glass_frost';
+  // Named when frost was the only ornament.
+  static const _kGlassOrnament = 'theme_glass_frost';
+  static const _kGlassSeason = 'theme_glass_season';
   static const _kLessonReminder = 'lesson_reminder_minutes';
   static const _kAppLock = 'app_lock_enabled';
   static const _kPinsFolded = 'mail_pins_folded';
@@ -134,10 +138,19 @@ class Prefs {
   Future<void> setGlassStrength(double v) async =>
       _p.setDouble(_kGlassStrength, v);
 
-  /// How far frost has grown on the glass, clear or matte, 0 to 1
-  /// (Settings' «Иней»).
-  double get glassFrost => (_p.getDouble(_kGlassFrost) ?? 0.5).clamp(0.0, 1.0);
-  Future<void> setGlassFrost(double v) async => _p.setDouble(_kGlassFrost, v);
+  /// How far the ornament has grown on the glass, clear or matte, 0 to 1
+  /// (Settings' «Иней», «Листья»…).
+  double get glassOrnament =>
+      (_p.getDouble(_kGlassOrnament) ?? 0.5).clamp(0.0, 1.0);
+  Future<void> setGlassOrnament(double v) async =>
+      _p.setDouble(_kGlassOrnament, v);
+
+  /// The season whose ornament the glass shows; null: the one it is.
+  Season? get glassSeason =>
+      Season.values.asNameMap()[_p.getString(_kGlassSeason)];
+  Future<void> setGlassSeason(Season? s) async => s == null
+      ? _p.remove(_kGlassSeason)
+      : _p.setString(_kGlassSeason, s.name);
 
   ThemeMode get themeMode {
     switch (_p.getString(_kTheme)) {

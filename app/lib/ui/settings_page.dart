@@ -162,6 +162,15 @@ class _Section extends StatelessWidget {
 class _GlassTile extends StatelessWidget {
   const _GlassTile();
 
+  /// The ornaments to choose from, by season (none: the one it is).
+  static const _patterns = {
+    '': 'По времени года',
+    'autumn': 'Осень: листья',
+    'winter': 'Зима: иней',
+    'spring': 'Весна: цветы',
+    'summer': 'Лето: самокаты',
+  };
+
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeController>();
@@ -202,13 +211,33 @@ class _GlassTile extends StatelessWidget {
             onChanged: (v) => theme.setStrength(v, save: false),
             onChangeEnd: theme.setStrength,
           ),
-        // Either: how far frost has grown on it.
+        // Either: the season's ornament, and how far it has grown.
+        if (theme.glass)
+          ListTile(
+            title: const Text('Узор'),
+            trailing: DropdownButton<String>(
+              value: theme.seasonChosen?.name ?? '',
+              underline: const SizedBox.shrink(),
+              items: [
+                for (final MapEntry(key: name, value: label)
+                    in _patterns.entries)
+                  DropdownMenuItem(value: name, child: Text(label)),
+              ],
+              onChanged: (name) =>
+                  theme.setSeason(Season.values.asNameMap()[name]),
+            ),
+          ),
         if (theme.glass)
           _PercentSlider(
-            label: 'Иней',
-            value: theme.frost,
-            onChanged: (v) => theme.setFrost(v, save: false),
-            onChangeEnd: theme.setFrost,
+            label: switch (theme.season) {
+              Season.autumn => 'Листья',
+              Season.winter => 'Иней',
+              Season.spring => 'Цветы',
+              Season.summer => 'Самокаты',
+            },
+            value: theme.ornament,
+            onChanged: (v) => theme.setOrnament(v, save: false),
+            onChangeEnd: theme.setOrnament,
           ),
       ],
     );
