@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/prefs.dart';
@@ -22,8 +21,8 @@ class ThemeController extends ChangeNotifier {
 
   ThemeMode get mode => _mode;
 
-  /// «Liquid Glass» chosen; only the browser offers it.
-  bool get glass => kIsWeb && _glass;
+  /// «Liquid Glass» chosen.
+  bool get glass => _glass;
 
   /// The glass matte, frosted and scuffed, rather than clear.
   bool get scuffed => _scuffed;

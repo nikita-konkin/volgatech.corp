@@ -124,7 +124,7 @@ class Prefs {
   bool get mailPinsFolded => _p.getBool(_kPinsFolded) ?? false;
   Future<void> setMailPinsFolded(bool v) async => _p.setBool(_kPinsFolded, v);
 
-  /// «Liquid Glass» (the browser's choice in Settings).
+  /// «Liquid Glass» (Settings' choice).
   bool get glass => _p.getBool(_kGlass) ?? false;
   Future<void> setGlass(bool on) async => _p.setBool(_kGlass, on);
 

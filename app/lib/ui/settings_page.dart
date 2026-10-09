@@ -73,7 +73,7 @@ class SettingsPage extends StatelessWidget {
                   ],
                 ),
               ),
-              if (kIsWeb) const _GlassTile(),
+              const _GlassTile(),
             ],
           ),
           // A browser can't ask for a fingerprint or Face ID.
@@ -158,7 +158,7 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// «Liquid Glass», in the browser: on top of light or dark.
+/// «Liquid Glass»: on top of light or dark.
 class _GlassTile extends StatelessWidget {
   const _GlassTile();
 
