@@ -70,11 +70,11 @@ const _profile = PersonProfile(
   experiences: [ExperienceEntry(typeName: 'Общий стаж', year: 12, month: 4)],
 );
 
-ScheduleEvent _lesson(String begin, String subject, String groups,
+ScheduleEvent _lesson(String begin, String end, String subject, String groups,
         {String type = 'Лекции', String room = '333г (III)'}) =>
     ScheduleEvent(
       timeBegin: '$begin:00',
-      timeEnd: '$begin:00',
+      timeEnd: '$end:00',
       description: subject,
       fullDescription: groups,
       typeWorkName: type,
@@ -114,12 +114,15 @@ Future<Widget> screensApp(Widget home,
             day(DateTime(monday.year, monday.month, monday.day + d), [
               _lesson(
                   '08:00',
+                  '09:30',
                   'Проектирование систем искусственного '
                       'интеллекта в спутниковой и наземной связи',
                   'ИСТ-43'),
-              _lesson('09:45', 'Системы искусственного интеллекта', 'ИСТм-11',
+              _lesson('09:45', '11:15', 'Системы искусственного интеллекта',
+                  'ИСТм-11',
                   type: 'Лабораторные'),
-              _lesson('11:30', 'Введение в инженерную деятельность', 'ИСТ-110',
+              _lesson('11:30', '13:00', 'Введение в инженерную деятельность',
+                  'ИСТ-110',
                   type: 'Практические'),
             ]),
         ];
@@ -149,6 +152,7 @@ Future<Widget> screensApp(Widget home,
                 channel: const MethodChannel('test/lesson_widget'))),
       ],
       child: MaterialApp(
+        debugShowCheckedModeBanner: false,
         theme: theme ?? buildLightTheme(browser: true),
         locale: const Locale('ru'),
         supportedLocales: const [Locale('ru')],

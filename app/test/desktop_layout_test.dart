@@ -79,7 +79,7 @@ void main() {
       // The menu: beside the schedule, or in its drawer.
       expect(find.byType(NavMenu), wide ? findsOneWidget : findsNothing);
       expect(find.byTooltip('Обновить'), findsOneWidget);
-      final time = tester.getTopLeft(find.text('09:45 - 09:45'));
+      final time = tester.getTopLeft(find.text('09:45 - 11:15'));
       final room = tester.getTopRight(find.text('333г (III)').at(1));
       expect(room.dx - time.dx, lessThanOrEqualTo(kReadableWidth));
 

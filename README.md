@@ -117,8 +117,8 @@ but:
 - **Иностранные группы** — the monthly «служебная записка» about classes taught
   to foreign students (groups with a 3-digit number, e.g. ИСТ-110), built from
   your schedule and shared as a .docx in the portal's own template.
-- **Настройки** — theme (system / light / dark, and in the browser Liquid
-  Glass: clear or matte, with a pattern of the season growing on it — autumn
+- **Настройки** — theme (system / light / dark, and Liquid Glass: clear or
+  matte, with a pattern of the season growing on it — autumn
   leaves, frost as fractal crystals, spring flowers, schoolchildren on kick
   scooters; picked by the date or in «Узор», with «Сила эффекта» and a slider
   for how much of it), an optional fingerprint / PIN **app-lock**,
@@ -138,9 +138,27 @@ but:
   the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
 
+## What's new — v0.5.3
+
+<img src="docs/screenshots/android-glass-schedule.webp" width="15%" alt="Liquid Glass в приложении: расписание, осенние листья"> <img src="docs/screenshots/android-glass-settings.webp" width="15%" alt="Настройки: Liquid Glass и узор «Лето: самокаты»"> <img src="docs/screenshots/android-glass-mail.webp" width="15%" alt="Почта на стекле"> <img src="docs/screenshots/glass-seasons.webp" width="15%" alt="Узор по времени года в браузере">
+
+- **Liquid Glass in the app** — until now only in the browser, now on
+  Android too: **Настройки → Тема оформления → Liquid Glass**. Translucent
+  panels over a coloured background, on top of the light or dark theme,
+  clear or matte, with «Сила эффекта». The schedule, mail and every other
+  screen turn to glass.
+- **A pattern of the season** grows on the glass in fine raised lines:
+  leaves in autumn, frost in winter, flowers in spring, schoolchildren on
+  kick scooters in summer. It follows the date, or pick one in **«Узор»**;
+  the slider under it («Листья», «Иней», «Цветы», «Самокаты») sets how much
+  of it there is. The same in the browser.
+
+From v0.5.1 the app offers this update by itself (**Настройки →
+Обновления**).
+
 ## What's new — v0.5.2
 
-<img src="docs/screenshots/widget.webp" width="15%" alt="Виджет «Ближайшая пара»"> <img src="docs/screenshots/reminder.webp" width="15%" alt="Напоминание о занятии"> <img src="docs/screenshots/mail-notify.webp" width="15%" alt="Уведомления о новых письмах"> <img src="docs/screenshots/mail-pick.webp" width="15%" alt="Почта: несколько писем выбрано"> <img src="docs/screenshots/crash-reports.webp" width="15%" alt="Отчёты об ошибках"> <img src="docs/screenshots/glass.webp" width="15%" alt="Liquid Glass в браузере"> <img src="docs/screenshots/glass-seasons.webp" width="15%" alt="Узор по времени года: осенние листья">
+<img src="docs/screenshots/widget.webp" width="15%" alt="Виджет «Ближайшая пара»"> <img src="docs/screenshots/reminder.webp" width="15%" alt="Напоминание о занятии"> <img src="docs/screenshots/mail-notify.webp" width="15%" alt="Уведомления о новых письмах"> <img src="docs/screenshots/mail-pick.webp" width="15%" alt="Почта: несколько писем выбрано"> <img src="docs/screenshots/crash-reports.webp" width="15%" alt="Отчёты об ошибках"> <img src="docs/screenshots/glass.webp" width="15%" alt="Liquid Glass в браузере">
 
 **Schedule**
 
@@ -183,10 +201,8 @@ but:
 **In the browser** (the site is updated with every change)
 
 - **Liquid Glass** — **Настройки → Тема оформления**: translucent panels
-  over a coloured background, on top of the light or dark theme, clear or
-  matte, with a pattern of the season growing on it (**Узор**): leaves in
-  autumn, frost in winter, flowers in spring, schoolchildren on kick
-  scooters in summer. Solid again by itself when the system asks to reduce transparency or increase
+  over a coloured background, on top of the light or dark theme. Solid
+  again by itself when the system asks to reduce transparency or increase
   contrast.
 - A layout for computers (see [On a computer](#on-a-computer)).
 - A logo and a progress bar while the app loads, with a way to reload if
