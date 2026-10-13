@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/cache.dart';
+import '../../core/crash_log.dart';
 import '../../core/prefs.dart';
 import '../../theme.dart';
 import '../../ui/web_view_page.dart';
@@ -16,6 +18,7 @@ import '../mail_config.dart';
 import '../mail_controller.dart';
 import '../mail_credentials.dart';
 import '../mail_models.dart';
+import '../mail_refusals.dart';
 import 'auto_reply_page.dart';
 import 'compose_page.dart';
 import 'mail_actions.dart';
@@ -49,6 +52,9 @@ class MailPage extends StatelessWidget {
               onInboxShown: MailAlerts.supported
                   ? (h) => unawaited(ctx.read<MailAlerts>().seen(h))
                   : null,
+              refusals: MailRefusals(ctx.read<Prefs>()),
+              onRefused: (e) => ctx.read<CrashLog>().record(
+                  refusalReport(e), StackTrace.fromString('экран почты')),
             );
         unawaited(c.start());
         return c;
@@ -87,6 +93,10 @@ class _MailViewState extends State<_MailView> {
   Widget build(BuildContext context) {
     final c = context.watch<MailController>();
     final signedOut = c.status == MailStatus.signedOut;
+    // The letters on show, fresh or saved.
+    final browsing = c.status == MailStatus.ready ||
+        c.status == MailStatus.offline ||
+        c.status == MailStatus.refused;
     final picking = c.selecting;
     return PopScope(
       // Back first puts the picked ones down.
@@ -102,9 +112,7 @@ class _MailViewState extends State<_MailView> {
                     ? const Text('Почта')
                     : _FolderTitle(c),
                 actions: [
-                  if (c.usageSummary case final u?
-                      when c.status == MailStatus.ready ||
-                          c.status == MailStatus.offline)
+                  if (c.usageSummary case final u? when browsing)
                     UsageBar(
                       usage: u,
                       onTap: () =>
@@ -113,8 +121,7 @@ class _MailViewState extends State<_MailView> {
                             value: c, child: const MailboxSizePage()),
                       )),
                     ),
-                  if (c.status == MailStatus.ready ||
-                      c.status == MailStatus.offline)
+                  if (browsing)
                     IconButton(
                       tooltip: 'Поиск',
                       icon: const Icon(Icons.search),
@@ -134,8 +141,7 @@ class _MailViewState extends State<_MailView> {
                       )
                     : null,
               ),
-        floatingActionButton: !picking &&
-                (c.status == MailStatus.ready || c.status == MailStatus.offline)
+        floatingActionButton: !picking && browsing
             ? FloatingActionButton(
                 tooltip: 'Написать',
                 backgroundColor: Brand.coral,
@@ -391,8 +397,14 @@ class _SignInForm extends StatefulWidget {
 }
 
 class _SignInFormState extends State<_SignInForm> {
+  // As typed, without the domain it signs in with (see loginCandidates).
   late final _login = TextEditingController(
-      text: context.read<MailController>().login?.split('@').first ??
+      text: context
+              .read<MailController>()
+              .login
+              ?.split('@')
+              .first
+              .replaceFirst('$kAdDomain\\', '') ??
           context.read<Prefs>().rememberedLogin ??
           '');
   final _password = TextEditingController();
@@ -411,7 +423,10 @@ class _SignInFormState extends State<_SignInForm> {
     final ok = await context
         .read<MailController>()
         .signIn(_login.text, _password.text);
-    if (ok) _password.clear();
+    if (!ok || !mounted) return;
+    // Taken: the phone's password manager may offer to keep it.
+    TextInput.finishAutofillContext();
+    _password.clear();
   }
 
   @override
@@ -431,26 +446,37 @@ class _SignInFormState extends State<_SignInForm> {
         Text(kMailHost,
             textAlign: TextAlign.center, style: TextStyle(color: muted)),
         const SizedBox(height: 24),
-        TextField(
-          controller: _login,
-          enabled: !busy,
-          autocorrect: false,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Логин'),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _password,
-          enabled: !busy,
-          obscureText: _obscure,
-          onSubmitted: (_) => unawaited(_submit()),
-          decoration: InputDecoration(
-            labelText: 'Пароль',
-            suffixIcon: IconButton(
-              icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscure = !_obscure),
+        // The phone's password manager fills these in, and offers to keep
+        // them once the server takes them — never a refused one (cancel).
+        AutofillGroup(
+          onDisposeAction: AutofillContextAction.cancel,
+          child: Column(children: [
+            TextField(
+              controller: _login,
+              enabled: !busy,
+              autocorrect: false,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.username],
+              decoration: const InputDecoration(labelText: 'Логин'),
             ),
-          ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _password,
+              enabled: !busy,
+              obscureText: _obscure,
+              autofillHints: const [AutofillHints.password],
+              onSubmitted: (_) => unawaited(_submit()),
+              decoration: InputDecoration(
+                labelText: 'Пароль',
+                suffixIcon: IconButton(
+                  icon:
+                      Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                ),
+              ),
+            ),
+          ]),
         ),
         if (c.error != null) ...[
           const SizedBox(height: 12),
@@ -527,6 +553,7 @@ class _MessageListState extends State<_MessageList> {
     return Column(
       children: [
         if (c.status == MailStatus.offline) const _OfflineStrip(),
+        if (c.status == MailStatus.refused) _RefusedStrip(c),
         Expanded(
           child: ColoredBox(
             color: Brand.card(context),
@@ -649,4 +676,52 @@ class _OfflineStrip extends StatelessWidget {
           ),
         ]),
       );
+}
+
+/// The saved password refused: the saved letters still show; try it again,
+/// or type a new one.
+class _RefusedStrip extends StatelessWidget {
+  const _RefusedStrip(this.c);
+  final MailController c;
+
+  @override
+  Widget build(BuildContext context) {
+    const ink = Color(0xFF8A2D2A);
+    final button = TextButton.styleFrom(
+      foregroundColor: ink,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      textStyle: Theme.of(context)
+          .textTheme
+          .labelLarge
+          ?.copyWith(fontSize: 13, fontWeight: FontWeight.w600),
+    );
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFFBE3E1),
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.lock_outline, size: 18, color: ink),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text('Сервер не принял пароль — показаны сохранённые письма',
+                style: TextStyle(color: ink, fontSize: 13)),
+          ),
+        ]),
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          TextButton(
+            style: button,
+            onPressed: () => unawaited(c.retry()),
+            child: const Text('Повторить'),
+          ),
+          TextButton(
+            style: button,
+            onPressed: c.typeNew,
+            child: const Text('Ввести новый'),
+          ),
+        ]),
+      ]),
+    );
+  }
 }

@@ -6,6 +6,7 @@ import '../core/prefs.dart';
 import 'ews_mail_service.dart';
 import 'mail_credentials.dart';
 import 'mail_models.dart';
+import 'mail_refusals.dart';
 import 'mail_service.dart';
 
 /// Unread mail in «Входящие», for the badge on the menu button and on
@@ -17,15 +18,22 @@ class MailBadge extends ChangeNotifier {
     required MailCredentialStore store,
     MailService Function()? service,
     this.minInterval = const Duration(minutes: 2),
+    this.onRefused,
   })  : _prefs = prefs,
         _store = store,
         _service = service ?? EwsMailService.new,
+        _refusals = MailRefusals(prefs),
         _unread = prefs.mailUnread;
 
   final Prefs _prefs;
   final MailCredentialStore _store;
   final MailService Function() _service;
+  final MailRefusals _refusals;
   final Duration minInterval;
+
+  /// Told when the server refuses the saved password (for «Отчёты об
+  /// ошибках»).
+  final void Function(MailAuthException e)? onRefused;
 
   int _unread;
   int get unread => _unread;
@@ -54,14 +62,16 @@ class MailBadge extends ChangeNotifier {
         set(0);
         return;
       }
+      // Refused lately: left for a while (see MailRefusals).
+      if (!await _refusals.mayTry()) return;
       await service.connect(creds);
+      await _refusals.accepted();
       set(await service.inboxUnread());
       _checkedAt = DateTime.now();
-    } on MailAuthException {
-      // The password changed: forget it, as the mail screen does, so no
-      // further attempt counts towards the account's lockout.
-      await _store.clear();
-      set(0);
+    } on MailAuthException catch (e) {
+      // Kept, and left alone for a while: the count stays as it was.
+      await _refusals.refused();
+      onRefused?.call(e);
     } on Object {
       // Offline or the server is busy: keep showing the last count.
     } finally {

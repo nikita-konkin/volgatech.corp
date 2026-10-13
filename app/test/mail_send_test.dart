@@ -471,6 +471,11 @@ void main() {
     late bool rejectRestriction;
     late bool noSearchIndex;
     late bool rejectMessagePin;
+
+    /// How many sign-ins to refuse, right password or not, and the client
+    /// port each sign-in came from.
+    late int refuseSignIns;
+    late List<int> signInPorts;
     setUp(() async {
       log = [];
       authed = {};
@@ -479,6 +484,8 @@ void main() {
       rejectRestriction = false;
       noSearchIndex = false;
       rejectMessagePin = false;
+      refuseSignIns = 0;
+      signInPorts = [];
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((req) async {
         final auth = req.headers.value('authorization') ?? '';
@@ -503,11 +510,22 @@ void main() {
           String text(int at) => String.fromCharCodes([
                 for (var i = 0; i < u16(at); i += 2) msg[u32(at + 4) + i],
               ]);
-          if (text(28) == 'MARSTU' && text(36) == 'konkinna') {
+          signInPorts.add(port);
+          if (refuseSignIns > 0) {
+            refuseSignIns--;
+            log.add('refused');
+            res
+              ..statusCode = 401
+              ..headers.add('X-MS-Diagnostics', '4000003;reason="locked"')
+              ..headers.contentType = ContentType.html
+              ..write('<html><head><title>401 - Unauthorized</title></head>'
+                  '</html>');
+          } else if (text(28) == 'MARSTU' && text(36) == 'konkinna') {
             authed.add(port);
             log.add('auth');
             res.write(_answer(body));
           } else {
+            log.add('refused');
             res.statusCode = 401;
           }
         } else if (authed.contains(port) &&
@@ -669,6 +687,27 @@ void main() {
       await expectLater(
           service().connect(const MailCredentials(r'MARSTU\someone', 'x')),
           throwsA(isA<MailAuthException>()));
+    });
+
+    test('a refused saved password is tried once more, on a new connection',
+        () async {
+      refuseSignIns = 1;
+      final s = service();
+      await s.connect(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+      expect(log, ['negotiate', 'refused', 'negotiate', 'auth']);
+      expect(signInPorts.toSet(), hasLength(2));
+      await s.disconnect();
+    });
+
+    test('a password just typed is tried once; the server\'s reply kept',
+        () async {
+      refuseSignIns = 1;
+      await expectLater(
+          service().connect(const MailCredentials(r'MARSTU\konkinna', 'secret'),
+              typed: true),
+          throwsA(isA<MailAuthException>().having((e) => e.serverReply, 'reply',
+              'HTTP 401 · 4000003;reason="locked" · 401 - Unauthorized')));
+      expect(log, ['negotiate', 'refused']);
     });
 
     test('the domain from the challenge is used for a bare login', () {

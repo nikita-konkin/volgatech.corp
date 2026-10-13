@@ -20,16 +20,25 @@ const ewsMessages =
 /// session keeps one connection and repeats the handshake only when the
 /// server asks again (new connection, idle timeout).
 class EwsSession {
-  EwsSession(this.credentials, {Uri? endpoint})
+  EwsSession(this.credentials, {Uri? endpoint, this.retryRefused = true})
       : _endpoint = endpoint ?? Uri.parse(kEwsUrl);
 
   final MailCredentials credentials;
   final Uri _endpoint;
-  final HttpClient _http = HttpClient()
+
+  /// A refused sign-in is tried once more on a new connection: NTLM signs
+  /// in the connection, not the request, so one dropped or swapped halfway
+  /// is refused though the password is right. Not for a password just
+  /// typed: each refusal counts towards the domain account's lockout.
+  final bool retryRefused;
+
+  HttpClient _http = _client();
+  bool _authenticated = false;
+
+  static HttpClient _client() => HttpClient()
     ..maxConnectionsPerHost = 1
     ..connectionTimeout = const Duration(seconds: 15)
     ..idleTimeout = const Duration(seconds: 50);
-  bool _authenticated = false;
   Future<void> _queue = Future.value();
 
   /// Posts a SOAP [body]; returns the response document or throws
@@ -45,13 +54,12 @@ class EwsSession {
   Future<XmlDocument> _call(List<int> bytes) async {
     try {
       HttpClientResponse res;
-      if (_authenticated) {
-        res = await _post(null, bytes);
-        if (res.statusCode == HttpStatus.unauthorized) {
-          await res.drain<void>();
-          res = await _handshake(bytes);
-        }
-      } else {
+      try {
+        res = await _send(bytes);
+      } on MailAuthException {
+        if (!retryRefused) rethrow;
+        _http.close(force: true);
+        _http = _client();
         res = await _handshake(bytes);
       }
       final text = await utf8.decodeStream(res);
@@ -73,6 +81,14 @@ class EwsSession {
       _authenticated = false;
       throw MailNetworkException(e);
     }
+  }
+
+  Future<HttpClientResponse> _send(List<int> bytes) async {
+    if (!_authenticated) return _handshake(bytes);
+    final res = await _post(null, bytes);
+    if (res.statusCode != HttpStatus.unauthorized) return res;
+    await res.drain<void>();
+    return _handshake(bytes);
   }
 
   /// NEGOTIATE on an empty request, then AUTHENTICATE carrying [bytes].
@@ -102,8 +118,7 @@ class EwsSession {
         )}',
         bytes);
     if (res.statusCode == HttpStatus.unauthorized) {
-      await res.drain<void>();
-      throw const MailAuthException();
+      throw MailAuthException(await refusalDetails(res));
     }
     _authenticated = true;
     return res;
@@ -123,6 +138,27 @@ class EwsSession {
   }
 
   void close() => _http.close(force: true);
+}
+
+/// What a refused sign-in [res] says beyond its status, for «Отчёты об
+/// ошибках»: Exchange's diagnostics header, or the error page's title.
+Future<String> refusalDetails(HttpClientResponse res) async {
+  final diagnostics = res.headers.value('x-ms-diagnostics');
+  String page;
+  try {
+    page = await res.transform(const Utf8Decoder(allowMalformed: true)).join();
+  } on Object {
+    page = '';
+  }
+  final title = RegExp(r'<title>([^<]*)</title>', caseSensitive: false)
+      .firstMatch(page)?[1]
+      ?.trim();
+  final said = [
+    'HTTP ${res.statusCode}',
+    if (diagnostics != null && diagnostics.isNotEmpty) diagnostics,
+    if (title != null && title.isNotEmpty) title,
+  ].join(' · ');
+  return said.length > 300 ? said.substring(0, 300) : said;
 }
 
 /// The schema every request is written against, unless it needs a newer one.

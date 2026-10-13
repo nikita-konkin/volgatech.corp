@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../core/crash_log.dart';
 import '../core/notifications.dart';
 import '../core/prefs.dart';
 import '../core/ru_plural.dart';
@@ -9,6 +11,7 @@ import 'ews_mail_service.dart';
 import 'mail_alerts.dart';
 import 'mail_credentials.dart';
 import 'mail_models.dart';
+import 'mail_refusals.dart';
 
 /// Android runs the check for new mail every 15 minutes (its shortest
 /// period), when there's a network, with the app closed too.
@@ -51,6 +54,17 @@ void mailCheckDispatcher() {
         store: MailCredentialStore(),
         service: EwsMailService(),
         alerts: LocalMailAlerts(),
+        report: (e) async {
+          final log = CrashLog(prefs, platform: 'android');
+          try {
+            final app = await PackageInfo.fromPlatform();
+            log.version = '${app.version}+${app.buildNumber}';
+          } on Object {
+            // Reported without the version, then.
+          }
+          await log.add(refusalReport(e),
+              StackTrace.fromString('фоновая проверка почты'));
+        },
       );
     } on Object catch (e) {
       debugPrint('mail check: $e');
@@ -67,6 +81,10 @@ class LocalMailAlerts implements MailAlertPlatform {
   static const _group = 'net.volgatech.mail';
   static const _summaryId = 19999;
   static const _shown = 4;
+
+  /// The refusal notice: on its own, apart from the messages.
+  static const _refusedTag = 'mail-password';
+  static const _refusedId = 19998;
 
   /// [at]: when the message came, which also orders them in the group.
   static AndroidNotificationDetails _android(DateTime? at,
@@ -144,12 +162,43 @@ class LocalMailAlerts implements MailAlertPlatform {
   }
 
   @override
+  Future<void> showRefused() async {
+    await Notifications.ensureReady();
+    await Notifications.plugin.show(
+      id: _refusedId,
+      title: 'Почта не принимает пароль',
+      body: 'Новые письма пока не проверяются. Откройте почту, чтобы войти '
+          'снова.',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'mail',
+          'Новые письма',
+          channelDescription: 'Письма во «Входящих»',
+          icon: 'ic_stat_mail',
+          category: AndroidNotificationCategory.error,
+          tag: _refusedTag,
+          styleInformation: BigTextStyleInformation(
+              'Новые письма пока не проверяются. Откройте почту, чтобы '
+              'войти снова.'),
+        ),
+      ),
+      payload: 'mail',
+    );
+  }
+
+  @override
+  Future<void> hideRefused() async {
+    await Notifications.ensureReady();
+    await Notifications.plugin.cancel(id: _refusedId, tag: _refusedTag);
+  }
+
+  @override
   Future<void> clear() async {
     await Notifications.ensureReady();
     final plugin = Notifications.plugin;
     for (final n in await plugin.getActiveNotifications()) {
-      if (n.tag == _tag && n.id != null) {
-        await plugin.cancel(id: n.id!, tag: _tag);
+      if ((n.tag == _tag || n.tag == _refusedTag) && n.id != null) {
+        await plugin.cancel(id: n.id!, tag: n.tag);
       }
     }
   }

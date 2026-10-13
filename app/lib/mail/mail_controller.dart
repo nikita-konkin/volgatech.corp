@@ -8,9 +8,13 @@ import '../core/cache.dart';
 import 'compose.dart';
 import 'mail_credentials.dart';
 import 'mail_models.dart';
+import 'mail_refusals.dart';
 import 'mail_service.dart';
 
-enum MailStatus { starting, signedOut, connecting, ready, offline }
+/// [refused]: the server refused the saved password; the saved letters
+/// show, and the password stays until a new one is typed (see
+/// [MailRefusals]).
+enum MailStatus { starting, signedOut, connecting, ready, offline, refused }
 
 const _inbox = MailFolder(name: 'INBOX', path: 'INBOX', role: FolderRole.inbox);
 
@@ -26,13 +30,24 @@ class MailController extends ChangeNotifier {
     this.manualQuota,
     this.onInboxUnread,
     this.onInboxShown,
+    MailRefusals? refusals,
+    this.onRefused,
   })  : _service = service,
         _store = store,
-        _cache = cache;
+        _cache = cache,
+        _refusals = refusals;
 
   final MailService _service;
   final MailCredentialStore _store;
   final JsonCache _cache;
+
+  /// When the password was last refused, shared with the background check
+  /// and the badge; none in tests, which try every time.
+  final MailRefusals? _refusals;
+
+  /// Told when the server refuses the saved password (for «Отчёты об
+  /// ошибках»).
+  final void Function(MailAuthException e)? onRefused;
 
   /// Messages pinned in Outlook go above the rest (an option in the menu).
   bool pinnedFirst;
@@ -114,8 +129,20 @@ class MailController extends ChangeNotifier {
       usageSummary = MailboxUsage(
           used: u['used'] as int? ?? 0, quota: _serverQuota ?? manualQuota);
     }
+    // Refused lately: not tried again until asked to, for a while.
+    if (!await _mayTry()) {
+      _set(MailStatus.refused);
+      return;
+    }
     await _connectAndLoad();
   }
+
+  /// «Повторить»: the saved password once more, now.
+  Future<void> retry() => _connectAndLoad();
+
+  /// «Ввести новый»: the sign-in form; the saved password stays until the
+  /// server takes a new one.
+  void typeNew() => _set(MailStatus.signedOut);
 
   /// Signs in as `MARSTU\login` (see [loginCandidates]) and remembers it.
   Future<bool> signIn(String login, String password) async {
@@ -124,8 +151,9 @@ class MailController extends ChangeNotifier {
     for (final candidate in loginCandidates(login)) {
       final creds = MailCredentials(candidate, password);
       try {
-        await _service.connect(creds);
+        await _service.connect(creds, typed: true);
         await _store.save(creds);
+        await _refusals?.accepted();
         _credentials = creds;
         await _loadFolders();
         await _load(folder);
@@ -145,6 +173,7 @@ class MailController extends ChangeNotifier {
   Future<void> signOut() async {
     await _service.disconnect();
     await _store.clear();
+    await _refusals?.accepted();
     await _cache.removePrefix(_cachePrefix);
     onInboxUnread?.call(0);
     _credentials = null;
@@ -189,15 +218,19 @@ class MailController extends ChangeNotifier {
   Future<void> refreshIfStale(
       {Duration maxAge = const Duration(seconds: 30)}) async {
     final at = loadedAt;
-    if (loading || (at != null && DateTime.now().difference(at) < maxAge)) {
+    if (loading ||
+        (at != null && DateTime.now().difference(at) < maxAge) ||
+        status == MailStatus.refused && !await _mayTry()) {
       return;
     }
     await refresh();
   }
 
+  /// Pulled down, or [refreshIfStale]: a refused password is tried again
+  /// too.
   Future<void> refresh() async {
     if (_credentials == null) return;
-    if (status == MailStatus.offline) {
+    if (status == MailStatus.offline || status == MailStatus.refused) {
       await _connectAndLoad();
     } else {
       await _guard(() => _load(folder));
@@ -553,15 +586,12 @@ class MailController extends ChangeNotifier {
     _set(MailStatus.connecting);
     try {
       await _service.connect(creds);
+      await _refusals?.accepted();
       await _loadFolders();
       await _load(folder);
       unawaited(_updateUsage());
     } on MailAuthException catch (e) {
-      // The password changed: ask again, keeping the login.
-      await _store.clear();
-      _credentials = null;
-      error = e;
-      _set(MailStatus.signedOut);
+      await _refused(e);
     } on MailNetworkException catch (e) {
       error = e;
       _set(MailStatus.offline);
@@ -616,13 +646,14 @@ class MailController extends ChangeNotifier {
     }
   }
 
-  /// Runs [job]; on a dropped connection reconnects once and retries.
+  /// Runs [job]; on a dropped connection reconnects once and retries —
+  /// unless the password was refused: that waits to be asked.
   Future<T> _retrying<T>(Future<T> Function() job) async {
     try {
       return await job();
     } on MailNetworkException {
       final creds = _credentials;
-      if (creds == null) rethrow;
+      if (creds == null || status == MailStatus.refused) rethrow;
       await _service.connect(creds);
       return job();
     }
@@ -644,15 +675,25 @@ class MailController extends ChangeNotifier {
       await _retrying(job);
       if (status != MailStatus.ready) _set(MailStatus.ready);
     } on MailAuthException catch (e) {
-      error = e;
-      await _store.clear();
-      _credentials = null;
-      _set(MailStatus.signedOut);
+      await _refused(e);
     } on MailNetworkException catch (e) {
       error = e;
-      _set(MailStatus.offline);
+      if (status != MailStatus.refused) _set(MailStatus.offline);
     }
   }
+
+  /// The server refused the saved password: kept, with the saved letters
+  /// on show, and left alone for a while (see [MailRefusals]).
+  Future<void> _refused(MailAuthException e) async {
+    error = e;
+    // Nothing more goes out with it until asked.
+    await _service.disconnect();
+    await _refusals?.refused();
+    onRefused?.call(e);
+    _set(MailStatus.refused);
+  }
+
+  Future<bool> _mayTry() async => await _refusals?.mayTry() ?? true;
 
   /// System folders first, then by name.
   static List<MailFolder> _sorted(List<MailFolder> list) => list

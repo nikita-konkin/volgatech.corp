@@ -34,6 +34,8 @@ class Prefs {
   static const _kUnread = 'mail_unread';
   static const _kMailNotify = 'mail_notify';
   static const _kMailSeenUntil = 'mail_seen_until';
+  static const _kMailRefusals = 'mail_refusals';
+  static const _kMailRefusedAt = 'mail_refused_at';
   static const _kDraft = 'mail_draft';
   static const _kSignNew = 'mail_signature_new';
   static const _kSignReplies = 'mail_signature_replies';
@@ -55,6 +57,23 @@ class Prefs {
       };
   Future<void> setMailSeenUntil(DateTime t) async =>
       _p.setInt(_kMailSeenUntil, t.millisecondsSinceEpoch);
+
+  /// How many times in a row the mail server refused the saved password,
+  /// and when it last did (see `MailRefusals`).
+  int get mailRefusals => _p.getInt(_kMailRefusals) ?? 0;
+  DateTime? get mailRefusedAt => switch (_p.getInt(_kMailRefusedAt)) {
+        final ms? => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),
+        null => null,
+      };
+  Future<void> setMailRefused(int count, DateTime at) async {
+    await _p.setInt(_kMailRefusals, count);
+    await _p.setInt(_kMailRefusedAt, at.millisecondsSinceEpoch);
+  }
+
+  Future<void> clearMailRefused() async {
+    await _p.remove(_kMailRefusals);
+    await _p.remove(_kMailRefusedAt);
+  }
 
   /// Minutes before a lesson to remind of it; 0: no reminders.
   int get lessonReminderMinutes => _p.getInt(_kLessonReminder) ?? 0;

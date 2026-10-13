@@ -23,6 +23,7 @@ import 'mail/mail_background.dart';
 import 'mail/mail_badge.dart';
 import 'mail/mail_config.dart';
 import 'mail/mail_credentials.dart';
+import 'mail/mail_refusals.dart';
 import 'state/auth_controller.dart';
 import 'state/theme_controller.dart';
 import 'state/updater.dart';
@@ -88,8 +89,12 @@ Future<void> main() async {
           ChangeNotifierProvider<MailAlerts>.value(value: mailAlerts),
         if (kNativeMail)
           ChangeNotifierProvider<MailBadge>(
-            create: (_) =>
-                MailBadge(prefs: prefs, store: MailCredentialStore())..watch(),
+            create: (_) => MailBadge(
+              prefs: prefs,
+              store: MailCredentialStore(),
+              onRefused: (e) => crashes.record(refusalReport(e),
+                  StackTrace.fromString('счётчик непрочитанных')),
+            )..watch(),
           ),
         ChangeNotifierProvider<AuthController>.value(value: auth),
       ],

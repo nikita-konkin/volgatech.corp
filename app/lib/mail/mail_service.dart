@@ -8,8 +8,10 @@ import 'mail_models.dart';
 /// The mailbox as the «Почта» screen needs it. An interface so the controller
 /// can be tested without a server; the real one is `EwsMailService`.
 abstract class MailService {
-  /// Signs in; throws [MailAuthException] or [MailNetworkException].
-  Future<void> connect(MailCredentials credentials);
+  /// Signs in; throws [MailAuthException] or [MailNetworkException]. A
+  /// refusal is tried once more on a new connection unless [typed]: a
+  /// password just typed in is tried once.
+  Future<void> connect(MailCredentials credentials, {bool typed = false});
 
   /// Mail folders; the one Outlook on the web archives to (or else one named
   /// «Архив») has [FolderRole.archive].
