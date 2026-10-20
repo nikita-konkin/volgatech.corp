@@ -245,12 +245,15 @@ class _MessagePageState extends State<MessagePage> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final unsubscribe =
         unsubscribeTarget(m.getHeaderValue('list-unsubscribe')) != null;
-    PopupMenuItem<_Tool> item(_Tool t, IconData icon, String label) =>
+    // A switch reads like the others, with a tick when it's on.
+    PopupMenuItem<_Tool> item(_Tool t, IconData icon, String label,
+            {bool? on}) =>
         PopupMenuItem(
           value: t,
           child: ListTile(
             leading: Icon(icon),
             title: Text(label),
+            trailing: on ?? false ? const Icon(Icons.check) : null,
             contentPadding: EdgeInsets.zero,
             dense: true,
           ),
@@ -269,14 +272,10 @@ class _MessagePageState extends State<MessagePage> {
         item(_Tool.translate, Icons.translate, 'Перевести'),
         item(_Tool.textSize, Icons.format_size, 'Размер текста'),
         if (dark)
-          CheckedPopupMenuItem(
-              value: _Tool.dark,
-              checked: _darkBody,
-              child: const Text('Тёмный фон письма')),
-        CheckedPopupMenuItem(
-            value: _Tool.images,
-            checked: _prefs.mailImagesAlways,
-            child: const Text('Всегда показывать картинки')),
+          item(_Tool.dark, Icons.dark_mode_outlined, 'Тёмный фон письма',
+              on: _darkBody),
+        item(_Tool.images, Icons.image_outlined, 'Всегда показывать картинки',
+            on: _prefs.mailImagesAlways),
         if (_intents.available)
           item(_Tool.contact, Icons.person_add_alt,
               'Сохранить отправителя в контакты'),

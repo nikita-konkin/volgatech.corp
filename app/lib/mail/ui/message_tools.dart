@@ -106,10 +106,8 @@ String _ext(String type) => switch (type.toLowerCase()) {
 /// «Картинки из интернета скрыты»: show them here, or always for [sender].
 class ImagesBanner extends StatelessWidget {
   const ImagesBanner(
-      {super.key,
-      required this.spam,
-      required this.onShow,
-      this.onAlways});
+      {super.key, required this.spam, required this.onShow, this.onAlways});
+
   /// The server marked the letter as spam: shown once, never always.
   final bool spam;
   final VoidCallback onShow;
