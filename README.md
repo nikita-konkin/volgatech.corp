@@ -134,12 +134,49 @@ hourly-load report all work, but:
   university's Exchange mailbox (EWS): folders, search, pin and «В архив»,
   several messages at once, attachments that open in the app, replies with
   a signature, address-book suggestions, «Автоответ», mailbox size, an
-  unread badge and new-mail notifications. The mail password is kept
+  unread badge and new-mail notifications; links, phone numbers, addresses
+  and dates in a letter open a sheet of actions, with find in a letter and
+  pictures from the internet on request. The mail password is kept
   in the OS keystore and deleted on «Выйти из почты». In the plain APKs,
   OWA opens in-app (WebView) as before.
 - **Портал** — the corporate portal opens **in-app** (WebView), keeping only
   the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.6
+
+<img src="docs/screenshots/mail-text.webp" width="15%" alt="Письмо: ссылки, телефоны и даты подчёркнуты, картинки из интернета скрыты"> <img src="docs/screenshots/mail-link.webp" width="15%" alt="Ссылка ведёт не на тот сайт, что в её тексте"> <img src="docs/screenshots/mail-tools.webp" width="15%" alt="Меню письма: поиск, ссылки, цитата, перевод, размер текста">
+
+- **Letters you can work with** (in the `app-mail-*` APKs). Links, e-mail
+  addresses, phone numbers and dates are tappable, in plain-text letters
+  too, and a tap opens a sheet instead of leaving the app:
+  - a **link** shows its full address with the site in bold, to open, copy
+    (the address or its text) or share. When the text names one site and
+    the link leads to another, the sheet warns that it looks like phishing;
+  - **«Присоединиться»** above a letter that invites to a Телемост,
+    Контур.Толк, VK Звонки, Zoom, Teams, Google Meet, SaluteJazz or МТС Линк
+    meeting;
+  - a **phone number** (+7…, 8…, a city number after «тел.», with «доб.»):
+    call, SMS, copy, add to contacts;
+  - an **address**: a new message here in the app, copy, add to contacts;
+    a **date**: add it to the calendar.
+- **⋮ in a letter:** find in the letter, all its links, reply quoting the
+  text you selected, copy / share / translate the text, text size, a dark
+  letter in the dark theme, save the sender to contacts (with the phone
+  from the signature), unsubscribe from a mailing list.
+- **Pictures from the internet** stay hidden until «Показать» (this
+  letter), «Всегда» (this sender) or ⋮ → «Всегда показывать картинки» —
+  loading them tells the sender the letter was opened. In letters the
+  server marks `*** SPAM ***` they load only by hand. A tap on a picture
+  opens it full screen to zoom, save or share. Narrow table columns no
+  longer break words in two.
+- **«Шаблоны»** when writing: phrases you often use, put in with a tap;
+  the list is yours to change.
+- **Matte Liquid Glass** has its own **«Сила эффекта»** slider now
+  (Настройки → Тема оформления); clear and matte glass each keep theirs.
+
+From v0.5.1 the app offers this update by itself (**Настройки →
+Обновления**).
 
 ## What's new — v0.5.5
 
