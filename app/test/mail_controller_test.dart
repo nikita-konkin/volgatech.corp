@@ -16,6 +16,7 @@ import 'package:volgatech_pro/mail/mail_badge.dart';
 import 'package:volgatech_pro/mail/mail_controller.dart';
 import 'package:volgatech_pro/mail/mail_credentials.dart';
 import 'package:volgatech_pro/mail/mail_models.dart';
+import 'package:volgatech_pro/mail/mail_refusals.dart';
 import 'package:volgatech_pro/mail/mail_service.dart';
 import 'package:volgatech_pro/mail/ui/compose_page.dart';
 import 'package:volgatech_pro/mail/ui/mail_page.dart' as ui;
@@ -48,6 +49,9 @@ class FakeMailService implements MailService {
 
   final String acceptedLogin;
   bool down = false;
+
+  /// Refuses even the right password (the account locked for a while).
+  bool refuse = false;
   final tried = <String>[];
   final seenOnServer = <String>{};
   final deleted = <String, String>{};
@@ -56,12 +60,16 @@ class FakeMailService implements MailService {
   List<MailHeader> inbox = [for (var i = 1; i <= 5; i++) _h(i)];
   bool connected = false;
 
+  /// Whether each sign-in was with a password just typed.
+  final typedIn = <bool>[];
+
   @override
-  Future<void> connect(MailCredentials c) async {
+  Future<void> connect(MailCredentials c, {bool typed = false}) async {
     tried.add(c.login);
+    typedIn.add(typed);
     if (down) throw const MailNetworkException('down');
-    if (c.login != acceptedLogin || c.password != 'secret') {
-      throw const MailAuthException();
+    if (refuse || c.login != acceptedLogin || c.password != 'secret') {
+      throw const MailAuthException('401 · locked');
     }
     connected = true;
   }
@@ -312,6 +320,7 @@ void main() {
     expect(c.status, MailStatus.signedOut);
     expect(c.error, isA<MailAuthException>());
     expect(await store.read(), isNull);
+    expect(server.typedIn, [true], reason: 'a typed password: tried once');
   });
 
   test('offline: the saved list is shown with the offline state', () async {
@@ -329,12 +338,119 @@ void main() {
     expect(c.headers, hasLength(5));
   });
 
-  test('a changed password sends the user back to the form', () async {
-    await store.save(const MailCredentials(r'MARSTU\konkinna', 'old'));
-    final c = controller();
-    await c.start();
-    expect(c.status, MailStatus.signedOut);
-    expect(await store.read(), isNull);
+  group('a refused password', () {
+    late Prefs prefs;
+    late List<String> reported;
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await Prefs.load();
+      reported = [];
+      await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+      cache.seed('mail_inbox', [_h(9, seen: true).toJson()], DateTime.now());
+      server.refuse = true;
+    });
+
+    MailController refusing() => MailController(
+        service: server,
+        store: store,
+        cache: cache,
+        refusals: MailRefusals(prefs),
+        onRefused: (e) => reported.add(refusalReport(e)));
+
+    test('stays, with the saved letters on show', () async {
+      final c = refusing();
+      await c.start();
+      expect(c.status, MailStatus.refused);
+      expect([for (final h in c.headers) h.id], ['msg9']);
+      expect((await store.read())?.password, 'secret');
+      expect(server.typedIn, [false], reason: 'saved: retried on a new line');
+      expect(reported, ['Почта: сервер не принял пароль (401 · locked)']);
+      expect(prefs.mailRefusals, 1);
+      expect(server.connected, isFalse);
+    });
+
+    test('is not tried again unasked for a while; «Повторить» does', () async {
+      await refusing().start();
+      final c = refusing();
+      await c.start(); // the mail screen opened again
+      await c.refreshIfStale(maxAge: Duration.zero); // back in the app
+      expect(c.status, MailStatus.refused);
+      expect(server.tried, hasLength(1));
+
+      await c.retry();
+      expect(server.tried, hasLength(2));
+      expect(prefs.mailRefusals, 2);
+
+      server.refuse = false; // unlocked
+      await c.retry();
+      expect(c.status, MailStatus.ready);
+      expect(c.headers, hasLength(5));
+      expect(prefs.mailRefusals, 0);
+    });
+
+    test('«Ввести новый»: the form, the old one kept until one is taken',
+        () async {
+      final c = refusing();
+      await c.start();
+      c.typeNew();
+      expect(c.status, MailStatus.signedOut);
+      expect((await store.read())?.password, 'secret');
+
+      server.refuse = false;
+      expect(await c.signIn('konkinna', 'secret'), isTrue);
+      expect(server.typedIn.last, isTrue);
+      expect(c.status, MailStatus.ready);
+      expect(prefs.mailRefusals, 0);
+    });
+
+    test('signing out forgets it, and the pause', () async {
+      final c = refusing();
+      await c.start();
+      await c.signOut();
+      expect(await store.read(), isNull);
+      expect(prefs.mailRefusals, 0);
+    });
+
+    testWidgets('the strip: «Повторить» and «Ввести новый»', (tester) async {
+      await initializeDateFormatting('ru_RU');
+      await tester.pumpWidget(Provider<Prefs>.value(
+        value: prefs,
+        child: MaterialApp(home: ui.MailPage(create: (_) => refusing())),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Сервер не принял пароль — показаны сохранённые письма'),
+          findsOneWidget);
+      expect(find.text('Письмо 9'), findsOneWidget);
+      expect(find.byTooltip('Написать'), findsOneWidget);
+
+      server.refuse = false;
+      await tester.tap(find.text('Повторить'));
+      await tester.pumpAndSettle();
+      expect(find.text('Сервер не принял пароль — показаны сохранённые письма'),
+          findsNothing);
+      expect(find.text('Письмо 5'), findsOneWidget);
+
+      server.refuse = true;
+      await tester.runAsync(() async {
+        await prefs.setMailRefused(0, DateTime.utc(2026));
+      });
+      final c = Provider.of<MailController>(
+          tester.element(find.text('Письмо 5')),
+          listen: false);
+      await tester.runAsync(c.retry);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ввести новый'));
+      await tester.pumpAndSettle();
+      expect(find.text('Вход в почту'), findsOneWidget);
+      final fields = tester.widgetList<TextField>(find.byType(TextField));
+      expect([
+        for (final f in fields) f.autofillHints
+      ], [
+        [AutofillHints.username],
+        [AutofillHints.password],
+      ]);
+      expect(fields.first.controller!.text, 'konkinna');
+    });
   });
 
   test('opening marks read; delete moves to the trash folder', () async {
@@ -865,8 +981,7 @@ void main() {
       expect(badge().unread, 4); // straight from preferences at start-up
     });
 
-    test('offline keeps the last count; a rejected password is forgotten',
-        () async {
+    test('offline or refused: the last count; the password is kept', () async {
       await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
       final b = badge();
       await b.check();
@@ -874,13 +989,14 @@ void main() {
       await b.check(force: true);
       expect(b.unread, 5);
       server.down = false;
-      await store.save(const MailCredentials(r'MARSTU\konkinna', 'old'));
+      server.refuse = true;
       await b.check(force: true);
-      expect(b.unread, 0);
-      expect(await store.read(), isNull);
+      expect(b.unread, 5);
+      expect(await store.read(), isNotNull);
+      expect(prefs.mailRefusals, 1);
       server.tried.clear();
       await b.check(force: true);
-      expect(server.tried, isEmpty); // no further attempts
+      expect(server.tried, isEmpty); // left alone for a while
     });
 
     test('no mail password: no badge, no server', () async {

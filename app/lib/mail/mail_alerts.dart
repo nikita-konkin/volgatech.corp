@@ -4,6 +4,7 @@ import '../core/prefs.dart';
 import 'mail_config.dart';
 import 'mail_credentials.dart';
 import 'mail_models.dart';
+import 'mail_refusals.dart';
 import 'mail_service.dart';
 
 /// The unread messages of [inbox] that came after [since], newest first.
@@ -18,7 +19,12 @@ abstract class MailAlertPlatform {
   Future<bool> requestPermission();
   Future<void> show(List<MailHeader> fresh);
 
-  /// The ones shown, once the inbox is open in the app.
+  /// That the server refused the saved password, so checks are paused
+  /// until it takes it again; and, once it has, no more.
+  Future<void> showRefused();
+  Future<void> hideRefused();
+
+  /// The ones shown, and the refusal, once the inbox is open in the app.
   Future<void> clear();
 }
 
@@ -30,17 +36,24 @@ abstract class MailCheckSchedule {
 
 /// One check for new mail, run in the background: tells of the unread
 /// messages that came after the newest one already shown or told of. The
-/// first time it only notes where «new» begins.
+/// first time it only notes where «new» begins. A refused password is kept
+/// (see [MailRefusals]): the checks pause, longer each time, and the first
+/// refusal in a row is told of, and [report]ed.
 Future<void> checkForNewMail({
   required Prefs prefs,
   required MailCredentialStore store,
   required MailService service,
   required MailAlertPlatform alerts,
+  Future<void> Function(MailAuthException e)? report,
+  DateTime Function()? clock,
 }) async {
   final creds = await store.read();
   if (creds == null) return;
+  final refusals = MailRefusals(prefs, clock: clock);
+  if (!await refusals.mayTry()) return;
   try {
     await service.connect(creds);
+    if (await refusals.accepted()) await alerts.hideRefused();
     final inbox = await service.latestInbox();
     final since = prefs.mailSeenUntil;
     if (since != null) {
@@ -48,10 +61,9 @@ Future<void> checkForNewMail({
       if (fresh.isNotEmpty) await alerts.show(fresh);
     }
     await _advance(prefs, inbox);
-  } on MailAuthException {
-    // The password changed: forget it, as the mail screen does, so the
-    // checks don't count towards the account's lockout.
-    await store.clear();
+  } on MailAuthException catch (e) {
+    if (await refusals.refused() == 1) await alerts.showRefused();
+    await report?.call(e);
   } finally {
     await service.disconnect();
   }

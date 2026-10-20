@@ -6,6 +6,7 @@ import 'package:volgatech_pro/mail/ews_mail_service.dart';
 import 'package:volgatech_pro/mail/mail_alerts.dart';
 import 'package:volgatech_pro/mail/mail_credentials.dart';
 import 'package:volgatech_pro/mail/mail_models.dart';
+import 'package:volgatech_pro/mail/mail_refusals.dart';
 
 import 'mail_controller_test.dart' show FakeMailService;
 
@@ -23,6 +24,19 @@ class _Alerts implements MailAlertPlatform {
 
   @override
   Future<void> clear() async => cleared++;
+
+  /// Whether «Почта не принимает пароль» is up, and how often it went up.
+  bool refusedUp = false;
+  int refusedShown = 0;
+
+  @override
+  Future<void> showRefused() async {
+    refusedUp = true;
+    refusedShown++;
+  }
+
+  @override
+  Future<void> hideRefused() async => refusedUp = false;
 }
 
 class _Schedule implements MailCheckSchedule {
@@ -56,8 +70,12 @@ void main() {
   late MailCredentialStore store;
   late FakeMailService service;
   late _Alerts alerts;
+  var now = t0;
+  final reported = <String>[];
 
   setUp(() async {
+    now = t0;
+    reported.clear();
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
     prefs = await Prefs.load();
@@ -68,7 +86,12 @@ void main() {
   });
 
   Future<void> check() => checkForNewMail(
-      prefs: prefs, store: store, service: service, alerts: alerts);
+      prefs: prefs,
+      store: store,
+      service: service,
+      alerts: alerts,
+      clock: () => now,
+      report: (e) async => reported.add(refusalReport(e)));
 
   test('freshMail: unread and later only, newest first', () {
     expect(
@@ -114,12 +137,51 @@ void main() {
     expect(service.connected, isFalse, reason: 'disconnected each time');
   });
 
-  test('a changed password stops the checks', () async {
+  test('a refused password stays, and is left alone for a while', () async {
     await store.save(const MailCredentials(r'MARSTU\konkinna', 'old'));
     await check();
-    expect(await store.read(), isNull);
+    expect(await store.read(), isNotNull, reason: 'never wiped unasked');
+    expect(alerts.refusedShown, 1);
+    expect(reported, ['Почта: сервер не принял пароль (401 · locked)']);
+    expect(reported.single, isNot(contains('old')));
+
+    // 1 h, then 3 h, then 12 h between tries; one notification for all.
+    for (final (wait, tries) in [
+      (const Duration(minutes: 59), 1),
+      (const Duration(hours: 1), 2),
+      (const Duration(hours: 3, minutes: -1), 2),
+      (const Duration(hours: 3), 3),
+      (const Duration(hours: 11), 3),
+      (const Duration(hours: 12), 4),
+      (const Duration(hours: 12), 5),
+    ]) {
+      now = prefs.mailRefusedAt!.add(wait);
+      await check();
+      expect(service.tried, hasLength(tries), reason: '$wait');
+    }
+    expect(alerts.refusedShown, 1);
+    expect(reported, hasLength(5));
+  });
+
+  test('taken again: the checks go on and the notification goes', () async {
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'old'));
     await check();
-    expect(service.tried, hasLength(1), reason: 'no second attempt');
+    expect(alerts.refusedUp, isTrue);
+
+    // Say the account was locked for a while, the password right all along.
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+    now = now.add(const Duration(hours: 1));
+    service.inbox = [_mail('пришло', now)];
+    await check();
+    expect(alerts.refusedUp, isFalse);
+    expect(prefs.mailRefusals, 0);
+    expect(prefs.mailSeenUntil, now);
+
+    // A later refusal starts over: 1 h, and a notification again.
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'old'));
+    await check();
+    expect(alerts.refusedShown, 2);
+    expect(MailRefusals.pause(prefs.mailRefusals), const Duration(hours: 1));
   });
 
   test('no mail password: nothing asked of the server', () async {

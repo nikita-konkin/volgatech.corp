@@ -35,9 +35,11 @@ class EwsMailService implements MailService {
       _session ?? (throw const MailNetworkException('not connected'));
 
   @override
-  Future<void> connect(MailCredentials credentials) async {
+  Future<void> connect(MailCredentials credentials,
+      {bool typed = false}) async {
     await disconnect();
-    final session = EwsSession(credentials, endpoint: _endpoint);
+    final session =
+        EwsSession(credentials, endpoint: _endpoint, retryRefused: !typed);
     try {
       // Signs in and learns which folders are Входящие, Отправленные, …
       _roles = parseRoles(await session.call(getSystemFoldersSoap));

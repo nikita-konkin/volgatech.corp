@@ -96,7 +96,12 @@ class CrashLog extends ChangeNotifier {
     };
   }
 
-  void record(Object error, StackTrace? stack, {DateTime? at}) {
+  void record(Object error, StackTrace? stack, {DateTime? at}) =>
+      unawaited(add(error, stack, at: at));
+
+  /// As [record], done once it is saved: for the background check, whose
+  /// isolate may end as soon as it returns.
+  Future<void> add(Object error, StackTrace? stack, {DateTime? at}) async {
     try {
       final entry = CrashEntry(
         at: at ?? DateTime.now(),
@@ -121,9 +126,9 @@ class CrashLog extends ChangeNotifier {
         for (final e in _entries)
           if (!identical(e, same)) e,
       ].take(limit).toList();
-      unawaited(_save());
       // Not in the middle of a build that failed.
       scheduleMicrotask(notifyListeners);
+      await _save();
     } on Object {
       // The log must never be a reason to fail.
     }

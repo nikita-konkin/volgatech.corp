@@ -138,6 +138,29 @@ but:
   the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
 
+## What's new — v0.5.4
+
+<img src="docs/screenshots/mail-refused.webp" width="15%" alt="Почта: сервер не принял пароль — письма на месте, «Повторить» и «Ввести новый»">
+
+- **Mail no longer forgets the password.** Until now a single refusal
+  from the server — a dropped connection while signing in, the account
+  locked for a moment — wiped the saved password, and new-mail
+  notifications quietly stopped. Now the password is forgotten only on
+  «Выйти» or when the server takes a new one. A refused password is tried
+  once more on a fresh connection; if it is still refused, the checks
+  pause for 1 hour, then 3, then 12, so a really wrong password can't lock
+  the university account. One notification, «Почта не принимает пароль»,
+  says so, and goes away once the server takes the password again.
+- **The saved letters stay on screen** with a strip «Сервер не принял
+  пароль» and two buttons: **«Повторить»** and **«Ввести новый»**.
+  Each refusal and what the server answered (never the password) go to
+  «Отчёты об ошибках».
+- **The phone's password manager** now fills in the mail login and
+  password and offers to save them after a successful sign-in.
+
+From v0.5.1 the app offers this update by itself (**Настройки →
+Обновления**).
+
 ## What's new — v0.5.3
 
 <img src="docs/screenshots/android-glass-schedule.webp" width="15%" alt="Liquid Glass в приложении: расписание, осенние листья"> <img src="docs/screenshots/android-glass-settings.webp" width="15%" alt="Настройки: Liquid Glass и узор «Лето: самокаты»"> <img src="docs/screenshots/android-glass-mail.webp" width="15%" alt="Почта на стекле"> <img src="docs/screenshots/glass-seasons.webp" width="15%" alt="Узор по времени года в браузере">
