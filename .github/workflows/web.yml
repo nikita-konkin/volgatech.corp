@@ -79,7 +79,16 @@ jobs:
             echo "::error::Secret GITVERSE_TOKEN is not set."
             exit 1
           fi
-          git clone -q --depth 1 "https://${TOKEN}@gitverse.ru/${REPO}.git" repo
+          # Over HTTP/1.1, and tried again: GitVerse has dropped HTTP/2
+          # streams halfway (curl exit 92), failing a run now and then.
+          git config --global http.version HTTP/1.1
+          for try in 1 2 3; do
+            git clone -q --depth 1 "https://${TOKEN}@gitverse.ru/${REPO}.git" repo && break
+            rm -rf repo
+            [ "$try" = 3 ] && exit 1
+            echo "::warning::Clone failed, trying again."
+            sleep 15
+          done
           find repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -r build/. repo/
           cp README.ru.md repo/README.md
@@ -93,7 +102,13 @@ jobs:
           fi
           git -c user.name='github-actions' -c user.email='actions@github.com' \
             commit -qm "Site from ${GITHUB_SHA::7}"
-          git push -q origin HEAD
+          # If a push that "failed" did reach GitVerse, the next has nothing to send.
+          for try in 1 2 3; do
+            git push -q origin HEAD && exit 0
+            [ "$try" = 3 ] && exit 1
+            echo "::warning::Push failed, trying again."
+            sleep 15
+          done
 
   github-pages:
     name: GitHub Pages
