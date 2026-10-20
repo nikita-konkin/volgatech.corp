@@ -1,7 +1,7 @@
 name: volgatech_pro
 description: "Volgatech PRO — staff cabinet (rebuild). Fast, native, old-device friendly."
 publish_to: 'none'
-version: 0.5.5+20
+version: 0.5.6+23
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -20,6 +20,8 @@ dependencies:
   shared_preferences: ^2.3.2
   local_auth: ^2.3.0
   webview_flutter: ^4.7.0
+  # Text size in the mail reader (AndroidWebViewController.setTextZoom).
+  webview_flutter_android: ^4.10.0
   cupertino_icons: ^1.0.8
   archive: ^4.3.0
   share_plus: ^12.0.2

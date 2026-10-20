@@ -63,8 +63,8 @@ class Brand {
 }
 
 /// [browser]: the web build, which brings its own font (see pubspec.yaml).
-/// [glass]: «Liquid Glass» (glass.dart): clear, at [strength] (0 to 1; 1, as
-/// designed), or, [scuffed], matte; either with the [season]'s ornament
+/// [glass]: «Liquid Glass» (glass.dart): clear or, [scuffed], matte, at
+/// [strength] (0 to 1; 1, as designed); either with the [season]'s ornament
 /// grown on it as far as [ornament] (0 to 1).
 ThemeData buildLightTheme(
         {bool browser = kIsWeb,
@@ -99,12 +99,11 @@ ThemeData _base(Brightness b, bool browser, bool glass, bool scuffed,
           : null;
   final g = !glass
       ? Glass.off
-      : scuffed
-          ? (dark ? Glass.scuffedDark : Glass.scuffedLight)
-              .copyWith(ornament: ornament, season: season)
-          : (dark ? Glass.dark : Glass.light)
-              .scaled(strength)
-              .copyWith(ornament: ornament, season: season);
+      : (scuffed
+              ? (dark ? Glass.scuffedDark : Glass.scuffedLight)
+              : (dark ? Glass.dark : Glass.light))
+          .scaled(strength)
+          .copyWith(ornament: ornament, season: season);
   final text = dark ? Glass.darkText : Glass.lightText;
   final scheme = (dark
           ? const ColorScheme.dark(

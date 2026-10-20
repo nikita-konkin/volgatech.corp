@@ -57,13 +57,13 @@ class _VolgatechAppState extends State<VolgatechApp>
       theme: buildLightTheme(
           glass: glass,
           scuffed: theme.scuffed,
-          strength: theme.strength,
+          strength: theme.effectStrength,
           ornament: theme.ornament,
           season: theme.season),
       darkTheme: buildDarkTheme(
           glass: glass,
           scuffed: theme.scuffed,
-          strength: theme.strength,
+          strength: theme.effectStrength,
           ornament: theme.ornament,
           season: theme.season),
       themeMode: theme.mode,

@@ -5,6 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'season.dart';
 
+const kDefaultMailTemplates = [
+  'Спасибо, получил(а).',
+  'Принято, сделаю.',
+  'Добрый день! ',
+  'С уважением,',
+];
+
 /// Non-secret preferences (remembered username, theme). Secrets live in
 /// [Session] (secure storage); this is plain, and survives logout on purpose.
 class Prefs {
@@ -20,6 +27,7 @@ class Prefs {
   static const _kGlass = 'theme_glass';
   static const _kScuffed = 'theme_glass_scuffed';
   static const _kGlassStrength = 'theme_glass_strength';
+  static const _kMatteStrength = 'theme_glass_matte_strength';
   // Named when frost was the only ornament.
   static const _kGlassOrnament = 'theme_glass_frost';
   static const _kGlassSeason = 'theme_glass_season';
@@ -39,6 +47,11 @@ class Prefs {
   static const _kDraft = 'mail_draft';
   static const _kSignNew = 'mail_signature_new';
   static const _kSignReplies = 'mail_signature_replies';
+  static const _kTextZoom = 'mail_text_zoom';
+  static const _kDarkBody = 'mail_dark_body';
+  static const _kTemplates = 'mail_templates';
+  static const _kImagesAlways = 'mail_images_always';
+  static const _kImageSenders = 'mail_image_senders';
 
   String? get rememberedLogin => _p.getString(_kLogin);
 
@@ -129,6 +142,30 @@ class Prefs {
   Future<void> setMailUnread(int n) async => _p.setInt(_kUnread, n);
 
   /// The message last left unsent (see `ComposeDraft.toJson`), if any.
+  /// The letter's text size, in percent.
+  int get mailTextZoom => _p.getInt(_kTextZoom) ?? 100;
+  Future<void> setMailTextZoom(int v) async => _p.setInt(_kTextZoom, v);
+
+  /// Letters shown dark (in the dark theme).
+  bool get mailDarkBody => _p.getBool(_kDarkBody) ?? true;
+  Future<void> setMailDarkBody(bool v) async => _p.setBool(_kDarkBody, v);
+
+  /// Pictures from the internet shown in every letter (but spam).
+  bool get mailImagesAlways => _p.getBool(_kImagesAlways) ?? false;
+  Future<void> setMailImagesAlways(bool v) async =>
+      _p.setBool(_kImagesAlways, v);
+
+  /// Senders whose letters show pictures from the internet, lowercased.
+  Set<String> get mailImageSenders => {...?_p.getStringList(_kImageSenders)};
+  Future<void> addMailImageSender(String email) async => _p.setStringList(
+      _kImageSenders, [...mailImageSenders, email.trim().toLowerCase()]);
+
+  /// Phrases to put into a message with a tap.
+  List<String> get mailTemplates =>
+      _p.getStringList(_kTemplates) ?? kDefaultMailTemplates;
+  Future<void> setMailTemplates(List<String> v) async =>
+      _p.setStringList(_kTemplates, v);
+
   Object? get mailDraft => readJson(_kDraft);
   Future<void> setMailDraft(Object? json) async =>
       json == null ? _p.remove(_kDraft) : writeJson(_kDraft, json);
@@ -156,6 +193,12 @@ class Prefs {
       (_p.getDouble(_kGlassStrength) ?? 1).clamp(0.0, 1.0);
   Future<void> setGlassStrength(double v) async =>
       _p.setDouble(_kGlassStrength, v);
+
+  /// The same for matte glass, kept apart so either keeps its own.
+  double get matteStrength =>
+      (_p.getDouble(_kMatteStrength) ?? 1).clamp(0.0, 1.0);
+  Future<void> setMatteStrength(double v) async =>
+      _p.setDouble(_kMatteStrength, v);
 
   /// How far the ornament has grown on the glass, clear or matte, 0 to 1
   /// (Settings' «Иней», «Листья»…).

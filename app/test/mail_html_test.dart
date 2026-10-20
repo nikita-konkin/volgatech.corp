@@ -24,10 +24,8 @@ Content-Type: text/plain; charset=utf-8
 
 <script>alert(1)</script> Привет & пока
 '''));
-    expect(
-        html,
-        contains(
-            '&lt;script&gt;alert(1)&lt;&#47;script&gt; Привет &amp; пока'));
+    expect(html,
+        contains('&lt;script&gt;alert(1)&lt;/script&gt; Привет &amp; пока'));
     expect(html, isNot(contains('<script>')));
   });
 
@@ -42,6 +40,34 @@ Content-Type: text/html; charset=utf-8
     expect(html, contains("default-src 'none'"));
     expect(html, contains('img-src data:;'));
     expect(html, contains('<p>Hi'));
+  });
+
+  test('pictures from the internet: counted, let in only when asked', () {
+    final m = _parse('''
+From: a@volgatech.net
+Subject: t
+Content-Type: text/html; charset=utf-8
+
+<table background="https://x.example/bg.png"><tr><td>
+<img alt="logo" src="https://x.example/logo.png"> <img src='http://x.example/p.gif'>
+<div style="background:url( 'https://x.example/b.jpg')">Привет</div>
+<img src="data:image/png;base64,iVBORw0KGgo=">
+</td></tr></table>
+''');
+    final hidden = messageBody(m);
+    expect(hidden.remoteImages, 4);
+    expect(hidden.html, contains('img-src data:;'));
+    final shown = messageBody(m, remoteImages: true);
+    expect(shown.html, contains('img-src data: https:;'));
+    expect(shown.html, contains("default-src 'none'"));
+    expect(shown.html, contains('overflow-wrap:break-word'));
+    expect(messageBody(_parse('''
+From: a@volgatech.net
+Subject: t
+Content-Type: text/plain; charset=utf-8
+
+https://x.example/logo.png
+''')).remoteImages, 0);
   });
 
   test('inline cid: images become data URIs', () {

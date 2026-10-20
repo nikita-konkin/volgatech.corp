@@ -26,9 +26,10 @@ class ComposeDraft {
     this.quotes = false,
   }) : attachments = attachments ?? [];
 
-  /// Reply to the sender (and, with [all], everyone else but me).
+  /// Reply to the sender (and, with [all], everyone else but me), quoting
+  /// the original or, given, just [quote] from it.
   factory ComposeDraft.reply(MimeMessage original,
-      {required bool all, required String myLogin}) {
+      {required bool all, required String myLogin, String? quote}) {
     final sender = original.replyTo?.isNotEmpty ?? false
         ? original.replyTo!
         : original.from ?? const <MailAddress>[];
@@ -44,7 +45,8 @@ class ComposeDraft {
       to: formatAddresses(sender),
       cc: formatAddresses(others),
       subject: _prefixed('RE: ', original.decodeSubject()),
-      text: '\n\n${_quoteHeader(original)}\n${_quote(_plainText(original))}',
+      text: '\n\n${_quoteHeader(original)}\n'
+          '${_quote(quote?.trim() ?? plainTextOf(original))}',
       inReplyTo: messageId,
       references:
           [if (refs != null) refs, if (messageId != null) messageId].join(' '),
@@ -71,7 +73,7 @@ class ComposeDraft {
           '${date == null ? '' : 'Дата: ${_date(date)}\n'}'
           'Тема: ${original.decodeSubject() ?? ''}\n'
           '${to.isEmpty ? '' : 'Кому: $to\n'}'
-          '\n${_plainText(original)}',
+          '\n${plainTextOf(original)}',
       attachments: files,
       quotes: true,
     );
@@ -212,7 +214,8 @@ String _prefixed(String prefix, String? subject) {
   return s.toUpperCase().startsWith(prefix.trim()) ? s : '$prefix$s';
 }
 
-String _plainText(MimeMessage m) {
+/// The text of [m]: its plain part, or its HTML part as text.
+String plainTextOf(MimeMessage m) {
   final plain = m.decodeTextPlainPart();
   if (plain != null) return plain.trimRight();
   return htmlToText(m.decodeTextHtmlPart() ?? '');
