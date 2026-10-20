@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -476,6 +477,10 @@ void main() {
     /// port each sign-in came from.
     late int refuseSignIns;
     late List<int> signInPorts;
+
+    /// Goes quiet on the next request on a signed-in connection: before
+    /// answering ('headers') or halfway through the answer ('body').
+    late String? stall;
     setUp(() async {
       log = [];
       authed = {};
@@ -486,6 +491,7 @@ void main() {
       rejectMessagePin = false;
       refuseSignIns = 0;
       signInPorts = [];
+      stall = null;
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((req) async {
         final auth = req.headers.value('authorization') ?? '';
@@ -539,6 +545,15 @@ void main() {
             ..statusCode = 500
             ..write('<faultstring>The request failed schema validation'
                 '</faultstring>');
+        } else if (authed.contains(port) && stall != null) {
+          log.add('stalled');
+          if (stall == 'body') {
+            res
+              ..contentLength = 4096
+              ..write('<s:Envelope');
+            await res.flush();
+          }
+          await Completer<void>().future; // a connection the network dropped
         } else if (authed.contains(port)) {
           log.add('call');
           res.write(_answer(body));
@@ -552,9 +567,10 @@ void main() {
     });
     tearDown(() => server.close(force: true));
 
-    EwsMailService service() => EwsMailService(
+    EwsMailService service({Duration? timeout}) => EwsMailService(
         endpoint:
-            Uri.parse('http://127.0.0.1:${server.port}/EWS/Exchange.asmx'));
+            Uri.parse('http://127.0.0.1:${server.port}/EWS/Exchange.asmx'),
+        timeout: timeout ?? EwsSession.defaultTimeout);
 
     test('signs in once, then reuses the connection', () async {
       final s = service();
@@ -687,6 +703,24 @@ void main() {
       await expectLater(
           service().connect(const MailCredentials(r'MARSTU\someone', 'x')),
           throwsA(isA<MailAuthException>()));
+    });
+
+    test('a connection gone quiet is dropped; the next request gets a new one',
+        () async {
+      final s = service(timeout: const Duration(milliseconds: 300));
+      await s.connect(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+      for (final quiet in ['headers', 'body']) {
+        stall = quiet;
+        final asked = DateTime.now();
+        await expectLater(s.folders(), throwsA(isA<MailNetworkException>()),
+            reason: quiet);
+        expect(DateTime.now().difference(asked).inSeconds, lessThan(5));
+        stall = null;
+        log.clear();
+        expect(await s.folders(), isNotEmpty, reason: 'without reconnecting');
+        expect(log.take(2), ['negotiate', 'auth'], reason: 'a new connection');
+      }
+      await s.disconnect();
     });
 
     test('a refused saved password is tried once more, on a new connection',
