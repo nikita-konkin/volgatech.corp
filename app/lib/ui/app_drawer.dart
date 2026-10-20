@@ -154,6 +154,8 @@ class NavMenu extends StatelessWidget {
         item(Section.exams, Icons.menu_book, 'Расписание экзаменов'),
         item(Section.foreign, Icons.translate, 'Иностранные группы',
             subtitle: 'служебная записка за месяц'),
+        item(Section.hourly, Icons.work_history_outlined, 'Почасовая нагрузка',
+            subtitle: 'отчёт по форме 28'),
         ListTile(
           leading: Icon(Icons.mail_outline, color: accent),
           title: const Text('Мои обращения'),
