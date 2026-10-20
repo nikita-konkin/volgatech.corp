@@ -27,6 +27,7 @@ class Prefs {
   static const _kGlass = 'theme_glass';
   static const _kScuffed = 'theme_glass_scuffed';
   static const _kGlassStrength = 'theme_glass_strength';
+  static const _kMatteStrength = 'theme_glass_matte_strength';
   // Named when frost was the only ornament.
   static const _kGlassOrnament = 'theme_glass_frost';
   static const _kGlassSeason = 'theme_glass_season';
@@ -192,6 +193,12 @@ class Prefs {
       (_p.getDouble(_kGlassStrength) ?? 1).clamp(0.0, 1.0);
   Future<void> setGlassStrength(double v) async =>
       _p.setDouble(_kGlassStrength, v);
+
+  /// The same for matte glass, kept apart so either keeps its own.
+  double get matteStrength =>
+      (_p.getDouble(_kMatteStrength) ?? 1).clamp(0.0, 1.0);
+  Future<void> setMatteStrength(double v) async =>
+      _p.setDouble(_kMatteStrength, v);
 
   /// How far the ornament has grown on the glass, clear or matte, 0 to 1
   /// (Settings' «Иней», «Листья»…).

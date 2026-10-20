@@ -14,8 +14,7 @@ void main() {
     for (final (dark, scuffed, strength) in [
       for (final dark in [false, true])
         for (final scuffed in [false, true])
-          // Matte glass is as thick however much ornament; see its tests.
-          for (final strength in scuffed ? [1.0] : [1.0, 0.75, 0.5, 0.25, 0.0])
+          for (final strength in [1.0, 0.75, 0.5, 0.25, 0.0])
             (dark, scuffed, strength),
     ]) {
       final theme = dark
@@ -387,6 +386,7 @@ void main() {
     for (final (dark, scuffed, strength) in [
       for (final dark in [false, true]) ...[
         (dark, true, 1.0),
+        (dark, true, 0.0),
         (dark, false, 1.0),
         (dark, false, 0.0),
       ],
@@ -426,10 +426,17 @@ void main() {
     expect(theme.season, Season.of(DateTime.now()));
     await theme.setOrnament(0.9);
     await theme.setStrength(0.3);
+    await theme.setScuffed(true);
+    expect(theme.effectStrength, 1, reason: 'matte keeps its own');
+    await theme.setEffectStrength(0.6);
     await theme.setSeason(Season.summer);
     final again = ThemeController(prefs);
     expect(again.ornament, 0.9);
     expect(again.strength, 0.3);
+    expect(again.matteStrength, 0.6);
+    expect(again.effectStrength, 0.6);
+    await again.setScuffed(false);
+    expect(again.effectStrength, 0.3);
     expect(again.season, Season.summer);
     await again.setSeason(null);
     expect(ThemeController(prefs).seasonChosen, isNull);

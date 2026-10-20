@@ -9,6 +9,7 @@ class ThemeController extends ChangeNotifier {
         _glass = _prefs.glass,
         _scuffed = _prefs.glassScuffed,
         _strength = _prefs.glassStrength,
+        _matteStrength = _prefs.matteStrength,
         _ornament = _prefs.glassOrnament,
         _season = _prefs.glassSeason;
   final Prefs _prefs;
@@ -16,6 +17,7 @@ class ThemeController extends ChangeNotifier {
   bool _glass;
   bool _scuffed;
   double _strength;
+  double _matteStrength;
   double _ornament;
   Season? _season;
 
@@ -29,6 +31,12 @@ class ThemeController extends ChangeNotifier {
 
   /// How strong the clear glass is, 0 to 1; 1, as designed.
   double get strength => _strength;
+
+  /// How strong the matte glass is, the same way.
+  double get matteStrength => _matteStrength;
+
+  /// How strong the glass chosen is, clear or matte.
+  double get effectStrength => _scuffed ? _matteStrength : _strength;
 
   /// How far the ornament has grown on the glass, clear or matte, 0 to 1.
   double get ornament => _ornament;
@@ -63,6 +71,20 @@ class ThemeController extends ChangeNotifier {
     }
     if (save) await _prefs.setGlassStrength(v);
   }
+
+  /// As [setStrength], for the matte glass.
+  Future<void> setMatteStrength(double v, {bool save = true}) async {
+    v = v.clamp(0.0, 1.0);
+    if (v != _matteStrength) {
+      _matteStrength = v;
+      notifyListeners();
+    }
+    if (save) await _prefs.setMatteStrength(v);
+  }
+
+  /// The strength of the glass chosen, clear or matte.
+  Future<void> setEffectStrength(double v, {bool save = true}) =>
+      _scuffed ? setMatteStrength(v, save: save) : setStrength(v, save: save);
 
   /// As [setStrength], for the ornament.
   Future<void> setOrnament(double v, {bool save = true}) async {

@@ -202,14 +202,14 @@ class _GlassTile extends StatelessWidget {
               onSelectionChanged: (s) => theme.setScuffed(s.first),
             ),
           ),
-        // Clear glass: how strong, from nearly solid panels to the full
-        // effect.
-        if (theme.glass && !theme.scuffed)
+        // How strong, from nearly solid panels to the full effect: clear
+        // and matte each keep their own.
+        if (theme.glass)
           _PercentSlider(
             label: 'Сила эффекта',
-            value: theme.strength,
-            onChanged: (v) => theme.setStrength(v, save: false),
-            onChangeEnd: theme.setStrength,
+            value: theme.effectStrength,
+            onChanged: (v) => theme.setEffectStrength(v, save: false),
+            onChangeEnd: theme.setEffectStrength,
           ),
         // Either: the season's ornament, and how far it has grown.
         if (theme.glass)
