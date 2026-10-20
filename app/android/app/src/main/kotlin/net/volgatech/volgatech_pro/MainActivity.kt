@@ -20,5 +20,8 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+        // Contacts, calendar events and translation for the mail reader.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "volgatech/text")
+            .setMethodCallHandler { call, result -> TextIntents.handle(this, call, result) }
     }
 }

@@ -1,22 +1,29 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:enough_mail/enough_mail.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
+import '../../core/prefs.dart';
 import '../../theme.dart';
 import '../attachments.dart';
 import '../compose.dart';
 import '../mail_controller.dart';
 import '../mail_html.dart';
 import '../mail_models.dart';
+import '../mail_text.dart';
+import '../text_intents.dart';
 import 'attachment_view.dart';
 import 'compose_page.dart';
 import 'mail_actions.dart';
+import 'message_tools.dart';
 import 'recipient_field.dart' show initials;
 
 /// One message: sender, recipients, attachments and the body.
@@ -28,11 +35,216 @@ class MessagePage extends StatefulWidget {
   State<MessagePage> createState() => _MessagePageState();
 }
 
+enum _Tool {
+  find,
+  links,
+  quote,
+  copy,
+  share,
+  translate,
+  textSize,
+  dark,
+  contact,
+  unsubscribe,
+}
+
 class _MessagePageState extends State<MessagePage> {
   late Future<MimeMessage> _message = _load();
+  final _body = GlobalKey<_BodyState>();
+  final _intents = const TextIntents();
+  late final Prefs _prefs = context.read<Prefs>();
+  late int _zoom = _prefs.mailTextZoom;
+  late bool _darkBody = _prefs.mailDarkBody;
 
-  Future<MimeMessage> _load() =>
-      context.read<MailController>().open(widget.header);
+  /// The letter, once here, and its page as last made.
+  MimeMessage? _loaded;
+  PreparedBody? _page;
+  bool? _pageDark;
+
+  Future<MimeMessage> _load() async {
+    final m = await context.read<MailController>().open(widget.header);
+    if (mounted) setState(() => _loaded = m);
+    return m;
+  }
+
+  bool get _dark =>
+      _darkBody && Theme.of(context).brightness == Brightness.dark;
+
+  PreparedBody _pageOf(MimeMessage m) {
+    if (_page == null || _pageDark != _dark) {
+      _page = messageBody(m, dark: _dark);
+      _pageDark = _dark;
+    }
+    return _page!;
+  }
+
+  String get _subject =>
+      widget.header.subject.isEmpty ? '(без темы)' : widget.header.subject;
+
+  void _onLink(MailLink link) =>
+      unawaited(showLinkSheet(context, link, subject: _subject));
+
+  void _compose(String title, ComposeDraft draft) {
+    final c = context.read<MailController>();
+    unawaited(Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ChangeNotifierProvider.value(
+        value: c,
+        child: ComposePage(draft: draft, title: title),
+      ),
+    )));
+  }
+
+  Future<void> _tool(_Tool t, MimeMessage m) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final text = tidyText(plainTextOf(m));
+    switch (t) {
+      case _Tool.find:
+        _body.currentState?.openFind();
+      case _Tool.links:
+        await showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          isScrollControlled: true,
+          builder: (_) =>
+              LinksSheet(links: _pageOf(m).webLinks, onTap: _onLink),
+        );
+      case _Tool.quote:
+        final quote = await _body.currentState?.selection() ?? '';
+        if (!mounted) return;
+        if (quote.isEmpty) {
+          messenger.showSnackBar(const SnackBar(
+              content: Text('Выделите в письме текст для цитаты: '
+                  'нажмите на него и подержите')));
+          return;
+        }
+        _compose(
+            'Ответ',
+            ComposeDraft.reply(m,
+                all: false,
+                myLogin: context.read<MailController>().login ?? '',
+                quote: quote));
+      case _Tool.copy:
+        copied(context, text, what: 'Текст письма скопирован');
+      case _Tool.share:
+        await SharePlus.instance
+            .share(ShareParams(text: text, subject: _subject));
+      case _Tool.translate:
+        if (!await _intents.translate(text)) {
+          // No translator: whoever takes the text.
+          await SharePlus.instance
+              .share(ShareParams(text: text, subject: _subject));
+        }
+      case _Tool.textSize:
+        await showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          builder: (_) => TextSizeSheet(
+            percent: _zoom,
+            onChanged: (p) {
+              setState(() => _zoom = p);
+              unawaited(_prefs.setMailTextZoom(p));
+            },
+          ),
+        );
+      case _Tool.dark:
+        setState(() => _darkBody = !_darkBody);
+        await _prefs.setMailDarkBody(_darkBody);
+      case _Tool.contact:
+        final from = m.from?.firstOrNull;
+        final taken = await _intents.addContact(
+          name: from?.personalName?.trim(),
+          email: from?.email ?? widget.header.fromEmail,
+          phone: signaturePhone(plainTextOf(m))?.split(',').first,
+        );
+        if (!taken) {
+          messenger.showSnackBar(const SnackBar(
+              content: Text('На телефоне нет приложения контактов')));
+        }
+      case _Tool.unsubscribe:
+        await _unsubscribe(m);
+    }
+  }
+
+  Future<void> _unsubscribe(MimeMessage m) async {
+    final target = unsubscribeTarget(m.getHeaderValue('list-unsubscribe'));
+    if (target == null) return;
+    final byMail = target.toLowerCase().startsWith('mailto:');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Отписаться от рассылки?'),
+        content: Text(byMail
+            ? 'Рассылка просит письмо на ${parseMailto(target).to} — '
+                'оно откроется готовым к отправке.'
+            : 'Откроется страница отписки на '
+                '${Uri.tryParse(target)?.host ?? target}.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Отмена')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Отписаться')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    if (byMail) {
+      final to = parseMailto(target);
+      _compose(
+          'Отписка',
+          ComposeDraft(
+              to: to.to,
+              subject: to.subject.isEmpty ? 'unsubscribe' : to.subject,
+              text: to.body));
+    } else {
+      await launchUrl(Uri.parse(target), mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _tools(MimeMessage m) {
+    final page = _pageOf(m);
+    final links = page.webLinks.length;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final unsubscribe =
+        unsubscribeTarget(m.getHeaderValue('list-unsubscribe')) != null;
+    PopupMenuItem<_Tool> item(_Tool t, IconData icon, String label) =>
+        PopupMenuItem(
+          value: t,
+          child: ListTile(
+            leading: Icon(icon),
+            title: Text(label),
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+          ),
+        );
+    return PopupMenuButton<_Tool>(
+      tooltip: 'Ещё',
+      onSelected: (t) => unawaited(_tool(t, m)),
+      itemBuilder: (_) => [
+        item(_Tool.find, Icons.search, 'Найти в письме'),
+        if (links > 0)
+          item(_Tool.links, Icons.link, 'Ссылки в письме · $links'),
+        item(_Tool.quote, Icons.format_quote_outlined,
+            'Ответить с цитатой выделенного'),
+        item(_Tool.copy, Icons.copy_outlined, 'Копировать текст'),
+        item(_Tool.share, Icons.share_outlined, 'Поделиться текстом'),
+        item(_Tool.translate, Icons.translate, 'Перевести'),
+        item(_Tool.textSize, Icons.format_size, 'Размер текста'),
+        if (dark)
+          CheckedPopupMenuItem(
+              value: _Tool.dark,
+              checked: _darkBody,
+              child: const Text('Тёмный фон письма')),
+        if (_intents.available)
+          item(_Tool.contact, Icons.person_add_alt,
+              'Сохранить отправителя в контакты'),
+        if (unsubscribe)
+          item(_Tool.unsubscribe, Icons.unsubscribe_outlined,
+              'Отписаться от рассылки'),
+      ],
+    );
+  }
 
   /// Pinned, as far as this page knows: it changes here.
   late bool _pinned = widget.header.pinned;
@@ -100,6 +312,7 @@ class _MessagePageState extends State<MessagePage> {
             icon: const Icon(Icons.mark_email_unread_outlined),
             onPressed: () => unawaited(_markUnread()),
           ),
+          if (_loaded case final m?) _tools(m),
         ],
       ),
       body: FutureBuilder<MimeMessage>(
@@ -117,9 +330,17 @@ class _MessagePageState extends State<MessagePage> {
                 const Expanded(
                     child: Center(child: CircularProgressIndicator()))
               else ...[
-                _Attachments(m),
-                Expanded(child: _Body(m)),
-                _ReplyBar(m),
+                _Attachments(m, meeting: _pageOf(m).meeting, onLink: _onLink),
+                Expanded(
+                  child: _Body(
+                    key: _body,
+                    page: _pageOf(m),
+                    dark: _dark,
+                    zoom: _zoom,
+                    onLink: _onLink,
+                  ),
+                ),
+                _ReplyBar(m, compose: _compose),
               ],
             ],
           );
@@ -308,9 +529,13 @@ class _Person extends StatelessWidget {
   }
 }
 
+/// The letter's attachments, after «Присоединиться» when it invites to an
+/// online meeting.
 class _Attachments extends StatelessWidget {
-  const _Attachments(this.message);
+  const _Attachments(this.message, {this.meeting, required this.onLink});
   final MimeMessage message;
+  final MailLink? meeting;
+  final void Function(MailLink) onLink;
 
   Future<void> _choose(BuildContext context, ContentInfo info) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -353,13 +578,23 @@ class _Attachments extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final files = message.findContentInfo();
-    if (files.isEmpty) return const SizedBox.shrink();
+    final call = meeting;
+    if (files.isEmpty && call == null) return const SizedBox.shrink();
     return SizedBox(
       height: 44,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
+          if (call != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                avatar: const Icon(Icons.videocam_outlined, size: 18),
+                label: Text('Присоединиться · ${call.meeting}'),
+                onPressed: () => onLink(call),
+              ),
+            ),
           for (final f in files)
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -431,8 +666,18 @@ String fileSize(int bytes) {
 }
 
 class _Body extends StatefulWidget {
-  const _Body(this.message);
-  final MimeMessage message;
+  const _Body(
+      {super.key,
+      required this.page,
+      required this.dark,
+      required this.zoom,
+      required this.onLink});
+  final PreparedBody page;
+  final bool dark;
+
+  /// Text size, in percent.
+  final int zoom;
+  final void Function(MailLink) onLink;
 
   @override
   State<_Body> createState() => _BodyState();
@@ -440,19 +685,34 @@ class _Body extends StatefulWidget {
 
 class _BodyState extends State<_Body> {
   late final WebViewController _web = WebViewController();
+  bool _finding = false;
+  int? _found;
+  int _current = 0;
 
   @override
   void initState() {
     super.initState();
-    // No JavaScript; links leave the app instead of loading in the reader.
-    unawaited(_web.setJavaScriptMode(JavaScriptMode.disabled));
-    unawaited(_web.setBackgroundColor(Colors.white));
+    // JavaScript for the reader's own find and selection only: the page's
+    // policy (mail_html.dart) keeps the letter's scripts from running.
+    unawaited(_web.setJavaScriptMode(JavaScriptMode.unrestricted));
+    unawaited(_web.enableZoom(true));
+    _zoomTo(widget.zoom);
     unawaited(_web.setNavigationDelegate(NavigationDelegate(
+      onPageFinished: (_) => unawaited(_run(readerScript)),
       onNavigationRequest: (req) {
+        // The letter's links: a sheet of what to do, nothing opens yet.
+        if (req.url.startsWith('$kLinkScheme:')) {
+          final i = int.tryParse(req.url.substring(kLinkScheme.length + 1));
+          final links = widget.page.links;
+          if (i != null && i >= 0 && i < links.length) widget.onLink(links[i]);
+          return NavigationDecision.prevent;
+        }
         final uri = Uri.tryParse(req.url);
         if (uri != null &&
             const ['http', 'https', 'mailto', 'tel'].contains(uri.scheme)) {
-          unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+          // Not a link the page was made with (an image map, a refresh):
+          // the same sheet.
+          if (req.isMainFrame) widget.onLink(linkFor(req.url, ''));
           return NavigationDecision.prevent;
         }
         return req.isMainFrame
@@ -460,26 +720,90 @@ class _BodyState extends State<_Body> {
             : NavigationDecision.prevent;
       },
     )));
-    unawaited(_web.loadHtmlString(messageHtml(widget.message)));
+    _show();
+  }
+
+  void _show() {
+    unawaited(
+        _web.setBackgroundColor(widget.dark ? Colors.black : Colors.white));
+    unawaited(_web.loadHtmlString(widget.page.html));
+  }
+
+  void _zoomTo(int percent) {
+    if (_web.platform case final AndroidWebViewController android) {
+      unawaited(android.setTextZoom(percent));
+    }
   }
 
   @override
-  Widget build(BuildContext context) => WebViewWidget(controller: _web);
+  void didUpdateWidget(_Body old) {
+    super.didUpdateWidget(old);
+    if (old.page.html != widget.page.html) {
+      _show();
+      _found = null;
+    }
+    if (old.zoom != widget.zoom) _zoomTo(widget.zoom);
+  }
+
+  Future<Object?> _run(String script) async {
+    try {
+      return await _web.runJavaScriptReturningResult(script);
+    } on Object {
+      return null; // the page not there yet, or gone
+    }
+  }
+
+  void openFind() => setState(() => _finding = true);
+
+  Future<void> _find(String query, int index) async {
+    final n = switch (await _run(findScript(query, index))) {
+      final num n => n.toInt(),
+      final Object r => int.tryParse('$r') ?? 0,
+      null => 0,
+    };
+    if (!mounted) return;
+    setState(() {
+      _found = query.isEmpty ? null : n;
+      _current = n == 0 ? 0 : (index % n + n) % n;
+    });
+  }
+
+  void _closeFind() {
+    unawaited(_run(findScript('', 0)));
+    setState(() {
+      _finding = false;
+      _found = null;
+      _current = 0;
+    });
+  }
+
+  /// The text selected in the letter, or selected last.
+  Future<String> selection() async {
+    final r = await _run(selectionScript);
+    // Android hands strings back JSON-quoted.
+    final text = r is String && r.startsWith('"')
+        ? jsonDecode(r) as String
+        : '${r ?? ''}';
+    return text.trim();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        if (_finding)
+          FindBar(
+            onFind: (q, i) => unawaited(_find(q, i)),
+            onClose: _closeFind,
+            found: _found,
+            current: _current,
+          ),
+        Expanded(child: WebViewWidget(controller: _web)),
+      ]);
 }
 
 class _ReplyBar extends StatelessWidget {
-  const _ReplyBar(this.message);
+  const _ReplyBar(this.message, {required this.compose});
   final MimeMessage message;
-
-  void _compose(BuildContext context, String title, ComposeDraft draft) {
-    final c = context.read<MailController>();
-    unawaited(Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => ChangeNotifierProvider.value(
-        value: c,
-        child: ComposePage(draft: draft, title: title),
-      ),
-    )));
-  }
+  final void Function(String title, ComposeDraft draft) compose;
 
   @override
   Widget build(BuildContext context) {
@@ -502,18 +826,15 @@ class _ReplyBar extends StatelessWidget {
             action(
                 Icons.reply,
                 'Ответить',
-                () => _compose(context, 'Ответ',
+                () => compose('Ответ',
                     ComposeDraft.reply(message, all: false, myLogin: login))),
             action(
                 Icons.reply_all,
                 'Всем',
-                () => _compose(context, 'Ответ всем',
+                () => compose('Ответ всем',
                     ComposeDraft.reply(message, all: true, myLogin: login))),
-            action(
-                Icons.forward,
-                'Переслать',
-                () => _compose(
-                    context, 'Пересылка', ComposeDraft.forward(message))),
+            action(Icons.forward, 'Переслать',
+                () => compose('Пересылка', ComposeDraft.forward(message))),
           ]),
         ),
       ),

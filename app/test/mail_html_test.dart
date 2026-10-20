@@ -27,7 +27,7 @@ Content-Type: text/plain; charset=utf-8
     expect(
         html,
         contains(
-            '&lt;script&gt;alert(1)&lt;&#47;script&gt; Привет &amp; пока'));
+            '&lt;script&gt;alert(1)&lt;/script&gt; Привет &amp; пока'));
     expect(html, isNot(contains('<script>')));
   });
 

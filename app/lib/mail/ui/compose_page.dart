@@ -11,6 +11,7 @@ import '../compose.dart';
 import '../mail_controller.dart';
 import 'message_page.dart' show fileSize;
 import 'recipient_field.dart';
+import 'templates_sheet.dart';
 
 /// New message, reply or forward.
 class ComposePage extends StatefulWidget {
@@ -184,6 +185,24 @@ class _ComposePageState extends State<ComposePage> {
     }
   }
 
+  /// A phrase from the templates, put where the cursor is.
+  Future<void> _template() async {
+    final t = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => const TemplatesSheet(),
+    );
+    if (t == null) return;
+    final v = _text.value;
+    final at = v.selection.isValid ? v.selection.start : 0;
+    final end = v.selection.isValid ? v.selection.end : 0;
+    _text.value = TextEditingValue(
+      text: v.text.replaceRange(at, end, t),
+      selection: TextSelection.collapsed(offset: at + t.length),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final muted = Brand.muted(context);
@@ -202,6 +221,11 @@ class _ComposePageState extends State<ComposePage> {
         appBar: AppBar(
           title: Text(widget.title),
           actions: [
+            IconButton(
+              tooltip: 'Шаблоны',
+              icon: const Icon(Icons.short_text),
+              onPressed: _sending ? null : () => unawaited(_template()),
+            ),
             IconButton(
               tooltip: 'Прикрепить файл',
               icon: const Icon(Icons.attach_file),
