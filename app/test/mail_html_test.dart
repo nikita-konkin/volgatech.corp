@@ -56,9 +56,9 @@ Content-Type: text/html; charset=utf-8
 ''');
     final hidden = messageBody(m);
     expect(hidden.remoteImages, 4);
-    expect(hidden.html, contains("img-src data:;"));
+    expect(hidden.html, contains('img-src data:;'));
     final shown = messageBody(m, remoteImages: true);
-    expect(shown.html, contains("img-src data: https:;"));
+    expect(shown.html, contains('img-src data: https:;'));
     expect(shown.html, contains("default-src 'none'"));
     expect(shown.html, contains('overflow-wrap:break-word'));
     expect(messageBody(_parse('''
