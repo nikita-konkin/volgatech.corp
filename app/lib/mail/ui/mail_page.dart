@@ -73,6 +73,10 @@ class _MailView extends StatefulWidget {
 
 class _MailViewState extends State<_MailView> {
   late final AppLifecycleListener _lifecycle;
+  late final Timer _every;
+
+  /// How often the list on screen looks for new mail by itself.
+  static const _period = Duration(minutes: 2);
 
   @override
   void initState() {
@@ -81,10 +85,19 @@ class _MailViewState extends State<_MailView> {
     _lifecycle = AppLifecycleListener(
         onResume: () =>
             unawaited(context.read<MailController>().refreshIfStale()));
+    // And while it's open, without being pulled down.
+    _every = Timer.periodic(_period, (_) {
+      final state = WidgetsBinding.instance.lifecycleState;
+      if (state != null && state != AppLifecycleState.resumed) return;
+      unawaited(context
+          .read<MailController>()
+          .refreshIfStale(maxAge: _period ~/ 2, usage: false));
+    });
   }
 
   @override
   void dispose() {
+    _every.cancel();
     _lifecycle.dispose();
     super.dispose();
   }

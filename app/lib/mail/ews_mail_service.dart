@@ -12,9 +12,15 @@ import 'mail_service.dart';
 
 /// [MailService] over Exchange Web Services.
 class EwsMailService implements MailService {
-  EwsMailService({Uri? endpoint}) : _endpoint = endpoint;
+  EwsMailService({Uri? endpoint, Duration timeout = EwsSession.defaultTimeout})
+      : _endpoint = endpoint,
+        _timeout = timeout;
 
   final Uri? _endpoint;
+
+  /// The server's silence that counts as a dead connection (see
+  /// [EwsSession.timeout]); shorter in tests.
+  final Duration _timeout;
   EwsSession? _session;
   Map<String, FolderRole> _roles = const {};
 
@@ -38,8 +44,8 @@ class EwsMailService implements MailService {
   Future<void> connect(MailCredentials credentials,
       {bool typed = false}) async {
     await disconnect();
-    final session =
-        EwsSession(credentials, endpoint: _endpoint, retryRefused: !typed);
+    final session = EwsSession(credentials,
+        endpoint: _endpoint, retryRefused: !typed, timeout: _timeout);
     try {
       // Signs in and learns which folders are Входящие, Отправленные, …
       _roles = parseRoles(await session.call(getSystemFoldersSoap));

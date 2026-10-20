@@ -214,27 +214,36 @@ class MailController extends ChangeNotifier {
   /// When the list was last loaded from the server.
   DateTime? loadedAt;
 
-  /// Back in the app: reload unless the list is fresh anyway.
+  /// Back in the app, or every so often while the list is on screen:
+  /// reload unless the list is fresh anyway; [usage] too, unless asked not
+  /// to.
   Future<void> refreshIfStale(
-      {Duration maxAge = const Duration(seconds: 30)}) async {
+      {Duration maxAge = const Duration(seconds: 30),
+      bool usage = true}) async {
     final at = loadedAt;
     if (loading ||
         (at != null && DateTime.now().difference(at) < maxAge) ||
         status == MailStatus.refused && !await _mayTry()) {
       return;
     }
-    await refresh();
+    await refresh(usage: usage);
   }
 
   /// Pulled down, or [refreshIfStale]: a refused password is tried again
-  /// too.
-  Future<void> refresh() async {
-    if (_credentials == null) return;
+  /// too. Not while signing in, nor on the form — even with the saved
+  /// password still kept («Ввести новый»).
+  Future<void> refresh({bool usage = true}) async {
+    if (_credentials == null ||
+        status == MailStatus.starting ||
+        status == MailStatus.signedOut ||
+        status == MailStatus.connecting) {
+      return;
+    }
     if (status == MailStatus.offline || status == MailStatus.refused) {
       await _connectAndLoad();
     } else {
       await _guard(() => _load(folder));
-      unawaited(_updateUsage());
+      if (usage) unawaited(_updateUsage());
     }
   }
 

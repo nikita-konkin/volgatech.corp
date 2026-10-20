@@ -395,6 +395,12 @@ void main() {
       c.typeNew();
       expect(c.status, MailStatus.signedOut);
       expect((await store.read())?.password, 'secret');
+      // Coming back to the app or the timer: the form stays, untried.
+      await prefs.setMailRefused(0, DateTime.utc(2026));
+      await c.refreshIfStale(maxAge: Duration.zero);
+      await c.refresh();
+      expect(c.status, MailStatus.signedOut);
+      expect(server.tried, hasLength(1));
 
       server.refuse = false;
       expect(await c.signIn('konkinna', 'secret'), isTrue);
@@ -918,6 +924,31 @@ void main() {
     expect(find.byTooltip('Открепить'), findsNothing); // back on the list
     expect(find.text('Письмо 3'), findsNothing);
     expect(server.moved, {'msg3': 'id-arch'});
+  });
+
+  testWidgets('the open list looks for new mail every 2 minutes',
+      (tester) async {
+    await initializeDateFormatting('ru_RU');
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await Prefs.load();
+    await store.save(const MailCredentials(r'MARSTU\konkinna', 'secret'));
+    final c = controller();
+    await tester.pumpWidget(Provider<Prefs>.value(
+      value: prefs,
+      child: MaterialApp(home: ui.MailPage(create: (_) => c)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Письмо 6'), findsNothing);
+
+    server.inbox = [...server.inbox, _h(6)];
+    await tester.pump(const Duration(minutes: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Письмо 6'), findsNothing, reason: 'not yet');
+
+    c.loadedAt = DateTime(2026); // as if two minutes old
+    await tester.pump(const Duration(minutes: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Письмо 6'), findsOneWidget);
   });
 
   test('back in the app: reloads only a list that is not fresh', () async {

@@ -19,8 +19,13 @@ const ewsMessages =
 /// NTLM authenticates the TCP connection rather than each request, so the
 /// session keeps one connection and repeats the handshake only when the
 /// server asks again (new connection, idle timeout).
+///
+/// Requests go one at a time, so one stuck on a dead connection would hold
+/// up every later one for good: the server's silence ([timeout]) drops the
+/// connection, and the next request starts on a new one.
 class EwsSession {
-  EwsSession(this.credentials, {Uri? endpoint, this.retryRefused = true})
+  EwsSession(this.credentials,
+      {Uri? endpoint, this.retryRefused = true, this.timeout = defaultTimeout})
       : _endpoint = endpoint ?? Uri.parse(kEwsUrl);
 
   final MailCredentials credentials;
@@ -32,13 +37,31 @@ class EwsSession {
   /// typed: each refusal counts towards the domain account's lockout.
   final bool retryRefused;
 
+  /// How long the server may keep silent, before answering or halfway
+  /// through an answer, before the connection counts as dead.
+  final Duration timeout;
+  static const defaultTimeout = Duration(seconds: 30);
+
   HttpClient _http = _client();
   bool _authenticated = false;
 
+  /// When the server last answered in full.
+  DateTime? _heardAt;
+
+  static const _idle = Duration(seconds: 50);
   static HttpClient _client() => HttpClient()
     ..maxConnectionsPerHost = 1
     ..connectionTimeout = const Duration(seconds: 15)
-    ..idleTimeout = const Duration(seconds: 50);
+    ..idleTimeout = _idle;
+
+  /// A new connection, to be signed in afresh; the old one goes, with
+  /// anything still stuck on it.
+  void _renew() {
+    _http.close(force: true);
+    _http = _client();
+    _authenticated = false;
+  }
+
   Future<void> _queue = Future.value();
 
   /// Posts a SOAP [body]; returns the response document or throws
@@ -52,33 +75,43 @@ class EwsSession {
   }
 
   Future<XmlDocument> _call(List<int> bytes) async {
+    // Quiet for longer than a connection is kept: the app was most likely
+    // frozen in the background, the idle timer with it, and the network
+    // may have dropped the connection without a word.
+    if (_heardAt case final at? when DateTime.now().difference(at) > _idle) {
+      _renew();
+    }
     try {
       HttpClientResponse res;
       try {
         res = await _send(bytes);
       } on MailAuthException {
         if (!retryRefused) rethrow;
-        _http.close(force: true);
-        _http = _client();
+        _renew();
         res = await _handshake(bytes);
       }
-      final text = await utf8.decodeStream(res);
+      final text = await utf8.decodeStream(res.timeout(timeout));
+      _heardAt = DateTime.now();
       if (res.statusCode != HttpStatus.ok) {
         throw EwsException(ewsError(text) ?? 'HTTP ${res.statusCode}');
       }
       final error = ewsError(text);
       if (error != null) throw EwsException(error);
       return XmlDocument.parse(text);
+    } on MailAuthException {
+      _renew();
+      rethrow;
     } on SocketException catch (e) {
-      _authenticated = false;
+      _renew();
       throw MailNetworkException(e);
     } on HandshakeException catch (e) {
+      _renew();
       throw MailNetworkException(e);
     } on TimeoutException catch (e) {
-      _authenticated = false;
+      _renew();
       throw MailNetworkException(e);
     } on HttpException catch (e) {
-      _authenticated = false;
+      _renew();
       throw MailNetworkException(e);
     }
   }
@@ -87,7 +120,7 @@ class EwsSession {
     if (!_authenticated) return _handshake(bytes);
     final res = await _post(null, bytes);
     if (res.statusCode != HttpStatus.unauthorized) return res;
-    await res.drain<void>();
+    await res.timeout(timeout).drain<void>();
     return _handshake(bytes);
   }
 
@@ -95,7 +128,8 @@ class EwsSession {
   Future<HttpClientResponse> _handshake(List<int> bytes) async {
     _authenticated = false;
     final first = await _post('NTLM ${ntlmNegotiate()}', const []);
-    await first.drain<void>(); // frees the connection for the second leg
+    // Frees the connection for the second leg.
+    await first.timeout(timeout).drain<void>();
     final header = first.headers[HttpHeaders.wwwAuthenticateHeader]
         ?.map((h) => h.trim())
         .where((h) => h.startsWith('NTLM '))
@@ -118,7 +152,7 @@ class EwsSession {
         )}',
         bytes);
     if (res.statusCode == HttpStatus.unauthorized) {
-      throw MailAuthException(await refusalDetails(res));
+      throw MailAuthException(await refusalDetails(res, timeout: timeout));
     }
     _authenticated = true;
     return res;
@@ -126,7 +160,7 @@ class EwsSession {
 
   Future<HttpClientResponse> _post(
       String? authorization, List<int> body) async {
-    final req = await _http.postUrl(_endpoint);
+    final req = await _http.postUrl(_endpoint).timeout(timeout);
     req.persistentConnection = true;
     req.headers.set(HttpHeaders.contentTypeHeader, 'text/xml; charset=utf-8');
     if (authorization != null) {
@@ -134,7 +168,10 @@ class EwsSession {
     }
     req.headers.contentLength = body.length;
     req.add(body);
-    return req.close().timeout(const Duration(seconds: 60));
+    // Room to upload a big message too, at 50 KB/s.
+    return req
+        .close()
+        .timeout(timeout + Duration(milliseconds: body.length ~/ 50));
   }
 
   void close() => _http.close(force: true);
@@ -142,11 +179,15 @@ class EwsSession {
 
 /// What a refused sign-in [res] says beyond its status, for «Отчёты об
 /// ошибках»: Exchange's diagnostics header, or the error page's title.
-Future<String> refusalDetails(HttpClientResponse res) async {
+Future<String> refusalDetails(HttpClientResponse res,
+    {Duration timeout = EwsSession.defaultTimeout}) async {
   final diagnostics = res.headers.value('x-ms-diagnostics');
   String page;
   try {
-    page = await res.transform(const Utf8Decoder(allowMalformed: true)).join();
+    page = await res
+        .timeout(timeout)
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .join();
   } on Object {
     page = '';
   }
