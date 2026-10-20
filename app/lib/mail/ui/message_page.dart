@@ -44,6 +44,7 @@ enum _Tool {
   translate,
   textSize,
   dark,
+  images,
   contact,
   unsubscribe,
 }
@@ -56,10 +57,19 @@ class _MessagePageState extends State<MessagePage> {
   late int _zoom = _prefs.mailTextZoom;
   late bool _darkBody = _prefs.mailDarkBody;
 
+  /// Pictures from the internet let in: always, for this sender, or for
+  /// this letter just now. Never by themselves for a letter marked spam.
+  late bool _images = !_spam &&
+      (_prefs.mailImagesAlways ||
+          _prefs.mailImageSenders
+              .contains(widget.header.fromEmail.toLowerCase()));
+
+  bool get _spam => widget.header.subject.contains('*** SPAM ***');
+
   /// The letter, once here, and its page as last made.
   MimeMessage? _loaded;
   PreparedBody? _page;
-  bool? _pageDark;
+  (bool, bool)? _pageMade;
 
   Future<MimeMessage> _load() async {
     final m = await context.read<MailController>().open(widget.header);
@@ -71,11 +81,34 @@ class _MessagePageState extends State<MessagePage> {
       _darkBody && Theme.of(context).brightness == Brightness.dark;
 
   PreparedBody _pageOf(MimeMessage m) {
-    if (_page == null || _pageDark != _dark) {
-      _page = messageBody(m, dark: _dark);
-      _pageDark = _dark;
+    if (_page == null || _pageMade != (_dark, _images)) {
+      _page = messageBody(m, dark: _dark, remoteImages: _images);
+      _pageMade = (_dark, _images);
     }
     return _page!;
+  }
+
+  Future<void> _alwaysImages() async {
+    setState(() => _images = true);
+    final from = widget.header.fromEmail;
+    if (from.isEmpty) return;
+    await _prefs.addMailImageSender(from);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Картинки от $from будут показываться сразу')));
+  }
+
+  Future<void> _openPicture(String src) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final file = await pictureFrom(src);
+    if (file == null || file.preview != PreviewKind.image) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть картинку')));
+      return;
+    }
+    await navigator.push(
+        MaterialPageRoute<void>(builder: (_) => AttachmentViewPage(file)));
   }
 
   String get _subject =>
@@ -149,6 +182,10 @@ class _MessagePageState extends State<MessagePage> {
       case _Tool.dark:
         setState(() => _darkBody = !_darkBody);
         await _prefs.setMailDarkBody(_darkBody);
+      case _Tool.images:
+        final always = !_prefs.mailImagesAlways;
+        await _prefs.setMailImagesAlways(always);
+        if (always && !_spam) setState(() => _images = true);
       case _Tool.contact:
         final from = m.from?.firstOrNull;
         final taken = await _intents.addContact(
@@ -236,6 +273,10 @@ class _MessagePageState extends State<MessagePage> {
               value: _Tool.dark,
               checked: _darkBody,
               child: const Text('Тёмный фон письма')),
+        CheckedPopupMenuItem(
+            value: _Tool.images,
+            checked: _prefs.mailImagesAlways,
+            child: const Text('Всегда показывать картинки')),
         if (_intents.available)
           item(_Tool.contact, Icons.person_add_alt,
               'Сохранить отправителя в контакты'),
@@ -331,6 +372,12 @@ class _MessagePageState extends State<MessagePage> {
                     child: Center(child: CircularProgressIndicator()))
               else ...[
                 _Attachments(m, meeting: _pageOf(m).meeting, onLink: _onLink),
+                if (!_images && _pageOf(m).remoteImages > 0)
+                  ImagesBanner(
+                    spam: _spam,
+                    onShow: () => setState(() => _images = true),
+                    onAlways: () => unawaited(_alwaysImages()),
+                  ),
                 Expanded(
                   child: _Body(
                     key: _body,
@@ -338,6 +385,7 @@ class _MessagePageState extends State<MessagePage> {
                     dark: _dark,
                     zoom: _zoom,
                     onLink: _onLink,
+                    onPicture: (src) => unawaited(_openPicture(src)),
                   ),
                 ),
                 _ReplyBar(m, compose: _compose),
@@ -671,13 +719,17 @@ class _Body extends StatefulWidget {
       required this.page,
       required this.dark,
       required this.zoom,
-      required this.onLink});
+      required this.onLink,
+      required this.onPicture});
   final PreparedBody page;
   final bool dark;
 
   /// Text size, in percent.
   final int zoom;
   final void Function(MailLink) onLink;
+
+  /// A picture tapped: its address.
+  final void Function(String src) onPicture;
 
   @override
   State<_Body> createState() => _BodyState();
@@ -705,6 +757,11 @@ class _BodyState extends State<_Body> {
           final i = int.tryParse(req.url.substring(kLinkScheme.length + 1));
           final links = widget.page.links;
           if (i != null && i >= 0 && i < links.length) widget.onLink(links[i]);
+          return NavigationDecision.prevent;
+        }
+        if (req.url.startsWith('$kImageScheme:')) {
+          final i = int.tryParse(req.url.substring(kImageScheme.length + 1));
+          if (i != null) unawaited(_picture(i));
           return NavigationDecision.prevent;
         }
         final uri = Uri.tryParse(req.url);
@@ -754,6 +811,12 @@ class _BodyState extends State<_Body> {
   }
 
   void openFind() => setState(() => _finding = true);
+
+  Future<void> _picture(int index) async {
+    final r = await _run(imageScript(index));
+    final src = r is String && r.startsWith('"') ? jsonDecode(r) as String : '';
+    if (src.isNotEmpty && mounted) widget.onPicture(src);
+  }
 
   Future<void> _find(String query, int index) async {
     final n = switch (await _run(findScript(query, index))) {

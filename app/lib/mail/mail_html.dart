@@ -5,39 +5,56 @@ import 'package:enough_mail/enough_mail.dart';
 import 'mail_text.dart';
 
 /// Content-Security-Policy for message bodies: no scripts, no remote loads
-/// (tracking pixels, remote images), only inline styles and embedded images.
-/// The reader's own scripts (find, the selection) are run by the app and
-/// aren't the page's, so the policy doesn't stop them.
-const _csp = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; "
-    'font-src data:';
+/// (tracking pixels, remote images) unless pictures from the internet are
+/// let in (https only: the app allows no plain http), only inline styles
+/// and embedded images. The reader's own scripts
+/// (find, the selection) are run by the app and aren't the page's, so the
+/// policy doesn't stop them.
+String _csp({required bool remoteImages}) =>
+    "default-src 'none'; img-src data:${remoteImages ? ' https:' : ''}; "
+    "style-src 'unsafe-inline'; font-src data:";
+
+/// A picture, or a background, the letter takes from the internet.
+final _remote = RegExp(
+    r'''<img\b[^>]*?\ssrc\s*=\s*["']?\s*https?:|\sbackground\s*=\s*["']?\s*https?:|url\(\s*["']?\s*https?:''',
+    caseSensitive: false);
 
 final _cid = RegExp(r'''cid:([^"'\s>)]+)''', caseSensitive: false);
 
 /// The page shown for [message] and what in it can be tapped: its HTML
 /// part, or the plain text part escaped, wrapped in a locked-down document,
 /// every link pointing at [kLinkScheme]. Inline images (`cid:`) are
-/// embedded as data URIs. [dark] turns the page dark, pictures as they are.
-PreparedBody messageBody(MimeMessage message, {bool dark = false}) {
+/// embedded as data URIs. [dark] turns the page dark, pictures as they are;
+/// [remoteImages] lets in pictures from the internet.
+PreparedBody messageBody(MimeMessage message,
+    {bool dark = false, bool remoteImages = false}) {
   final html = message.decodeTextHtmlPart();
   final body = prepareBody(
     html: html == null ? null : _inlineImages(message, html),
     text: message.decodeTextPlainPart(),
     sent: message.decodeDate(),
   );
-  return PreparedBody(_page(body.html, dark: dark), body.links);
+  return PreparedBody(
+    _page(body.html, dark: dark, remoteImages: remoteImages),
+    body.links,
+    remoteImages: html == null ? 0 : _remote.allMatches(html).length,
+  );
 }
 
 /// [messageBody]'s page alone.
-String messageHtml(MimeMessage message, {bool dark = false}) =>
-    messageBody(message, dark: dark).html;
+String messageHtml(MimeMessage message,
+        {bool dark = false, bool remoteImages = false}) =>
+    messageBody(message, dark: dark, remoteImages: remoteImages).html;
 
-String _page(String body, {required bool dark}) =>
+String _page(String body, {required bool dark, required bool remoteImages}) =>
     '<!doctype html><html><head><meta charset="utf-8">'
-    '<meta http-equiv="Content-Security-Policy" content="$_csp">'
+    '<meta http-equiv="Content-Security-Policy" '
+    'content="${_csp(remoteImages: remoteImages)}">'
     '<meta name="viewport" content="width=device-width, initial-scale=1">'
     '<style>'
     'body{margin:0;padding:12px 16px;font:15px/1.45 Roboto,sans-serif;'
-    'color:#222;background:#fff;overflow-wrap:anywhere}'
+    // break-word, not anywhere: a narrow table cell keeps its words whole.
+    'color:#222;background:#fff;overflow-wrap:break-word}'
     'img{max-width:100%;height:auto}table{max-width:100%}'
     '.plain{white-space:pre-wrap}'
     'blockquote{margin:8px 0;padding-left:10px;border-left:3px solid #ccc}'
@@ -107,10 +124,21 @@ String findScript(String query, int index) => '''
 })(${jsonEncode(query)}, $index)''';
 
 /// Run once the page is shown: keeps the last text selected, which tapping
-/// outside the page may clear before [selectionScript] asks for it.
+/// outside the page may clear before [selectionScript] asks for it, and
+/// sends a tap on a shown picture (not a link's) to [kImageScheme].
 const readerScript = "document.addEventListener('selectionchange',"
     'function(){var s=String(window.getSelection());'
-    'if(s.trim())window.vtSelected=s;})';
+    'if(s.trim())window.vtSelected=s;});'
+    "document.addEventListener('click',function(e){var t=e.target;"
+    "if(t.tagName==='IMG'&&t.naturalWidth>0&&!t.closest('a')){"
+    'e.preventDefault();'
+    "location.href='$kImageScheme:'+"
+    'Array.prototype.indexOf.call(document.images,t);}},true)';
+
+/// The address of the page's [index]th picture (a `data:` URI or a web one).
+String imageScript(int index) =>
+    '(function(i){return i?(i.currentSrc||i.src):"";})'
+    '(document.images[$index])';
 
 /// The text the reader has selected in the page, or selected last.
 const selectionScript =

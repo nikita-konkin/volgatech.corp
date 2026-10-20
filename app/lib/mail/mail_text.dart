@@ -8,6 +8,9 @@ import 'dart:convert';
 /// The scheme the prepared page links with: `volga-link:3` is [links][3].
 const kLinkScheme = 'volga-link';
 
+/// A picture tapped in the page: `volga-img:2` is `document.images[2]`.
+const kImageScheme = 'volga-img';
+
 enum LinkKind { web, meeting, mail, phone, date }
 
 /// One tappable thing in a letter.
@@ -59,11 +62,14 @@ class MailLink {
 
 /// A letter's body ready for the reader, and what in it can be tapped.
 class PreparedBody {
-  const PreparedBody(this.html, this.links);
+  const PreparedBody(this.html, this.links, {this.remoteImages = 0});
 
   /// The body's HTML, every link pointing at `volga-link:<index>`.
   final String html;
   final List<MailLink> links;
+
+  /// How many pictures the letter takes from the internet.
+  final int remoteImages;
 
   /// The web and meeting links, each address once, as the letter has them.
   List<MailLink> get webLinks {

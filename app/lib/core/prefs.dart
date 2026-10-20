@@ -49,6 +49,8 @@ class Prefs {
   static const _kTextZoom = 'mail_text_zoom';
   static const _kDarkBody = 'mail_dark_body';
   static const _kTemplates = 'mail_templates';
+  static const _kImagesAlways = 'mail_images_always';
+  static const _kImageSenders = 'mail_image_senders';
 
   String? get rememberedLogin => _p.getString(_kLogin);
 
@@ -146,6 +148,16 @@ class Prefs {
   /// Letters shown dark (in the dark theme).
   bool get mailDarkBody => _p.getBool(_kDarkBody) ?? true;
   Future<void> setMailDarkBody(bool v) async => _p.setBool(_kDarkBody, v);
+
+  /// Pictures from the internet shown in every letter (but spam).
+  bool get mailImagesAlways => _p.getBool(_kImagesAlways) ?? false;
+  Future<void> setMailImagesAlways(bool v) async =>
+      _p.setBool(_kImagesAlways, v);
+
+  /// Senders whose letters show pictures from the internet, lowercased.
+  Set<String> get mailImageSenders => {...?_p.getStringList(_kImageSenders)};
+  Future<void> addMailImageSender(String email) async => _p.setStringList(
+      _kImageSenders, [...mailImageSenders, email.trim().toLowerCase()]);
 
   /// Phrases to put into a message with a tap.
   List<String> get mailTemplates =>

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +14,7 @@ import '../compose.dart';
 import '../mail_controller.dart';
 import '../mail_text.dart';
 import '../text_intents.dart';
+import 'attachment_view.dart';
 import 'compose_page.dart';
 
 /// What can be done with a link, an address, a number or a date tapped in
@@ -48,6 +51,94 @@ void copied(BuildContext context, String text, {String? what}) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(what ?? 'Скопировано: $text',
           maxLines: 2, overflow: TextOverflow.ellipsis)));
+}
+
+/// A picture from the letter, to look at closely: a `data:` one decoded, a
+/// web one downloaded (it's on the page already, so nothing new is told).
+/// Null when it can't be had.
+Future<ReceivedFile?> pictureFrom(String src) async {
+  if (src.startsWith('data:')) {
+    final data = Uri.tryParse(src)?.data;
+    if (data == null) return null;
+    final type = data.mimeType;
+    return ReceivedFile(
+        name: 'картинка.${_ext(type)}',
+        bytes: data.contentAsBytes(),
+        type: type);
+  }
+  final uri = Uri.tryParse(src);
+  if (uri == null || !(uri.scheme == 'https' || uri.scheme == 'http')) {
+    return null;
+  }
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+  try {
+    final res = await (await client.getUrl(uri))
+        .close()
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) return null;
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in res.timeout(const Duration(seconds: 30))) {
+      bytes.add(chunk);
+      if (bytes.length > 20 * 1024 * 1024) return null;
+    }
+    final type = res.headers.contentType?.mimeType ?? 'image/png';
+    final last = uri.pathSegments.where((s) => s.isNotEmpty).lastOrNull;
+    final name = last != null && last.contains('.')
+        ? Uri.decodeComponent(last)
+        : 'картинка.${_ext(type)}';
+    return ReceivedFile(name: name, bytes: bytes.takeBytes(), type: type);
+  } on Object {
+    return null;
+  } finally {
+    client.close(force: true);
+  }
+}
+
+String _ext(String type) => switch (type.toLowerCase()) {
+      'image/jpeg' || 'image/jpg' => 'jpg',
+      'image/gif' => 'gif',
+      'image/webp' => 'webp',
+      'image/bmp' => 'bmp',
+      'image/svg+xml' => 'svg',
+      _ => 'png',
+    };
+
+/// «Картинки из интернета скрыты»: show them here, or always for [sender].
+class ImagesBanner extends StatelessWidget {
+  const ImagesBanner(
+      {super.key,
+      required this.spam,
+      required this.onShow,
+      this.onAlways});
+  /// The server marked the letter as spam: shown once, never always.
+  final bool spam;
+  final VoidCallback onShow;
+  final VoidCallback? onAlways;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Brand.muted(context);
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+        child: Row(children: [
+          Icon(Icons.image_not_supported_outlined, size: 20, color: muted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+                spam
+                    ? 'Картинки скрыты: письмо помечено как спам'
+                    : 'Картинки из интернета скрыты',
+                style: const TextStyle(fontSize: 13.5)),
+          ),
+          TextButton(onPressed: onShow, child: const Text('Показать')),
+          if (onAlways != null && !spam)
+            TextButton(onPressed: onAlways, child: const Text('Всегда')),
+        ]),
+      ),
+    );
+  }
 }
 
 /// «14 октября 2026, 15:00».
