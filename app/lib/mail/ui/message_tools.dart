@@ -236,7 +236,7 @@ class _Address extends StatelessWidget {
     final host = u?.host ?? '';
     final at = host.isEmpty ? -1 : url.indexOf(host);
     final style = TextStyle(color: muted, fontSize: 13.5);
-    if (at < 0) return SelectableText(url, style: style, maxLines: 6);
+    if (at < 0) return SelectableText(url, style: style);
     return SelectableText.rich(
       TextSpan(style: style, children: [
         TextSpan(text: url.substring(0, at)),
@@ -247,7 +247,6 @@ class _Address extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurface)),
         TextSpan(text: url.substring(at + host.length)),
       ]),
-      maxLines: 6,
     );
   }
 }
