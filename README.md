@@ -88,8 +88,8 @@ A narrower window gets the phone layout, with the menu behind ☰.
 
 ### Unlike on Android
 
-Schedule, week overview, exams, profile and the foreign-groups memo all work,
-but:
+Schedule, week overview, exams, profile, the foreign-groups memo and the
+hourly-load report all work, but:
 
 - «Почта» opens the web mail in a new tab: the mail server doesn't let a web page
   talk to it, so there is no built-in mail client;
@@ -117,6 +117,9 @@ but:
 - **Иностранные группы** — the monthly «служебная записка» about classes taught
   to foreign students (groups with a 3-digit number, e.g. ИСТ-110), built from
   your schedule and shared as a .docx in the portal's own template.
+- **Почасовая нагрузка** — «Приложение к форме 28» for the disciplines you
+  tick, over any months, with lesson topics from a plan per discipline (or
+  left for you to fill in), shared as a .docx.
 - **Настройки** — theme (system / light / dark, and Liquid Glass: clear or
   matte, with a pattern of the season growing on it — autumn
   leaves, frost as fractal crystals, spring flowers, schoolchildren on kick
@@ -137,6 +140,33 @@ but:
 - **Портал** — the corporate portal opens **in-app** (WebView), keeping only
   the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.5
+
+<img src="docs/screenshots/hourly-report.webp" width="15%" alt="Почасовая нагрузка: занятия за период с темами"> <img src="docs/screenshots/hourly-courses.webp" width="15%" alt="Дисциплины с почасовой нагрузкой"> <img src="docs/screenshots/hourly-topics.webp" width="15%" alt="Тематический план: темы и число занятий"> <img src="docs/screenshots/hourly-docx.webp" width="32%" alt="Готовое «Приложение к форме 28»">
+
+- **Почасовая нагрузка** — a new section in the menu builds «Приложение к
+  форме 28 — Отчет по видам выполненных работ» as a .docx from your
+  schedule. Tick the disciplines with hourly-paid classes in
+  **«Дисциплины»** (a whole discipline or some of its groups), pick any
+  months, and the classes are listed with their date, 2 hours each, group,
+  type (Лекция, Практика, Лабораторная) and discipline; groups taught
+  together are one class. **«Темы занятий»** holds a plan per discipline
+  and type — topics in order, each for so many classes in a row, pasted as
+  a list («Pandas ×4») or taken from an earlier report. Topics count from
+  the start of the semester, so the next report goes on where the last one
+  stopped; any class's topic can be changed. Or switch «Заполнять темы»
+  off and fill the column in by hand. The teacher line and the head of
+  department's signature are remembered.
+- **Mail refreshes again without a restart.** A connection that died
+  halfway through an answer (the app asleep in the background, the mobile
+  network dropping it) used to hold up every later refresh; now it is
+  dropped after 30 s of silence and the next request starts afresh. While
+  the mail list is open it also looks for new mail by itself every 2
+  minutes.
+
+From v0.5.1 the app offers this update by itself (**Настройки →
+Обновления**).
 
 ## What's new — v0.5.4
 

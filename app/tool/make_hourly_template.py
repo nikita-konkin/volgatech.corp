@@ -15,7 +15,10 @@ Output: app/assets/hourly/form28_appendix.docx — the same document with
   * the file's author and last editor removed — the output is committed to
     a public repository,
   * the table's header row marked to repeat on every page, and class rows
-    kept whole at a page break.
+    kept whole at a page break,
+  * the «Вид занятия» column widened from the topic column's share, so
+    «Лабораторная» fits on one line (the form's own width only fits
+    «Практика»).
 
 Everything else (fonts, column widths, page setup, the spacing that lines
 the signature up) is kept as it was.
@@ -37,6 +40,9 @@ OUT = Path(__file__).resolve().parent.parent / 'assets/hourly/form28_appendix.do
 CLASS_ROW = [['{{date}}'], ['{{hours}}'], ['{{group}}'], ['{{type}}'],
              ['{{discipline}}'], ['{{topic}}']]
 TOTAL_ROW = [None, ['{{total}}'], None, None, None, None]
+
+# Column widths (twips): «Вид занятия» takes this much from the topic column.
+WIDEN_TYPE = 330
 
 TEXT = re.compile(r'(<w:t(?: [^>]*)?>)([^<]*)(</w:t>)')
 
@@ -116,7 +122,24 @@ def cut_table(doc: str) -> str:
         + keep_whole(set_row(rows[-1], TOTAL_ROW))
     first = table.index(rows[0])
     last = table.rindex(rows[-1]) + len(rows[-1])
-    return doc[:t0] + table[:first] + new_rows + table[last:] + doc[t1:]
+    table = widen_type(table[:first] + new_rows + table[last:])
+    return doc[:t0] + table + doc[t1:]
+
+
+def widen_type(table: str) -> str:
+    """The 4th column wider and the 6th narrower by [WIDEN_TYPE], in the
+    grid and in every cell."""
+    widths = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', table)]
+    assert len(widths) == 6, widths
+    old_type, old_topic = widths[3], widths[5]
+    new = {old_type: old_type + WIDEN_TYPE, old_topic: old_topic - WIDEN_TYPE}
+    assert len(new) == 2, 'type and topic columns share a width'
+
+    def repl(m):
+        w = int(m.group(2))
+        return f'{m.group(1)}{new.get(w, w)}"' if w in new else m.group(0)
+
+    return re.sub(r'(<w:(?:gridCol|tcW) w:w=")(\d+)"', repl, table)
 
 
 def main(src: str) -> None:
