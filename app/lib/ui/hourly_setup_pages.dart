@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -431,16 +432,32 @@ class _HourlyHeaderPageState extends State<HourlyHeaderPage> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  HourlyHeader _typed() {
     String t(TextEditingController c) => c.text.trim();
+    return HourlyHeader(
+      teacherPost: t(_teacherPost),
+      teacherName: t(_teacherName),
+      signerPost: t(_signerPost),
+      signerName: t(_signerName),
+    );
+  }
+
+  bool get _changed => !mapEquals(_typed().toJson(), _initial.toJson());
+
+  bool _saved = false;
+
+  Future<void> _save() async {
     final navigator = Navigator.of(context);
-    await context.read<HourlyController>().saveHeader(HourlyHeader(
-          teacherPost: t(_teacherPost),
-          teacherName: t(_teacherName),
-          signerPost: t(_signerPost),
-          signerName: t(_signerName),
-        ));
+    _saved = true;
+    await context.read<HourlyController>().saveHeader(_typed());
     navigator.pop();
+  }
+
+  /// Leaving by «назад» keeps what was typed too.
+  void _left(bool didPop, Object? _) {
+    if (didPop && !_saved && _changed) {
+      unawaited(context.read<HourlyController>().saveHeader(_typed()));
+    }
   }
 
   @override
@@ -455,26 +472,36 @@ class _HourlyHeaderPageState extends State<HourlyHeaderPage> {
             decoration: InputDecoration(labelText: label, hintText: hint),
           ),
         );
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Шапка и подпись'),
-        actions: [
-          TextButton(onPressed: _save, child: const Text('Сохранить')),
-        ],
-      ),
-      body: ListView(
-        padding: readable(context, const EdgeInsets.fromLTRB(16, 16, 16, 24)),
-        children: [
-          Text('Преподаватель', style: TextStyle(color: muted)),
-          const SizedBox(height: 8),
-          field(_teacherPost, 'Должность', hint: 'ст. преподаватель'),
-          field(_teacherName, 'ФИО', hint: 'Фамилия Имя Отчество'),
-          const SizedBox(height: 8),
-          Text('Подпись под таблицей', style: TextStyle(color: muted)),
-          const SizedBox(height: 8),
-          field(_signerPost, 'Должность', hint: 'Зав. кафедрой ПиП ЭВС'),
-          field(_signerName, 'И.О. Фамилия', hint: 'А.Б. Иванова'),
-        ],
+    return PopScope(
+      onPopInvokedWithResult: _left,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Шапка и подпись'),
+          actions: [
+            TextButton(
+              onPressed: _save,
+              // The bar's own colour: the theme's blue on a blue bar hid it.
+              style: TextButton.styleFrom(
+                  foregroundColor:
+                      Theme.of(context).appBarTheme.foregroundColor),
+              child: const Text('Сохранить'),
+            ),
+          ],
+        ),
+        body: ListView(
+          padding: readable(context, const EdgeInsets.fromLTRB(16, 16, 16, 24)),
+          children: [
+            Text('Преподаватель', style: TextStyle(color: muted)),
+            const SizedBox(height: 8),
+            field(_teacherPost, 'Должность', hint: 'ст. преподаватель'),
+            field(_teacherName, 'ФИО', hint: 'Фамилия Имя Отчество'),
+            const SizedBox(height: 8),
+            Text('Подпись под таблицей', style: TextStyle(color: muted)),
+            const SizedBox(height: 8),
+            field(_signerPost, 'Должность', hint: 'Зав. кафедрой ПиП ЭВС'),
+            field(_signerName, 'И.О. Фамилия', hint: 'А.Б. Иванова'),
+          ],
+        ),
       ),
     );
   }

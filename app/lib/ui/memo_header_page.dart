@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -53,59 +56,81 @@ class _MemoHeaderPageState extends State<MemoHeaderPage> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  MemoHeader _typed() {
     String t(TextEditingController c) => c.text.trim();
+    return MemoHeader(
+      department: t(_department),
+      departmentDative: t(_departmentDative),
+      addresseePost: t(_addresseePost),
+      addresseeName: t(_addresseeName),
+      signerPost: t(_signerPost),
+      signerName: t(_signerName),
+      executorName: t(_executorName),
+      executorPhone: t(_executorPhone),
+      teacherName: t(_teacherName),
+      teacherPost: t(_teacherPost),
+    );
+  }
+
+  bool _saved = false;
+
+  Future<void> _save() async {
     final navigator = Navigator.of(context);
-    await context.read<MemoController>().saveHeader(MemoHeader(
-          department: t(_department),
-          departmentDative: t(_departmentDative),
-          addresseePost: t(_addresseePost),
-          addresseeName: t(_addresseeName),
-          signerPost: t(_signerPost),
-          signerName: t(_signerName),
-          executorName: t(_executorName),
-          executorPhone: t(_executorPhone),
-          teacherName: t(_teacherName),
-          teacherPost: t(_teacherPost),
-        ));
+    _saved = true;
+    await context.read<MemoController>().saveHeader(_typed());
     navigator.pop();
+  }
+
+  /// Leaving by «назад» keeps what was typed too.
+  void _left(bool didPop, Object? _) {
+    if (didPop && !_saved && !mapEquals(_typed().toJson(), _initial.toJson())) {
+      unawaited(context.read<MemoController>().saveHeader(_typed()));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Шапка и подписи'),
-        actions: [
-          TextButton(
-            onPressed: _save,
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
-            child: const Text('Сохранить'),
+    return PopScope(
+        onPopInvokedWithResult: _left,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Шапка и подписи'),
+            actions: [
+              TextButton(
+                onPressed: _save,
+                // The bar's own colour: white was lost on light glass.
+                style: TextButton.styleFrom(
+                    foregroundColor:
+                        Theme.of(context).appBarTheme.foregroundColor),
+                child: const Text('Сохранить'),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: ListView(
-        padding: readable(context, const EdgeInsets.fromLTRB(16, 8, 16, 24)),
-        children: [
-          const _Section('Подразделение'),
-          _Field(_department, 'В шапке', hint: 'Кафедра …'),
-          _Field(_departmentDative, 'В тексте: «по … следующим сотрудникам»',
-              hint: 'Кафедре …'),
-          const _Section('Кому'),
-          _Field(_addresseePost, 'Должность', hint: 'Первому проректору'),
-          _Field(_addresseeName, 'Фамилия И.О. (кому)', hint: 'Иванову И.И.'),
-          const _Section('Подписывает'),
-          _Field(_signerPost, 'Должность', hint: 'Заведующий кафедрой'),
-          _Field(_signerName, 'И.О. Фамилия', hint: 'И.И. Иванова'),
-          const _Section('Преподаватель'),
-          _Field(_teacherName, 'ФИО'),
-          _Field(_teacherPost, 'Должность', hint: 'ст. преподаватель'),
-          const _Section('Исполнитель'),
-          _Field(_executorName, 'ФИО'),
-          _Field(_executorPhone, 'Телефон', keyboard: TextInputType.phone),
-        ],
-      ),
-    );
+          body: ListView(
+            padding:
+                readable(context, const EdgeInsets.fromLTRB(16, 8, 16, 24)),
+            children: [
+              const _Section('Подразделение'),
+              _Field(_department, 'В шапке', hint: 'Кафедра …'),
+              _Field(
+                  _departmentDative, 'В тексте: «по … следующим сотрудникам»',
+                  hint: 'Кафедре …'),
+              const _Section('Кому'),
+              _Field(_addresseePost, 'Должность', hint: 'Первому проректору'),
+              _Field(_addresseeName, 'Фамилия И.О. (кому)',
+                  hint: 'Иванову И.И.'),
+              const _Section('Подписывает'),
+              _Field(_signerPost, 'Должность', hint: 'Заведующий кафедрой'),
+              _Field(_signerName, 'И.О. Фамилия', hint: 'И.И. Иванова'),
+              const _Section('Преподаватель'),
+              _Field(_teacherName, 'ФИО'),
+              _Field(_teacherPost, 'Должность', hint: 'ст. преподаватель'),
+              const _Section('Исполнитель'),
+              _Field(_executorName, 'ФИО'),
+              _Field(_executorPhone, 'Телефон', keyboard: TextInputType.phone),
+            ],
+          ),
+        ));
   }
 }
 
