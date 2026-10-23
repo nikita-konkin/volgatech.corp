@@ -65,8 +65,7 @@ void main() {
     expect(tester.takeException(), isNull);
   }
 
-  testWidgets('the hourly header is kept when left by «назад»',
-      (tester) async {
+  testWidgets('the hourly header is kept when left by «назад»', (tester) async {
     await leaveByBackAndReload(tester, const HourlyLoadPage(),
         tooltip: 'Шапка и подпись',
         field: 'И.О. Фамилия',
