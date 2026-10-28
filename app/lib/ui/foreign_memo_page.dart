@@ -1,13 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../core/foreign_memo.dart';
 import '../core/memo_docx.dart';
@@ -17,12 +13,10 @@ import '../data/volgatech_api.dart';
 import '../state/auth_controller.dart';
 import '../state/memo_controller.dart';
 import '../theme.dart';
+import 'doc_export.dart';
 import 'glass.dart';
 import 'layout.dart';
 import 'memo_header_page.dart';
-
-const _docxMime =
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 /// «Иностранные группы»: the month's classes with foreign-student groups,
 /// turned into the portal's «служебная записка» (.docx) to share.
@@ -186,23 +180,11 @@ class _MemoView extends StatelessWidget {
     }
     try {
       final bytes = await c.buildDocx();
-      final XFile doc;
-      if (kIsWeb) {
-        // No files in a browser: Safari's share sheet takes it from memory,
-        // other browsers download it.
-        doc = XFile.fromData(bytes, name: c.fileName, mimeType: _docxMime);
-      } else {
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/${c.fileName}');
-        await file.writeAsBytes(bytes, flush: true);
-        doc = XFile(file.path, mimeType: _docxMime);
-      }
-      await SharePlus.instance.share(ShareParams(
-        files: [doc],
-        fileNameOverrides: [c.fileName],
-        subject: 'Служебная записка: занятия на иностранном языке, '
-            '${c.monthLabel}',
-      ));
+      if (!context.mounted) return;
+      await exportDocx(context, bytes,
+          fileName: c.fileName,
+          subject: 'Служебная записка: занятия на иностранном языке, '
+              '${c.monthLabel}');
     } catch (e) {
       messenger.showSnackBar(
           SnackBar(content: Text('Не удалось сформировать документ: $e')));
