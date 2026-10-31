@@ -260,6 +260,21 @@
       });
     }
   </script>
+  <script>
+    // Visit counting through GoatCounter: one image request each time the app
+    // opens, with no cookies and no third-party code on a page that holds the
+    // session. Not on a computer or phone on the local network, and not in a
+    // browser driven by automation.
+    (function () {
+      var local = /^(localhost|127\.|\[::1\]|10\.|192\.168\.)/.test(location.hostname);
+      if (local || navigator.webdriver) return;
+      new Image().src = 'https://konkin-nikita.goatcounter.com/count?p=' +
+          encodeURIComponent(location.pathname) +
+          '&t=' + encodeURIComponent(document.title) +
+          '&r=' + encodeURIComponent(document.referrer) +
+          '&rnd=' + Math.random().toString(36).slice(2);
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
