@@ -120,6 +120,9 @@ hourly-load report all work, but:
 - **Почасовая нагрузка** — «Приложение к форме 28» for the disciplines you
   tick, over any months, with lesson topics from a plan per discipline (or
   left for you to fill in), shared as a .docx.
+- **Дисциплины** — every discipline in a semester's schedule with its groups
+  and class counts, to look over and copy (one name or all of them); a held
+  lesson or exam copies its name too.
 - **Настройки** — theme (system / light / dark, and Liquid Glass: clear or
   matte, with a pattern of the season growing on it — autumn
   leaves, frost as fractal crystals, spring flowers, schoolchildren on kick
@@ -142,6 +145,26 @@ hourly-load report all work, but:
 - **Портал** — the corporate portal opens **in-app** (WebView), keeping only
   the site session cookie, never the password.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.7
+
+<img src="docs/screenshots/disciplines.webp" width="15%" alt="«Дисциплины»: все дисциплины семестра, каждую можно скопировать"> <img src="docs/screenshots/copy-name.webp" width="15%" alt="Удержание занятия копирует его название">
+
+- **Copy a discipline's name:** hold a lesson in «Расписание занятий», a
+  row in «Обзор недели» or an exam — the name goes to the clipboard (a
+  right click does the same with a mouse).
+- **«Дисциплины»** in the menu: every discipline in a semester's schedule,
+  A–Z, with its groups and how many lectures, practicals and labs; the
+  arrows switch semesters. Copy one name, or all of them at once, one per
+  line.
+- **Reports are saved as files too:** «Сформировать .docx» (memo and
+  «Почасовая нагрузка») now asks — «Сохранить в файлы» on Android,
+  «Скачать» in a browser, or «Отправить…» as before.
+- **«Шапка и подпись»:** «Сохранить» is visible on the web again, and
+  leaving with «назад» keeps what was typed.
+
+From v0.5.1 the app offers this update by itself (**Настройки →
+Обновления**).
 
 ## What's new — v0.5.6
 
