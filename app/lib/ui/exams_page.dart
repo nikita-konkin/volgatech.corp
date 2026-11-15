@@ -15,6 +15,7 @@ import 'calendar_export.dart';
 import 'glass.dart';
 import 'layout.dart';
 import 'offline_banner.dart';
+import 'widgets/copy_text.dart';
 
 class ExamsPage extends StatelessWidget {
   const ExamsPage({super.key});
@@ -204,6 +205,13 @@ class _ExamCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final time =
         e.examDate != null ? DateFormat('HH:mm').format(e.examDate!) : '';
+    return CopyOnHold(
+      text: e.subjectName ?? '',
+      child: _card(context, time),
+    );
+  }
+
+  Widget _card(BuildContext context, String time) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: cardDecoration(
