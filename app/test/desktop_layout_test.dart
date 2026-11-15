@@ -59,6 +59,9 @@ void main() {
             .descendant(
                 of: find.byType(NavMenu), matching: find.byType(Scrollable))
             .first);
+    // All of it, not only its top edge, in a short window.
+    await tester.ensureVisible(menuItem(title));
+    await settle(tester);
     await tester.tap(menuItem(title));
     await settle(tester);
   }
@@ -93,6 +96,7 @@ void main() {
       for (final (item, shows) in [
         ('Расписание экзаменов', 'Проектирование систем'),
         ('Иностранные группы', 'ИСТ-110'),
+        ('Дисциплины', 'Введение в инженерную деятельность'),
         ('Профиль', 'Константинопольский'),
         ('Настройки', 'Тема оформления'),
       ]) {

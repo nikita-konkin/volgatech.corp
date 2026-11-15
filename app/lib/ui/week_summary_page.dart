@@ -12,6 +12,7 @@ import '../theme.dart';
 import 'calendar_export.dart';
 import 'glass.dart';
 import 'layout.dart';
+import 'widgets/copy_text.dart';
 import 'widgets/marquee_text.dart';
 import 'widgets/skeleton.dart';
 
@@ -364,41 +365,44 @@ class _DayCard extends StatelessWidget {
               else ...[
                 const SizedBox(height: 8),
                 for (final s in slots)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 44,
-                          child: Text(
-                            (s.lead.timeBegin != null &&
-                                    s.lead.timeBegin!.length >= 5)
-                                ? s.lead.timeBegin!.substring(0, 5)
-                                : '',
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w500),
+                  CopyOnHold(
+                    text: s.lead.description ?? '',
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 44,
+                            child: Text(
+                              (s.lead.timeBegin != null &&
+                                      s.lead.timeBegin!.length >= 5)
+                                  ? s.lead.timeBegin!.substring(0, 5)
+                                  : '',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          child: MarqueeText(s.lead.description ?? '',
-                              style: const TextStyle(fontSize: 13)),
-                        ),
-                        const SizedBox(width: 6),
-                        if (s.isShared)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Text('${s.groups.length} гр.',
+                          Expanded(
+                            child: MarqueeText(s.lead.description ?? '',
+                                style: const TextStyle(fontSize: 13)),
+                          ),
+                          const SizedBox(width: 6),
+                          if (s.isShared)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Text('${s.groups.length} гр.',
+                                  style: TextStyle(
+                                      color: accent,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                          if ((s.lead.room ?? '').isNotEmpty)
+                            Text(s.lead.room!,
                                 style: TextStyle(
-                                    color: accent,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600)),
-                          ),
-                        if ((s.lead.room ?? '').isNotEmpty)
-                          Text(s.lead.room!,
-                              style: TextStyle(
-                                  color: Brand.room(context), fontSize: 13)),
-                      ],
+                                    color: Brand.room(context), fontSize: 13)),
+                        ],
+                      ),
                     ),
                   ),
                 if (footer.isNotEmpty)

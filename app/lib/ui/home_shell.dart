@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_drawer.dart';
+import 'disciplines_page.dart';
 import 'exams_page.dart';
 import 'foreign_memo_page.dart';
 import 'glass.dart';
@@ -11,13 +12,22 @@ import 'schedule_page.dart';
 import 'settings_page.dart';
 
 /// The screens the menu opens.
-enum Section { schedule, exams, foreign, hourly, profile, settings }
+enum Section {
+  schedule,
+  exams,
+  foreign,
+  hourly,
+  disciplines,
+  profile,
+  settings
+}
 
 Widget sectionPage(Section section) => switch (section) {
       Section.schedule => const SchedulePage(),
       Section.exams => const ExamsPage(),
       Section.foreign => const ForeignMemoPage(),
       Section.hourly => const HourlyLoadPage(),
+      Section.disciplines => const DisciplinesPage(),
       Section.profile => const ProfilePage(),
       Section.settings => const SettingsPage(),
     };

@@ -30,6 +30,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: 3.50 deprecates package:flutter/material.dart (material_ui),
+          # and `flutter analyze` fails on the infos. Move up together with
+          # that migration.
+          flutter-version: 3.47.5
           cache: true
 
       - name: Install dependencies
@@ -74,6 +78,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: 3.50 deprecates package:flutter/material.dart (material_ui),
+          # and `flutter analyze` fails on the infos. Move up together with
+          # that migration.
+          flutter-version: 3.47.5
           cache: true
 
       - name: Install dependencies

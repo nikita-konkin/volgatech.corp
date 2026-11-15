@@ -21,6 +21,7 @@ import 'home_shell.dart';
 import 'layout.dart';
 import 'offline_banner.dart';
 import 'week_summary_page.dart';
+import 'widgets/copy_text.dart';
 import 'widgets/skeleton.dart';
 
 class SchedulePage extends StatelessWidget {
@@ -268,6 +269,13 @@ class _LessonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return CopyOnHold(
+      text: e.description ?? '',
+      child: _card(context),
+    );
+  }
+
+  Widget _card(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: cardDecoration(
