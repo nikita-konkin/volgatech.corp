@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:volgatech_pro/data/portal_workload_client.dart';
@@ -287,6 +288,165 @@ Future<T> _withWorkload<T>(
   }
 }
 
+/// A workload WebView with a configurable action whose reply is lost.
+final class _LossyPlatform extends WebViewPlatform {
+  _LossyPlatform(this.month, this.cell, this.lostReply);
+
+  final String month;
+  final String cell;
+  final String lostReply;
+
+  @override
+  PlatformWebViewController createPlatformWebViewController(
+    PlatformWebViewControllerCreationParams params,
+  ) =>
+      _LossyController(params, month, cell, lostReply);
+
+  @override
+  PlatformNavigationDelegate createPlatformNavigationDelegate(
+    PlatformNavigationDelegateCreationParams params,
+  ) =>
+      _GatewayDelegate(params);
+}
+
+/// A workload page whose postbacks and saves can finish after losing a reply.
+final class _LossyController extends PlatformWebViewController {
+  _LossyController(super.params, this.month, this.cell, this.lostReply)
+      : super.implementation();
+
+  final String month;
+  final String cell;
+  final String lostReply;
+  late _GatewayDelegate _delegate;
+  final _url = _page('Нагрузка на первую половину дня.aspx');
+  String _selected = 'sep';
+  String _mode = 'view';
+  int _revision = 0;
+  int _amount = 0;
+  Map<String, Object> _receipt = {};
+
+  @override
+  Future<void> setJavaScriptMode(JavaScriptMode mode) async {}
+
+  @override
+  Future<void> setPlatformNavigationDelegate(
+    covariant _GatewayDelegate delegate,
+  ) async {
+    _delegate = delegate;
+  }
+
+  @override
+  Future<String?> currentUrl() async => _url;
+
+  @override
+  Future<void> loadRequest(LoadRequestParams params) async {
+    _mode = 'view';
+    _revision++;
+    _delegate.finished(params.uri.toString());
+  }
+
+  @override
+  Future<Object> runJavaScriptReturningResult(String script) async {
+    final args = RegExp(r'\(("\w+", .*?)\)$').firstMatch(script);
+    if (args == null) return false;
+    final [action, request] = jsonDecode('[${args[1]}]') as List<Object?>;
+    final filters = {
+      'department': _filter([('ИТРС', '1726')], '1726'),
+      'year': _filter([('2026/2027', '2026')], '2026'),
+      'month': _filter(
+          [('Сентябрь 2026', 'sep'), ('Ноябрь 2026', month)], _selected),
+    };
+    final Map<String, Object> reply;
+    switch (action) {
+      case 'info':
+        reply = {'filters': filters, 'mode': _mode, 'revision': _revision};
+      case 'inspect':
+        reply = {
+          'scope': _selected,
+          'filters': filters,
+          'cells': [
+            {
+              'key': cell,
+              'rowKey': 'row',
+              'column': 'HoursAuditLec',
+              'discipline': 'Информатика',
+              'specialty': '09.03.01',
+              'appointment': 'Доцент',
+              'semester': '1 семестр',
+              'amount': _amount,
+            },
+          ],
+        };
+      case 'select':
+        final selection = (request as Map<String, Object?>)['value'] as String;
+        Timer(const Duration(milliseconds: 73), () {
+          _selected = selection;
+          _mode = 'view';
+          _revision++;
+        });
+        reply = {'started': true};
+      case 'edit':
+        _mode = 'edit';
+        _revision++;
+        reply = {'started': true};
+      case 'submit':
+        final submission = request as Map<String, Object?>;
+        final changes = submission['changes'] as Map<String, Object?>;
+        final change = changes[cell] as Map<String, Object?>;
+        Timer(const Duration(milliseconds: 4137), () {
+          _amount = change['after'] as int;
+          _receipt = {'id': submission['id'] as int, 'state': 'received'};
+        });
+        reply = {'started': true};
+      case 'receipt':
+        reply = _receipt;
+      default:
+        throw StateError('Unexpected workload action $action');
+    }
+    return action == lostReply ? Completer<Object>().future : jsonEncode(reply);
+  }
+}
+
+Future<Object?> _workloadOutcome(
+  _LossyPlatform platform,
+  Future<Object> Function(PortalWorkloadClient) operation,
+  Duration budget,
+) async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  await rootBundle.loadString('assets/portal/workload.js');
+  final original = WebViewPlatform.instance;
+  try {
+    WebViewPlatform.instance = platform;
+    return fakeAsync<Object?>((time) {
+      Object? outcome;
+      final client = PortalWorkloadClient(
+        onSignedIn: () {},
+        onAuthRequest: (request) => request.onCancel(),
+        onLoginFailure: (_) {},
+      );
+      unawaited(operation(client).then<void>((value) {
+        outcome = value;
+      }, onError: (Object error) {
+        outcome = error;
+      }));
+      time.elapse(budget);
+      return outcome;
+    });
+  } finally {
+    if (original != null) WebViewPlatform.instance = original;
+  }
+}
+
+Map<String, Object> _filter(List<(String, String)> options, String value) => {
+      'selected': {
+        'label': options.firstWhere((option) => option.$2 == value).$1,
+        'value': value,
+      },
+      'options': [
+        for (final (label, value) in options) {'label': label, 'value': value}
+      ],
+    };
+
 String _marker(Random random) =>
     '&AuthResend${List.generate(32, (_) => random.nextInt(16).toRadixString(16).toUpperCase()).join()}';
 
@@ -546,6 +706,55 @@ void main() {
       workloadSelection(_report(), DateTime(2027, 3))['month'],
       equals('1'),
       reason: 'a month missing on the portal was requested',
+    );
+  });
+
+  test('A month switch survives a lost postback reply', () async {
+    final month = 'm-${Random().nextInt(9617) + 317}';
+    final result = await _workloadOutcome(
+      _LossyPlatform(month, 'cell-$month', 'select'),
+      (client) async => (await client.load(selection: {'month': month})).month!,
+      const Duration(seconds: 22),
+    );
+    expect(
+      result,
+      DateTime(2026, 11),
+      reason: 'load did not return the requested month within the bound',
+    );
+  });
+
+  test('A save with a lost submit reply is verified by its receipt', () async {
+    final amount = Random().nextInt(723) + 31;
+    final cell = 'row-${Random().nextInt(6737)}:lec';
+    final result = await _workloadOutcome(
+      _LossyPlatform('m-$amount', cell, 'submit'),
+      (client) async {
+        final before = await client.load();
+        final report =
+            await client.submit(before, {cell: amount}, onProgress: (_) {});
+        return report.cells.single.amount;
+      },
+      const Duration(seconds: 22),
+    );
+    expect(
+      result,
+      amount,
+      reason: 'the save was not verified after the submit reply was lost',
+    );
+  });
+
+  test('A silent workload page fails to load within the polling budget',
+      () async {
+    final seed = Random().nextInt(67421);
+    final result = await _workloadOutcome(
+      _LossyPlatform('m-$seed', 'cell-$seed', 'info'),
+      (client) => client.load(),
+      const Duration(seconds: 22),
+    );
+    expect(
+      result,
+      isA<PortalWorkloadFailure>(),
+      reason: 'load did not report a failure when the page stopped replying',
     );
   });
 }

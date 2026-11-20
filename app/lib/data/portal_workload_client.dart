@@ -10,6 +10,8 @@ const _portal = 'https://portal.volgatech.net';
 const _profilePath = '/my/person.aspx';
 const _profile = '$_portal$_profilePath';
 const _loginPath = '/cookieauth.dll';
+const _callLimit = Duration(seconds: 3);
+const _waitLimit = Duration(seconds: 22);
 const _unauthorizedDocument =
     r'/^401\s+unauthorized$/i.test(document.body?.innerText.trim() || "")';
 
@@ -197,9 +199,17 @@ class PortalWorkloadClient {
         final navigation = _navigation;
         final uri = Uri.tryParse(url);
         if (uri != null && _onPortal(uri)) {
-          // The gateway can return a plain 401 at either the login or profile URL.
-          final denied = await controller
-              .runJavaScriptReturningResult(_unauthorizedDocument);
+          final Object denied;
+          try {
+            denied = await controller
+                .runJavaScriptReturningResult(_unauthorizedDocument)
+                .timeout(_callLimit);
+          } on TimeoutException {
+            if (navigation != null && !navigation.isCompleted) {
+              navigation.complete(null);
+            }
+            return;
+          }
           if (denied.toString() == 'true') {
             _authRequired = true;
             if (_login) {
@@ -326,9 +336,7 @@ class PortalWorkloadClient {
   Future<String?> _awaitNavigation(Future<void> Function() start) async {
     final navigation = _navigation = Completer<String?>();
     try {
-      return await start()
-          .then((_) => navigation.future)
-          .timeout(const Duration(seconds: 22));
+      return await start().then((_) => navigation.future).timeout(_waitLimit);
     } finally {
       _navigation = null;
     }
@@ -337,7 +345,8 @@ class PortalWorkloadClient {
   Future<void> _navigate(Uri uri) async {
     _authRequired = false;
     try {
-      final url = await _awaitNavigation(() => controller.loadRequest(uri));
+      final url = await _awaitNavigation(
+          () => controller.loadRequest(uri).timeout(_callLimit));
       if (_authRequired) throw PortalWorkloadFailure.signInRequired;
       if (url == null) throw _unavailable;
       final loaded = Uri.parse(url);
@@ -352,8 +361,8 @@ class PortalWorkloadClient {
 
   Future<Map<String, dynamic>> _run(String action,
       [Map<String, Object>? request]) async {
-    final script = await _script;
-    final url = await controller.currentUrl();
+    final script = await _script.timeout(_callLimit);
+    final url = await controller.currentUrl().timeout(_callLimit);
     final uri = url == null ? null : Uri.tryParse(url);
     if (uri != null && _isLogin(uri)) {
       throw PortalWorkloadFailure.signInRequired;
@@ -363,25 +372,53 @@ class PortalWorkloadClient {
       return {'error': 'loading'};
     }
     final args = [jsonEncode(action), jsonEncode(request)].join(', ');
-    final result =
-        await controller.runJavaScriptReturningResult('$script($args)');
+    final result = await controller
+        .runJavaScriptReturningResult('$script($args)')
+        .timeout(_callLimit);
     final data = jsonDecode(result as String);
     return _fields(data is String ? jsonDecode(data) : data);
   }
 
+  Future<Map<String, dynamic>> _read(String action) =>
+      _run(action).onError<TimeoutException>((_, __) => throw _unavailable);
+
+  Future<Map<String, dynamic>?> _start(String action,
+      [Map<String, Object>? request]) async {
+    try {
+      return await _run(action, request);
+    } on TimeoutException {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> _wait(
-      String action, bool Function(Map<String, dynamic>) accept) async {
-    final elapsed = Stopwatch()..start();
-    while (elapsed.elapsed < const Duration(seconds: 22)) {
+      String action, bool Function(Map<String, dynamic>) accept) {
+    var expired = false;
+    return _poll(action, accept, () => expired).timeout(_waitLimit,
+        onTimeout: () {
+      expired = true;
+      throw _unavailable;
+    });
+  }
+
+  Future<Map<String, dynamic>> _poll(
+      String action,
+      bool Function(Map<String, dynamic>) accept,
+      bool Function() expired) async {
+    while (!expired()) {
       try {
         final result = await _run(action);
         if (accept(result)) return result;
-      } on PlatformException {
-        // A postback can replace the document before the script returns.
-      } on FormatException {
-        // A WebView in the middle of navigation can return an empty result.
+      } on Exception catch (error) {
+        if (error is! PlatformException &&
+            error is! FormatException &&
+            error is! TimeoutException) {
+          rethrow;
+        }
       }
-      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!expired()) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
     }
     throw _unavailable;
   }
@@ -390,8 +427,11 @@ class PortalWorkloadClient {
     Map<String, String> selection = const {},
     bool fresh = false,
   }) async {
-    await _ready;
-    final current = Uri.tryParse(await controller.currentUrl() ?? '');
+    await _ready.timeout(_callLimit, onTimeout: () => throw _unavailable);
+    final currentUrl = await controller
+        .currentUrl()
+        .timeout(_callLimit, onTimeout: () => throw _unavailable);
+    final current = Uri.tryParse(currentUrl ?? '');
     final onWorkload = current != null && isWorkloadPage(current);
     if (_workload == null) {
       if (onWorkload) {
@@ -400,7 +440,7 @@ class PortalWorkloadClient {
         if (current == null || !_isProfile(current)) {
           await _navigate(Uri.parse(_profile));
         }
-        final link = (await _run('link'))['url'] as String?;
+        final link = (await _read('link'))['url'] as String?;
         final url = link == null ? null : Uri.tryParse(link);
         if (url == null || !isWorkloadPage(url)) throw _unavailable;
         _workload = url;
@@ -414,7 +454,8 @@ class PortalWorkloadClient {
     if (fresh && onWorkload) {
       final displayed = await _run('info')
           .onError<PlatformException>((_, __) => {})
-          .onError<FormatException>((_, __) => {});
+          .onError<FormatException>((_, __) => {})
+          .onError<TimeoutException>((_, __) => {});
       if (_readyInfo(displayed) &&
           filters.any((name) {
             final value = selection[name];
@@ -429,8 +470,8 @@ class PortalWorkloadClient {
     for (final name in filters) {
       final value = selection[name];
       if (value == null || _selected(info, name) == value) continue;
-      final started = await _run('select', {'filter': name, 'value': value});
-      if (started['started'] != true) throw _changed;
+      final started = await _start('select', {'filter': name, 'value': value});
+      if (started != null && started['started'] != true) throw _changed;
       final revision = info['revision'];
       info = await _wait(
           'info',
@@ -440,15 +481,15 @@ class PortalWorkloadClient {
               _selected(result, name) == value);
     }
     if (info['mode'] != 'edit') {
-      final started = await _run('edit');
-      if (started['started'] != true) throw _unavailable;
+      final started = await _start('edit');
+      if (started != null && started['started'] != true) throw _unavailable;
       final revision = info['revision'];
       await _wait(
           'info',
           (result) =>
               result['mode'] == 'edit' && result['revision'] != revision);
     }
-    final report = await _run('inspect');
+    final report = await _read('inspect');
     if (report['error'] != null) throw _unavailable;
     return PortalWorkloadReport(report);
   }
@@ -476,7 +517,7 @@ class PortalWorkloadClient {
     }
     onProgress(1);
     final id = ++_submission;
-    final result = await _run('submit', {
+    final result = await _start('submit', {
       'scope': fresh.scope,
       'id': id,
       'changes': {
@@ -484,11 +525,11 @@ class PortalWorkloadClient {
           entry.key: {'before': current[entry.key], 'after': entry.value},
       },
     });
-    if (result['error'] == 'value') {
+    if (result?['error'] == 'value') {
       throw const PortalWorkloadFailure(
           'Портал отклонил одно из значений. Проверьте часы.');
     }
-    if (result['started'] != true) throw _changed;
+    if (result != null && result['started'] != true) throw _changed;
     onProgress(2);
     try {
       await _wait('receipt',
