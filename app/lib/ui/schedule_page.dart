@@ -9,6 +9,7 @@ import '../core/lesson_grouping.dart';
 import '../core/lesson_reminders.dart';
 import '../core/lesson_widget.dart';
 import '../core/ru_plural.dart';
+import '../data/portal_timetable_store.dart';
 import '../data/volgatech_api.dart';
 import '../mail/mail_config.dart';
 import '../models/schedule.dart';
@@ -196,7 +197,9 @@ class _ScheduleView extends StatelessWidget {
       );
     }
     // Merge lessons that share a time + room + subject (two groups together).
-    final slots = groupParallelLessons(events);
+    final personId = context.read<AuthController>().personId;
+    final timetable = context.watch<PortalTimetableStore?>()?.read(personId);
+    final slots = groupParallelLessons(events, studyForm: timetable?.formFor);
     return RefreshIndicator(
       onRefresh: c.refresh,
       child: ListView.builder(

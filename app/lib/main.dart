@@ -17,6 +17,7 @@ import 'core/notifications.dart';
 import 'core/photo_store.dart';
 import 'core/prefs.dart';
 import 'core/session.dart';
+import 'data/portal_timetable_store.dart';
 import 'data/volgatech_api.dart';
 import 'mail/mail_alerts.dart';
 import 'mail/mail_background.dart';
@@ -75,6 +76,7 @@ Future<void> main() async {
         Provider<JsonCache>.value(value: cache),
         Provider<PhotoStore>.value(value: PhotoStore(api, cache)),
         Provider<Prefs>.value(value: prefs),
+        ChangeNotifierProvider(create: (_) => PortalTimetableStore(prefs)),
         ChangeNotifierProvider<CrashLog>.value(value: crashes),
         ChangeNotifierProvider<ThemeController>(
           create: (_) => ThemeController(prefs),

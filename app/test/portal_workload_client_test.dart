@@ -173,6 +173,7 @@ final class _WorkloadController extends PlatformWebViewController {
   bool _editing = true;
   bool _receiptRead = false;
   Object? _submission;
+  Object? _timetableRequest;
 
   @override
   Future<void> setJavaScriptMode(JavaScriptMode mode) async {}
@@ -258,6 +259,17 @@ final class _WorkloadController extends PlatformWebViewController {
       case 'receipt':
         _receiptRead = true;
         return jsonEncode({'id': _submission, 'state': 'received'});
+      case 'timetableStart':
+        _timetableRequest = request!['id'];
+        return jsonEncode({'started': true});
+      case 'timetableReceipt':
+        return jsonEncode({
+          'id': _timetableRequest,
+          'state': 'ready',
+          'rows': [
+            {'group': 'ЩМ-$_month', 'form': 'оз'},
+          ],
+        });
       default:
         throw StateError('Unexpected workload action ${call[1]}');
     }
@@ -354,7 +366,7 @@ final class _LossyController extends PlatformWebViewController {
 
   @override
   Future<Object> runJavaScriptReturningResult(String script) async {
-    if (script.contains('401')) {
+    if (script.startsWith(r'/^401\s+unauthorized$/')) {
       return Future<Object>.delayed(probe, () => false);
     }
     final args = RegExp(r'\(("\w+", .*?)\)$').firstMatch(script);
@@ -504,6 +516,21 @@ PortalWorkloadReport _report({
 }
 
 void main() {
+  test('The timetable read leaves the workload document in place', () async {
+    final month = '${Random().nextInt(11) + 1}';
+    final platform = _WorkloadPlatform([month], 277);
+    final result = await _withWorkload(platform, (client) async {
+      final rows = await client.readTimetable();
+      final report = await client.load();
+      return [rows, report.selection['month'], platform.view.gets];
+    });
+    expect(
+      result,
+      [[{'group': 'ЩМ-$month', 'form': 'оз'}], month, 0],
+      reason: 'the timetable bridge hid its rows or navigated away from the workload',
+    );
+  });
+
   test('A fresh load of another month uses the selection postback', () async {
     final random = Random();
     final month = '${random.nextInt(5) + 8}';

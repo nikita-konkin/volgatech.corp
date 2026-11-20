@@ -9,6 +9,11 @@ class WorkloadTotal {
   final List<String> groups;
   final List<DateTime> dates = [];
   int hours = 0;
+
+  String? get studyForm {
+    final forms = groups.map(_studyForm).toSet();
+    return forms.length == 1 ? forms.single : null;
+  }
 }
 
 List<WorkloadTotal> monthlyWorkload(
@@ -43,6 +48,10 @@ String workloadName(String value) =>
     value.trim().toLowerCase().replaceAll('ё', 'е').replaceAll(_spaces, ' ');
 
 final _spaces = RegExp(r'\s+');
+final _studyFormMarker = RegExp(r'\(\s*(о|оз|з)\s*\)', caseSensitive: false);
+
+String? _studyForm(String label) =>
+    _studyFormMarker.firstMatch(label)?[1]?.toLowerCase();
 
 DateTime? portalWorkloadMonth(String label) {
   const months = [
@@ -89,6 +98,7 @@ class PortalWorkloadCell {
   final int amount;
 
   bool get available => amount == 0;
+  String? get studyForm => _studyForm(specialty);
 }
 
 const workloadColumnLabels = {
@@ -129,7 +139,7 @@ typedef WorkloadTargetOptions = ({
 });
 
 /// The grid groups rows by appointment, semester, discipline and specialty.
-/// A timetable group label alone does not identify a specialty or appointment.
+/// The study form can identify a unique free specialty for a discipline.
 WorkloadTargetOptions workloadTargets(
     WorkloadTotal total, List<PortalWorkloadCell> cells, DateTime month,
     {Set<String> occupied = const {}}) {
@@ -141,14 +151,15 @@ WorkloadTargetOptions workloadTargets(
       .where((cell) =>
           workloadName(cell.discipline) == workloadName(total.discipline))
       .toList();
+  final form = total.studyForm;
+  final available = matching.where((cell) =>
+      cell.available &&
+      !occupied.contains(cell.key) &&
+      (matching.length == 1 || (form != null && cell.studyForm == form)));
   return (
     choices: matching.isEmpty ? eligible : matching,
     sameDiscipline: matching.isNotEmpty,
-    suggested: matching.length == 1 &&
-            matching.single.available &&
-            !occupied.contains(matching.single.key)
-        ? matching.single.key
-        : null,
+    suggested: available.length == 1 ? available.single.key : null,
   );
 }
 

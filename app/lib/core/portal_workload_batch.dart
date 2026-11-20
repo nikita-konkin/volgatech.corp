@@ -114,12 +114,15 @@ class WorkloadBatchMonth {
 class WorkloadBatchLine {
   final _choices = <WorkloadCellIdentity>{};
   final _matching = <WorkloadCellIdentity>{};
+  final _matchingForm = <WorkloadCellIdentity>{};
   bool _hasSuggestion = false;
 
   Set<WorkloadCellIdentity> get choices => _choices;
   bool get sameDiscipline => _matching.isNotEmpty;
-  WorkloadCellIdentity? get suggested =>
-      _matching.length == 1 && _hasSuggestion ? _matching.single : null;
+  WorkloadCellIdentity? get suggested {
+    if (_matching.length == 1 && _hasSuggestion) return _matching.single;
+    return _matchingForm.length == 1 ? _matchingForm.single : null;
+  }
 }
 
 /// The shared row choices and per-month changes for a multi-month review.
@@ -130,11 +133,15 @@ class WorkloadBatch {
         final line = lines.putIfAbsent(
             workloadLineIdentity(total), WorkloadBatchLine.new);
         final options = month._options(total);
+        final form = total.studyForm;
         for (final cell in options.choices) {
           final row = workloadCellIdentity(cell);
           if (options.sameDiscipline) line._matching.add(row);
           if (month.availableCell(row) == null) continue;
           line._choices.add(row);
+          if (options.sameDiscipline && form != null && cell.studyForm == form) {
+            line._matchingForm.add(row);
+          }
           if (options.suggested == cell.key) line._hasSuggestion = true;
         }
       }
