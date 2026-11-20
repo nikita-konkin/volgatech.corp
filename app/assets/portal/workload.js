@@ -1,9 +1,10 @@
 ((action, request) => {
   const portal = 'https://portal.volgatech.net';
   const pageName = 'нагрузка на первую половину дня.aspx';
+  const pagePath = url => url.pathname.replace(/&authresend[0-9a-f]+$/i, '');
   const isWorkloadPage = url => url.origin === portal &&
-    /^\/my\/personal\/[^/]+\/sitepages\/[^/]+$/i.test(url.pathname) &&
-    decodeURIComponent(url.pathname).split('/').pop().toLowerCase() === pageName;
+    /^\/my\/personal\/[^/]+\/sitepages\/[^/]+$/i.test(pagePath(url)) &&
+    decodeURIComponent(pagePath(url)).split('/').pop().toLowerCase() === pageName;
   const reply = data => JSON.stringify(data);
   const fail = error => reply({error});
   const clean = text => text.trim().replace(/\s+/g, ' ');
@@ -50,12 +51,12 @@
   if (Object.values(filters).some(filter => filter === null)) return fail('loading');
   const edit = document.querySelector('a[id$="_btnEdit"]');
   const save = document.querySelector('a[id$="_btnSave"]');
-  const scope = JSON.stringify([location.pathname,
+  const scope = JSON.stringify([pagePath(location),
     ...Object.values(filters).map(filter => filter.selected)]);
   const form = document.getElementById('aspnetForm');
   const target = form && new URL(form.action);
   const validForm = target && isWorkloadPage(target) &&
-    target.pathname === location.pathname &&
+    pagePath(target) === pagePath(location) &&
     form.method.toLowerCase() === 'post' && form.elements.__VIEWSTATE;
   const postEvent = (name, argument) => {
     form.elements.__EVENTTARGET.value = name;

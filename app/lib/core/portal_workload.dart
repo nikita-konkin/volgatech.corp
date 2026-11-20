@@ -151,3 +151,26 @@ WorkloadTargetOptions workloadTargets(
         : null,
   );
 }
+
+/// Timetable totals split by whether the department's form lists their
+/// discipline; the hidden ones are taught for other departments.
+({List<WorkloadTotal> shown, List<WorkloadTotal> hidden}) departmentWorkload(
+    List<WorkloadTotal> totals, Iterable<PortalWorkloadCell> cells) {
+  final names = {for (final cell in cells) workloadName(cell.discipline)};
+  bool listed(WorkloadTotal total) =>
+      names.contains(workloadName(total.discipline));
+  return (
+    shown: totals.where(listed).toList(),
+    hidden: totals.where((total) => !listed(total)).toList(),
+  );
+}
+
+/// One field as the save confirmation lists it.
+String workloadChange(PortalWorkloadCell cell, int amount) =>
+    '${cell.discipline} · ${workloadColumnLabels[cell.column]}: '
+    '${formatWorkloadHours(cell.amount)} → ${formatWorkloadHours(amount)} ч.';
+
+/// The month a form opens on: the previous one during the first week, when
+/// it is usually still being filled, otherwise the current one.
+DateTime workloadMonth(DateTime today) =>
+    DateTime(today.year, today.month - (today.day <= 7 ? 1 : 0));

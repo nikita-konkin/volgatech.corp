@@ -1,17 +1,24 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../core/hourly_load.dart';
 import '../core/portal_workload.dart';
+import '../core/ru_plural.dart';
 import '../data/portal_workload_client.dart';
 import '../data/volgatech_api.dart';
 import '../state/auth_controller.dart';
 import 'layout.dart';
+
+const _departmentKey = 'portal_workload_department';
+
+DateTime _moscowNow() => DateTime.now().toUtc().add(const Duration(hours: 3));
 
 class PortalWorkloadPage extends StatefulWidget {
   const PortalWorkloadPage({super.key});
@@ -153,7 +160,7 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
       if (selection != null) _selection = selection;
     });
     try {
-      final report = await _portal.load(selection: _selection, fresh: fresh);
+      var report = await _portal.load(selection: _selection, fresh: fresh);
       final name = auth.profile?.fullName ??
           (personId == null
               ? null
@@ -166,7 +173,19 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
         throw const PortalWorkloadFailure(
             'Преподаватель на портале не совпадает с профилем приложения.');
       }
-      setState(() => _setReport(report));
+      final preferences = await SharedPreferences.getInstance();
+      if (_report == null && selection == null) {
+        final wanted = workloadSelection(report, workloadMonth(_moscowNow()),
+            department: preferences.getString(_departmentKey));
+        if (!mapEquals(wanted, report.selection)) {
+          report = await _portal.load(selection: wanted);
+        }
+      }
+      if (!mounted || auth.personId != personId) return;
+      await preferences.setString(
+          _departmentKey, report.selection['department']!);
+      final loaded = report;
+      setState(() => _setReport(loaded));
     } on PortalWorkloadFailure catch (error) {
       _handle(error);
     } on Exception {
@@ -210,7 +229,7 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
         context: context,
         builder: (dialog) => AlertDialog(
           title: Text(title),
-          content: Text(text),
+          content: SingleChildScrollView(child: Text(text)),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(dialog, false),
@@ -247,7 +266,7 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
     final personId = auth.personId;
     final month = report.month;
     if (personId == null || month == null) return;
-    final today = DateTime.now().toUtc().add(const Duration(hours: 3));
+    final today = _moscowNow();
     final yesterday = DateTime(today.year, today.month, today.day - 1);
     if (yesterday.isBefore(month)) {
       _notice('В выбранном месяце ещё нет прошедших дней.');
@@ -259,10 +278,13 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
       final days = await api.getSchedule(
           personId, month, yesterday.isBefore(end) ? yesterday : end);
       if (!mounted || auth.personId != personId) return;
-      final totals = monthlyWorkload(hourlyClassesFrom(days), month, today);
+      final split = departmentWorkload(
+          monthlyWorkload(hourlyClassesFrom(days), month, today), cells);
+      final totals = split.shown;
       if (totals.isEmpty) {
-        _notice(
-            'В расписании за прошедшие дни месяца нет занятий для заполнения.');
+        _notice(split.hidden.isEmpty
+            ? 'В расписании за прошедшие дни месяца нет занятий для заполнения.'
+            : 'В расписании за прошедшие дни месяца нет занятий по дисциплинам этой кафедры.');
         return;
       }
       final occupied = {
@@ -278,6 +300,7 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
                 workloadTargets(total, cells, month, occupied: occupied),
             ],
             occupied,
+            split.hidden,
           ),
         ),
       );
@@ -301,10 +324,19 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
     final auth = context.read<AuthController>();
     final id = auth.personId;
     final month = report.filters['month']!.selected.label;
+    final cells = {for (final cell in report.cells) cell.key: cell};
+    final total = changes.values.fold(0, (sum, amount) => sum + amount);
     if (id == null ||
         !await _confirm(
             'Сохранить на портале?',
-            '$month · $_semester\nПолей к сохранению · ${changes.length}',
+            [
+              '$month · $_semester',
+              '',
+              for (final entry in changes.entries)
+                workloadChange(cells[entry.key]!, entry.value),
+              '',
+              'Итого в этих полях: ${formatWorkloadHours(total)} ч.',
+            ].join('\n'),
             'Сохранить')) {
       return;
     }
@@ -373,7 +405,13 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
         month != null &&
         _semester == workloadSemesterForMonth(month);
     return PopScope(
-      canPop: !_saving,
+      canPop: !_saving && !_hasEdits,
+      onPopInvokedWithResult: (popped, _) async {
+        if (popped || _saving) return;
+        final leave = await _confirm('Выйти без сохранения?',
+            'Изменения в форме ещё не сохранены.', 'Выйти');
+        if (leave && context.mounted) Navigator.of(context).pop();
+      },
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Учебная нагрузка'),
@@ -601,11 +639,12 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
 }
 
 class _WorkloadReview extends StatefulWidget {
-  const _WorkloadReview(this.totals, this.choices, this.occupied);
+  const _WorkloadReview(this.totals, this.choices, this.occupied, this.hidden);
 
   final List<WorkloadTotal> totals;
   final List<WorkloadTargetOptions> choices;
   final Set<String> occupied;
+  final List<WorkloadTotal> hidden;
 
   @override
   State<_WorkloadReview> createState() => _WorkloadReviewState();
@@ -629,13 +668,30 @@ class _WorkloadReviewState extends State<_WorkloadReview> {
       draft.update(key, (value) => value + hours, ifAbsent: () => hours);
     }
     final hours = draft.values.fold(0, (sum, value) => sum + value);
+    final names = {for (final total in widget.hidden) total.discipline};
+    final offset = names.isEmpty ? 0 : 1;
     return Scaffold(
       appBar: AppBar(title: const Text('Из расписания')),
       body: ListView.separated(
         padding: readable(context, const EdgeInsets.all(16)),
-        itemCount: widget.totals.length,
+        itemCount: widget.totals.length + offset,
         separatorBuilder: (_, __) => const Divider(height: 24),
-        itemBuilder: (context, index) {
+        itemBuilder: (context, position) {
+          if (position < offset) {
+            final skipped =
+                widget.hidden.fold(0, (sum, total) => sum + total.hours);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Скрыто ${names.length} '
+                    '${pluralRu(names.length, 'дисциплина', 'дисциплины', 'дисциплин')} '
+                    'других кафедр · $skipped ч.'),
+                Text(names.join(', '),
+                    style: Theme.of(context).textTheme.bodySmall),
+              ],
+            );
+          }
+          final index = position - offset;
           final total = widget.totals[index];
           final options = widget.choices[index];
           final choices = options.choices.where(_canFill).toList();

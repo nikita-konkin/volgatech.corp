@@ -18,9 +18,19 @@ bool _onPortal(Uri uri) =>
     uri.port == 443 &&
     uri.userInfo.isEmpty;
 
-bool _isWorkload(Uri uri) {
+final _authResend = RegExp(r'&AuthResend[0-9a-f]+$', caseSensitive: false);
+
+/// The address without the marker the gateway appends to a page it
+/// re-authenticated after a sign-in.
+Uri portalAddress(Uri uri) =>
+    uri.replace(path: uri.path.replaceFirst(_authResend, ''));
+
+bool isWorkloadPage(Uri uri) {
   if (!_onPortal(uri)) return false;
-  final parts = uri.pathSegments.map((part) => part.toLowerCase()).toList();
+  final parts = portalAddress(uri)
+      .pathSegments
+      .map((part) => part.toLowerCase())
+      .toList();
   return parts.length == 5 &&
       parts[0] == 'my' &&
       parts[1] == 'personal' &&
@@ -67,6 +77,28 @@ class PortalWorkloadReport {
       };
 
   DateTime? get month => portalWorkloadMonth(filters['month']!.selected.label);
+}
+
+/// The filters to open the form on: [month] in its study year, and the
+/// remembered [department] while the portal still offers it.
+Map<String, String> workloadSelection(
+    PortalWorkloadReport report, DateTime month,
+    {String? department}) {
+  final start = month.month >= 9 ? month.year : month.year - 1;
+  String pick(String name, bool Function(PortalWorkloadOption) wanted) {
+    final filter = report.filters[name]!;
+    return filter.options
+        .where(wanted)
+        .map((option) => option.value)
+        .followedBy([filter.selected.value]).first;
+  }
+
+  return {
+    'department': pick('department', (option) => option.value == department),
+    'year': pick('year', (option) => option.label == '$start/${start + 1}'),
+    'month':
+        pick('month', (option) => portalWorkloadMonth(option.label) == month),
+  };
 }
 
 class PortalWorkloadFailure implements Exception {
@@ -145,7 +177,7 @@ class PortalWorkloadClient {
         if (_login &&
             !_authRequired &&
             uri != null &&
-            (_isWorkload(uri) || url == _profile)) {
+            (isWorkloadPage(uri) || url == _profile)) {
           _login = false;
           onSignedIn();
         }
@@ -205,7 +237,7 @@ class PortalWorkloadClient {
       throw _signIn;
     }
     if (uri == null ||
-        (action == 'link' ? url != _profile : !_isWorkload(uri))) {
+        (action == 'link' ? url != _profile : !isWorkloadPage(uri))) {
       return {'error': 'loading'};
     }
     final args = [jsonEncode(action), jsonEncode(request)].join(', ');
@@ -239,19 +271,19 @@ class PortalWorkloadClient {
     await _ready;
     final current = Uri.tryParse(await controller.currentUrl() ?? '');
     if (_workload == null) {
-      if (current == null || !_isWorkload(current)) {
+      if (current == null || !isWorkloadPage(current)) {
         if (current?.toString() != _profile) {
           await _navigate(Uri.parse(_profile));
         }
         final link = (await _run('link'))['url'] as String?;
         final url = link == null ? null : Uri.tryParse(link);
-        if (url == null || !_isWorkload(url)) throw _unavailable;
+        if (url == null || !isWorkloadPage(url)) throw _unavailable;
         _workload = url;
         await _navigate(url);
       } else {
-        _workload = current;
+        _workload = portalAddress(current);
       }
-    } else if (fresh || current == null || !_isWorkload(current)) {
+    } else if (fresh || current == null || !isWorkloadPage(current)) {
       await _navigate(_workload!);
     }
 
