@@ -36,8 +36,7 @@ final class _PortalSignInState extends State<PortalSignIn> {
   bool _busy = false;
   String? _error;
 
-  String? get _domainLogin =>
-      loginCandidates(_login.text.split(r'\').last).firstOrNull;
+  String? get _domainLogin => loginCandidates(_login.text).firstOrNull;
 
   bool get _canSubmit =>
       !_busy && _password.text.isNotEmpty && _domainLogin != null;

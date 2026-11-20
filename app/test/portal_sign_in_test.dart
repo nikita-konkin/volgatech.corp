@@ -51,8 +51,7 @@ void main() {
     );
   });
 
-  testWidgets('An explicitly typed domain is replaced with the portal domain',
-      (tester) async {
+  testWidgets('An explicitly typed domain is kept', (tester) async {
     final random = Random();
     final name = 's.ven-${random.nextInt(99731)}';
     final domain = 'BRANCH${random.nextInt(573)}';
@@ -70,8 +69,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       submitted,
-      'MARSTU\\$name',
-      reason: 'the callback retained a domain that the portal does not use',
+      '$domain\\$name',
+      reason: 'the typed domain was replaced',
     );
   });
 
