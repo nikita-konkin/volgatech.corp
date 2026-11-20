@@ -392,8 +392,11 @@ class PortalWorkloadClient {
   }) async {
     await _ready;
     final current = Uri.tryParse(await controller.currentUrl() ?? '');
+    final onWorkload = current != null && isWorkloadPage(current);
     if (_workload == null) {
-      if (current == null || !isWorkloadPage(current)) {
+      if (onWorkload) {
+        _workload = portalAddress(current);
+      } else {
         if (current == null || !_isProfile(current)) {
           await _navigate(Uri.parse(_profile));
         }
@@ -402,18 +405,28 @@ class PortalWorkloadClient {
         if (url == null || !isWorkloadPage(url)) throw _unavailable;
         _workload = url;
         await _navigate(url);
-      } else {
-        _workload = portalAddress(current);
       }
-    } else if (fresh || current == null || !isWorkloadPage(current)) {
+    } else if (!onWorkload) {
       await _navigate(_workload!);
     }
-
-    var info = await _wait('info', (result) {
-      final mode = result['mode'];
-      return mode == 'view' || mode == 'edit';
-    });
-    for (final name in ['department', 'year', 'month']) {
+    final filters = ['department', 'year', 'month'];
+    Map<String, dynamic>? initial;
+    if (fresh && onWorkload) {
+      final displayed = await _run('info')
+          .onError<PlatformException>((_, __) => {})
+          .onError<FormatException>((_, __) => {});
+      if (_readyInfo(displayed) &&
+          filters.any((name) {
+            final value = selection[name];
+            return value != null && _selected(displayed, name) != value;
+          })) {
+        initial = displayed;
+      } else {
+        await _navigate(_workload!);
+      }
+    }
+    var info = initial ?? await _wait('info', _readyInfo);
+    for (final name in filters) {
       final value = selection[name];
       if (value == null || _selected(info, name) == value) continue;
       final started = await _run('select', {'filter': name, 'value': value});
@@ -438,6 +451,11 @@ class PortalWorkloadClient {
     final report = await _run('inspect');
     if (report['error'] != null) throw _unavailable;
     return PortalWorkloadReport(report);
+  }
+
+  bool _readyInfo(Map<String, dynamic> info) {
+    final mode = info['mode'];
+    return mode == 'view' || mode == 'edit';
   }
 
   String _selected(Map<String, dynamic> info, String name) =>
