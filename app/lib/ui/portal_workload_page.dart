@@ -15,6 +15,7 @@ import '../data/portal_workload_client.dart';
 import '../data/volgatech_api.dart';
 import '../state/auth_controller.dart';
 import 'layout.dart';
+import 'portal_sign_in.dart';
 import 'portal_workload_batch_review.dart';
 
 const _departmentKey = 'portal_workload_department';
@@ -62,7 +63,7 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
   Future<void> _openLogin() async {
     setState(() => _showLogin = true);
     try {
-      await _portal.openLogin();
+      await _portal.openLogin(resume: true);
     } on PlatformException {
       _loginFailed(const PortalWorkloadFailure(
           'Не удалось открыть страницу входа.',
@@ -652,7 +653,7 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
           actions: [
             IconButton(
               tooltip: 'Обновить',
-              onPressed: _busy ? null : _changePeriod,
+              onPressed: _busy || _signInRequired ? null : _changePeriod,
               icon: const Icon(Icons.refresh),
             ),
           ],
@@ -718,28 +719,35 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
     );
   }
 
-  Widget _connection() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: _busy
-              ? const CircularProgressIndicator()
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_error != null)
-                      Text(_error!, textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: _signInRequired
-                          ? _openLogin
-                          : () => _load(fresh: true),
-                      child: Text(
-                          _signInRequired ? 'Войти на портал' : 'Повторить'),
-                    ),
-                  ],
-                ),
-        ),
+  Widget _connection() {
+    if (_signInRequired && !_busy) {
+      return PortalSignIn(
+        signIn: _portal.signIn,
+        onSignedIn: () => unawaited(_load()),
+        onUnexpected: () => unawaited(_openLogin()),
+        message: _error,
       );
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: _busy
+            ? const CircularProgressIndicator()
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_error != null)
+                    Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => _load(fresh: true),
+                    child: const Text('Повторить'),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
 
   Widget _form(PortalWorkloadReport report, List<PortalWorkloadCell> cells,
       bool canEdit) {

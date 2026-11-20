@@ -61,6 +61,7 @@ flutter:
     - assets/memo/foreign_language_memo.docx
     - assets/hourly/form28_appendix.docx
     - assets/portal/workload.js
+    - assets/portal/logon.js
   # Bundled so the web build never fetches Roboto from Google at start-up
   # (without it there would be no text at all where Google is unreachable).
   # The same face Android uses (Apache 2.0, see assets/fonts/).

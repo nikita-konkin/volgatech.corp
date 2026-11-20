@@ -11,7 +11,7 @@
 
   if (location.origin !== portal) return fail('page');
   if (action === 'link') {
-    if (location.pathname.toLowerCase() !== '/my/person.aspx') return fail('page');
+    if (pagePath(location).toLowerCase() !== '/my/person.aspx') return fail('page');
     const link = Array.from(document.links).find(link => isWorkloadPage(new URL(link.href)));
     return reply({url: link ? link.href : null});
   }

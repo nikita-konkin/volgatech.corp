@@ -48,6 +48,45 @@ PortalWorkloadReport _report({
 }
 
 void main() {
+  test('A profile with the gateway marker means the sign-in succeeded', () {
+    final page = Uri.parse(
+        'https://portal.volgatech.net/my/person.aspx${_marker(Random())}');
+    expect(
+      portalSignInLanding(page),
+      PortalSignInResult.signedIn,
+      reason: 'the marked profile was not recognised as a successful sign-in',
+    );
+  });
+
+  test('A workload page means the sign-in succeeded', () {
+    final page = Uri.parse(_page('Нагрузка на первую половину дня.aspx'));
+    expect(
+      portalSignInLanding(page),
+      PortalSignInResult.signedIn,
+      reason: 'the workload page was not recognised as a successful sign-in',
+    );
+  });
+
+  test('A return to the gateway with a nonzero reason means rejection', () {
+    final reason = Random().nextInt(891) + 1;
+    final page = Uri.parse('https://portal.volgatech.net/'
+        'CookieAuth.dll?GetLogon?curl=Z2FmyZ2Fperson.aspx&reason=$reason&formdir=12');
+    expect(
+      portalSignInLanding(page),
+      PortalSignInResult.rejected,
+      reason: 'a return to the gateway was not recognised as a rejection',
+    );
+  });
+
+  test('A password change page is an unexpected landing', () {
+    final page = Uri.parse(_page('Смена пароля.aspx'));
+    expect(
+      portalSignInLanding(page),
+      PortalSignInResult.unexpected,
+      reason: 'the password change page was mistaken for a sign-in result',
+    );
+  });
+
   test(
       'a workload page the gateway marked after sign-in is still the workload page',
       () {

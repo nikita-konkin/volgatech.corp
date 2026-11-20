@@ -7,7 +7,9 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../core/portal_workload.dart';
 
 const _portal = 'https://portal.volgatech.net';
-const _profile = '$_portal/my/person.aspx';
+const _profilePath = '/my/person.aspx';
+const _profile = '$_portal$_profilePath';
+const _loginPath = '/cookieauth.dll';
 
 Map<String, dynamic> _fields(Object? data) =>
     Map<String, dynamic>.from(data as Map<Object?, Object?>);
@@ -39,7 +41,22 @@ bool isWorkloadPage(Uri uri) {
 }
 
 bool _isLogin(Uri uri) =>
-    _onPortal(uri) && uri.path.toLowerCase() == '/cookieauth.dll';
+    _onPortal(uri) && uri.path.toLowerCase() == _loginPath;
+
+bool _isProfile(Uri uri) =>
+    _onPortal(uri) && portalAddress(uri).path.toLowerCase() == _profilePath;
+
+/// The outcome of an attempted portal sign-in.
+enum PortalSignInResult { signedIn, rejected, unexpected }
+
+PortalSignInResult portalSignInLanding(Uri? uri) {
+  if (uri == null) return PortalSignInResult.unexpected;
+  if (_isProfile(uri) || isWorkloadPage(uri)) {
+    return PortalSignInResult.signedIn;
+  }
+  if (_isLogin(uri)) return PortalSignInResult.rejected;
+  return PortalSignInResult.unexpected;
+}
 
 typedef PortalWorkloadOption = ({String label, String value});
 
@@ -129,7 +146,10 @@ class PortalWorkloadClient {
   late final Future<void> _ready;
   late final Future<String> _script =
       rootBundle.loadString('assets/portal/workload.js');
+  late final Future<String> _logonScript =
+      rootBundle.loadString('assets/portal/logon.js');
   Completer<String?>? _navigation;
+  void Function(HttpAuthRequest)? _nativeAuth;
   Uri? _workload;
   bool _login = false;
   bool _authRequired = false;
@@ -146,6 +166,11 @@ class PortalWorkloadClient {
       },
       onHttpAuthRequest: (request) {
         if (request.host == Uri.parse(_portal).host) {
+          final nativeAuth = _nativeAuth;
+          if (nativeAuth != null) {
+            nativeAuth(request);
+            return;
+          }
           if (_login) {
             onAuthRequest(request);
             return;
@@ -155,6 +180,7 @@ class PortalWorkloadClient {
         request.onCancel();
       },
       onPageFinished: (url) async {
+        final navigation = _navigation;
         final uri = Uri.tryParse(url);
         if (uri != null && _onPortal(uri)) {
           // The gateway can return a plain 401 at either the login or profile URL.
@@ -170,14 +196,12 @@ class PortalWorkloadClient {
             }
           }
         }
-        final navigation = _navigation;
         if (navigation != null && !navigation.isCompleted) {
           navigation.complete(url);
         }
         if (_login &&
             !_authRequired &&
-            uri != null &&
-            (isWorkloadPage(uri) || url == _profile)) {
+            portalSignInLanding(uri) == PortalSignInResult.signedIn) {
           _login = false;
           onSignedIn();
         }
@@ -199,21 +223,86 @@ class PortalWorkloadClient {
     ));
   }
 
-  Future<void> openLogin() async {
+  Future<void> openLogin({bool resume = false}) async {
     await _ready;
     _authRequired = false;
     _login = true;
+    if (resume) {
+      final current = Uri.tryParse(await controller.currentUrl() ?? '');
+      if (!_login) return;
+      if (current != null &&
+          _onPortal(current) &&
+          portalSignInLanding(current) != PortalSignInResult.signedIn) {
+        return;
+      }
+    }
     await controller.loadRequest(Uri.parse(_profile));
   }
 
   void cancelLogin() => _login = false;
 
-  Future<void> _navigate(Uri uri) async {
+  /// Signs in once with a login in the portal's domain format.
+  Future<PortalSignInResult> signIn(String domainLogin, String password) async {
+    if (_nativeAuth != null) return PortalSignInResult.unexpected;
+    var challenged = false;
+    _authRequired = false;
+    _nativeAuth = (request) {
+      if (!challenged) {
+        challenged = true;
+        request.onProceed(
+            WebViewCredential(user: domainLogin, password: password));
+        return;
+      }
+      _authRequired = true;
+      request.onCancel();
+      final navigation = _navigation;
+      if (navigation != null && !navigation.isCompleted) {
+        navigation.complete(null);
+      }
+    };
+    try {
+      await _ready;
+      final initialUrl = await _awaitNavigation(
+          () => controller.loadRequest(Uri.parse(_profile)));
+      if (_authRequired) return PortalSignInResult.rejected;
+      final initial = portalSignInLanding(Uri.tryParse(initialUrl ?? ''));
+      if (initial != PortalSignInResult.rejected || challenged) return initial;
+      final script = await _logonScript;
+      if (_authRequired || challenged) return PortalSignInResult.rejected;
+      final args = [jsonEncode(domainLogin), jsonEncode(password)].join(', ');
+      final landing = await _awaitNavigation(() async {
+        final started = await controller.runJavaScriptReturningResult(
+            'location.origin === ${jsonEncode(_portal)} && '
+            'location.pathname.toLowerCase() === ${jsonEncode(_loginPath)} && '
+            '$script($args).started');
+        if (started != true) throw _unavailable;
+      });
+      if (_authRequired) return PortalSignInResult.rejected;
+      return portalSignInLanding(Uri.tryParse(landing ?? ''));
+    } on Exception {
+      return _authRequired
+          ? PortalSignInResult.rejected
+          : PortalSignInResult.unexpected;
+    } finally {
+      _nativeAuth = null;
+    }
+  }
+
+  Future<String?> _awaitNavigation(Future<void> Function() start) async {
     final navigation = _navigation = Completer<String?>();
+    try {
+      return await start()
+          .then((_) => navigation.future)
+          .timeout(const Duration(seconds: 22));
+    } finally {
+      _navigation = null;
+    }
+  }
+
+  Future<void> _navigate(Uri uri) async {
     _authRequired = false;
     try {
-      await controller.loadRequest(uri);
-      final url = await navigation.future.timeout(const Duration(seconds: 22));
+      final url = await _awaitNavigation(() => controller.loadRequest(uri));
       if (_authRequired) throw _signIn;
       if (url == null) throw _unavailable;
       final loaded = Uri.parse(url);
@@ -223,8 +312,6 @@ class PortalWorkloadClient {
       if (!_onPortal(loaded)) throw _unavailable;
     } on TimeoutException {
       throw _unavailable;
-    } finally {
-      _navigation = null;
     }
   }
 
@@ -237,7 +324,7 @@ class PortalWorkloadClient {
       throw _signIn;
     }
     if (uri == null ||
-        (action == 'link' ? url != _profile : !isWorkloadPage(uri))) {
+        (action == 'link' ? !_isProfile(uri) : !isWorkloadPage(uri))) {
       return {'error': 'loading'};
     }
     final args = [jsonEncode(action), jsonEncode(request)].join(', ');
@@ -272,7 +359,7 @@ class PortalWorkloadClient {
     final current = Uri.tryParse(await controller.currentUrl() ?? '');
     if (_workload == null) {
       if (current == null || !isWorkloadPage(current)) {
-        if (current?.toString() != _profile) {
+        if (current == null || !_isProfile(current)) {
           await _navigate(Uri.parse(_profile));
         }
         final link = (await _run('link'))['url'] as String?;
