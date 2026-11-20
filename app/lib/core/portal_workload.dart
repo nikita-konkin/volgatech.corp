@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'hourly_load.dart';
 
 /// A monthly timetable total for groups taught together, counted once per slot.
@@ -174,3 +176,19 @@ String workloadChange(PortalWorkloadCell cell, int amount) =>
 /// it is usually still being filled, otherwise the current one.
 DateTime workloadMonth(DateTime today) =>
     DateTime(today.year, today.month - (today.day <= 7 ? 1 : 0));
+
+String workloadPortalPayload(DateTime month, Iterable<WorkloadTotal> totals) =>
+    jsonEncode({
+      'volgatech': 'workload/1',
+      'month': '${month.year}-${month.month.toString().padLeft(2, '0')}',
+      'semester': workloadSemesterForMonth(month),
+      'lines': [
+        for (final total in totals)
+          {
+            'discipline': total.discipline,
+            'column': total.column,
+            'hours': total.hours,
+            'groups': total.groups,
+          },
+      ],
+    });

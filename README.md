@@ -149,6 +149,9 @@ hourly-load report all work, but:
   every change listed before saving, several months at once, and the
   portal's sign-in as a native screen (the login is remembered, the
   password never).
+- **Учебная нагрузка в браузере** — copy monthly hours from the timetable,
+  preview and fill the portal form with the «Заполнить из Волгатех» bookmark,
+  then save on the portal.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
 
 ## What's new — v0.5.8
