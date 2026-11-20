@@ -26,7 +26,7 @@ dependencies:
   archive: ^4.3.0
   share_plus: ^12.0.2
   package_info_plus: ^9.0.1
-  enough_mail: ^2.1.7
+  enough_mail: ^3.0.0
   crypto: ^3.0.7
   pointycastle: ^4.0.0
   xml: ^6.5.0
