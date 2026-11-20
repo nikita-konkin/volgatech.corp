@@ -190,6 +190,16 @@ void main() {
           reason: 'the encoded recipient name was hidden in a quoted string');
     });
 
+    test('a multipart message root declares no base64 encoding', () {
+      final head = utf8
+          .decode(buildMime(ComposeDraft(
+              to: _mailbox(), subject: _cyrillicName(), text: _cyrillicName())))
+          .split('\r\n\r\n')
+          .first;
+      expect(head, isNot(contains('Content-Transfer-Encoding: base64')),
+          reason: 'the multipart root told Exchange to decode its parts');
+    });
+
     test('an encoded header names the utf-8 charset', () {
       final header = _header(
           buildMime(ComposeDraft(
