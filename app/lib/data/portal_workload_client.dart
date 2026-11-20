@@ -199,17 +199,9 @@ class PortalWorkloadClient {
         final navigation = _navigation;
         final uri = Uri.tryParse(url);
         if (uri != null && _onPortal(uri)) {
-          final Object denied;
-          try {
-            denied = await controller
-                .runJavaScriptReturningResult(_unauthorizedDocument)
-                .timeout(_callLimit);
-          } on TimeoutException {
-            if (navigation != null && !navigation.isCompleted) {
-              navigation.complete(null);
-            }
-            return;
-          }
+          final denied = await controller
+              .runJavaScriptReturningResult(_unauthorizedDocument)
+              .timeout(_callLimit, onTimeout: () => false);
           if (denied.toString() == 'true') {
             _authRequired = true;
             if (_login) {
@@ -380,7 +372,7 @@ class PortalWorkloadClient {
   }
 
   Future<Map<String, dynamic>> _read(String action) =>
-      _run(action).onError<TimeoutException>((_, __) => throw _unavailable);
+      _wait(action, (_) => true);
 
   Future<Map<String, dynamic>?> _start(String action,
       [Map<String, Object>? request]) async {

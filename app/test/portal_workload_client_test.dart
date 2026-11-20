@@ -290,17 +290,20 @@ Future<T> _withWorkload<T>(
 
 /// A workload WebView with a configurable action whose reply is lost.
 final class _LossyPlatform extends WebViewPlatform {
-  _LossyPlatform(this.month, this.cell, this.lostReply);
+  _LossyPlatform(this.month, this.cell, this.lostReply,
+      {this.losses = 1 << 30, this.probe = Duration.zero});
 
   final String month;
   final String cell;
   final String lostReply;
+  final int losses;
+  final Duration probe;
 
   @override
   PlatformWebViewController createPlatformWebViewController(
     PlatformWebViewControllerCreationParams params,
   ) =>
-      _LossyController(params, month, cell, lostReply);
+      _LossyController(params, month, cell, lostReply, losses, probe);
 
   @override
   PlatformNavigationDelegate createPlatformNavigationDelegate(
@@ -311,12 +314,16 @@ final class _LossyPlatform extends WebViewPlatform {
 
 /// A workload page whose postbacks and saves can finish after losing a reply.
 final class _LossyController extends PlatformWebViewController {
-  _LossyController(super.params, this.month, this.cell, this.lostReply)
+  _LossyController(super.params, this.month, this.cell, this.lostReply,
+      this.losses, this.probe)
       : super.implementation();
 
   final String month;
   final String cell;
   final String lostReply;
+  final int losses;
+  final Duration probe;
+  int _lost = 0;
   late _GatewayDelegate _delegate;
   final _url = _page('Нагрузка на первую половину дня.aspx');
   String _selected = 'sep';
@@ -347,6 +354,9 @@ final class _LossyController extends PlatformWebViewController {
 
   @override
   Future<Object> runJavaScriptReturningResult(String script) async {
+    if (script.contains('401')) {
+      return Future<Object>.delayed(probe, () => false);
+    }
     final args = RegExp(r'\(("\w+", .*?)\)$').firstMatch(script);
     if (args == null) return false;
     final [action, request] = jsonDecode('[${args[1]}]') as List<Object?>;
@@ -403,7 +413,9 @@ final class _LossyController extends PlatformWebViewController {
       default:
         throw StateError('Unexpected workload action $action');
     }
-    return action == lostReply ? Completer<Object>().future : jsonEncode(reply);
+    return action == lostReply && _lost++ < losses
+        ? Completer<Object>().future
+        : jsonEncode(reply);
   }
 }
 
@@ -755,6 +767,35 @@ void main() {
       result,
       isA<PortalWorkloadFailure>(),
       reason: 'load did not report a failure when the page stopped replying',
+    );
+  });
+
+  test('A lost reply to reading the form is read again', () async {
+    final seed = Random().nextInt(48311) + 17;
+    final result = await _workloadOutcome(
+      _LossyPlatform('m-$seed', 'cell-$seed', 'inspect', losses: 1),
+      (client) => client.load(),
+      const Duration(seconds: 22),
+    );
+    expect(
+      result,
+      isA<PortalWorkloadReport>(),
+      reason: 'one lost reply to reading the form failed the whole load',
+    );
+  });
+
+  test('A slow authorization probe does not fail a page load', () async {
+    final seed = Random().nextInt(39157) + 29;
+    final result = await _workloadOutcome(
+      _LossyPlatform('m-$seed', 'cell-$seed', 'none',
+          probe: Duration(milliseconds: 3000 + Random().nextInt(4000) + 1)),
+      (client) => client.load().then((_) => client.load(fresh: true)),
+      const Duration(seconds: 44),
+    );
+    expect(
+      result,
+      isA<PortalWorkloadReport>(),
+      reason: 'a slow answer from a loaded page was taken for a failed load',
     );
   });
 }
