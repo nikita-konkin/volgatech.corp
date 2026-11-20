@@ -444,7 +444,10 @@ class PortalWorkloadClient {
       PortalWorkloadFilter(_fields(info['filters'])[name]).selected.value;
 
   Future<PortalWorkloadReport> submit(
-      PortalWorkloadReport before, Map<String, int> changes) async {
+    PortalWorkloadReport before,
+    Map<String, int> changes, {
+    required void Function(int completedStages) onProgress,
+  }) async {
     final fresh = await load(selection: before.selection, fresh: true);
     final previous = {for (final cell in before.cells) cell.key: cell.amount};
     final current = {for (final cell in fresh.cells) cell.key: cell.amount};
@@ -453,6 +456,7 @@ class PortalWorkloadClient {
             !previous.containsKey(key) || previous[key] != current[key])) {
       throw _changed;
     }
+    onProgress(1);
     final id = ++_submission;
     final result = await _run('submit', {
       'scope': fresh.scope,
@@ -467,10 +471,14 @@ class PortalWorkloadClient {
           'Портал отклонил одно из значений. Проверьте часы.');
     }
     if (result['started'] != true) throw _changed;
+    onProgress(2);
     try {
       await _wait('receipt',
           (result) => result['id'] == id && result['state'] != 'pending');
-      return await load(selection: before.selection, fresh: true);
+      onProgress(3);
+      final report = await load(selection: before.selection, fresh: true);
+      onProgress(4);
+      return report;
     } on Exception {
       throw const PortalWorkloadFailure(
           'Не удалось проверить сохранение. Обновите месяц перед повторной отправкой.');

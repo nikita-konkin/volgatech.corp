@@ -11,6 +11,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../core/hourly_load.dart';
 import '../core/portal_workload.dart';
 import '../core/portal_workload_batch.dart';
+import '../core/portal_workload_save_progress.dart';
 import '../data/portal_workload_client.dart';
 import '../data/volgatech_api.dart';
 import '../state/auth_controller.dart';
@@ -38,6 +39,7 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
   int _revision = 0;
   bool _busy = false;
   bool _saving = false;
+  double _saveProgress = 0;
   bool _signInRequired = false;
   bool _showLogin = false;
   bool _authDialog = false;
@@ -494,7 +496,10 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
       for (final month in changes)
         if (month.amounts.isEmpty) month.option.label,
     ];
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _saveProgress = 0;
+    });
     var verified = 0;
     String? failure;
     try {
@@ -502,7 +507,20 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
         setState(
             () => _batchProgress = workloadBatchProgress(labels, verified));
         final before = reports[month.option.value]!;
-        final after = await _portal.submit(before, month.amounts);
+        final after = await _portal.submit(
+          before,
+          month.amounts,
+          onProgress: (completedStages) {
+            if (!mounted || auth.personId != personId) return;
+            setState(() {
+              _saveProgress = workloadSaveProgress(
+                months: pending.length,
+                completedMonths: verified,
+                completedStages: completedStages,
+              );
+            });
+          },
+        );
         if (!mounted || auth.personId != personId) return null;
         if (after.scope != before.scope) {
           throw const PortalWorkloadFailure(
@@ -579,10 +597,24 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
     setState(() {
       _busy = true;
       _saving = true;
+      _saveProgress = 0;
       _error = null;
     });
     try {
-      final verified = await _portal.submit(report, changes);
+      final verified = await _portal.submit(
+        report,
+        changes,
+        onProgress: (completedStages) {
+          if (!mounted || auth.personId != id) return;
+          setState(() {
+            _saveProgress = workloadSaveProgress(
+              months: 1,
+              completedMonths: 0,
+              completedStages: completedStages,
+            );
+          });
+        },
+      );
       if (!mounted || auth.personId != id) return;
       final saved = {for (final cell in verified.cells) cell.key: cell.amount};
       final count = changes.entries
@@ -659,9 +691,12 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
             ),
           ],
           bottom: _busy
-              ? const PreferredSize(
-                  preferredSize: Size.fromHeight(3),
-                  child: LinearProgressIndicator())
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(3),
+                  child: _saving
+                      ? LinearProgressIndicator(
+                          minHeight: 3, value: _saveProgress)
+                      : const LinearProgressIndicator())
               : null,
         ),
         body: Column(
