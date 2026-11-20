@@ -1,0 +1,325 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import '../core/portal_workload.dart';
+
+const _portal = 'https://portal.volgatech.net';
+const _profile = '$_portal/my/person.aspx';
+
+Map<String, dynamic> _fields(Object? data) =>
+    Map<String, dynamic>.from(data as Map<Object?, Object?>);
+
+bool _onPortal(Uri uri) =>
+    uri.scheme == 'https' &&
+    uri.host == 'portal.volgatech.net' &&
+    uri.port == 443 &&
+    uri.userInfo.isEmpty;
+
+bool _isWorkload(Uri uri) {
+  if (!_onPortal(uri)) return false;
+  final parts = uri.pathSegments.map((part) => part.toLowerCase()).toList();
+  return parts.length == 5 &&
+      parts[0] == 'my' &&
+      parts[1] == 'personal' &&
+      parts[3] == 'sitepages' &&
+      parts[4] == 'нагрузка на первую половину дня.aspx';
+}
+
+bool _isLogin(Uri uri) =>
+    _onPortal(uri) && uri.path.toLowerCase() == '/cookieauth.dll';
+
+typedef PortalWorkloadOption = ({String label, String value});
+
+class PortalWorkloadFilter {
+  PortalWorkloadFilter(Object? json)
+      : selected = _option(_fields(json)['selected']),
+        options =
+            (_fields(json)['options'] as List<Object?>).map(_option).toList();
+
+  final PortalWorkloadOption selected;
+  final List<PortalWorkloadOption> options;
+
+  static PortalWorkloadOption _option(Object? data) {
+    final fields = _fields(data);
+    return (label: fields['label'] as String, value: fields['value'] as String);
+  }
+}
+
+class PortalWorkloadReport {
+  PortalWorkloadReport(Map<String, dynamic> data)
+      : scope = data['scope'] as String,
+        filters = _fields(data['filters'])
+            .map((key, value) => MapEntry(key, PortalWorkloadFilter(value))),
+        cells = (data['cells'] as List<Object?>)
+            .map((cell) => PortalWorkloadCell.fromJson(_fields(cell)))
+            .toList();
+
+  final String scope;
+  final Map<String, PortalWorkloadFilter> filters;
+  final List<PortalWorkloadCell> cells;
+
+  Map<String, String> get selection => {
+        for (final name in ['department', 'year', 'month'])
+          name: filters[name]!.selected.value,
+      };
+
+  DateTime? get month => portalWorkloadMonth(filters['month']!.selected.label);
+}
+
+class PortalWorkloadFailure implements Exception {
+  const PortalWorkloadFailure(this.message, {this.signIn = false});
+  final String message;
+  final bool signIn;
+}
+
+const _signIn = PortalWorkloadFailure('Войдите на портал', signIn: true);
+const _changed = PortalWorkloadFailure(
+    'Данные на портале изменились. Обновите месяц и проверьте часы.');
+const _unavailable =
+    PortalWorkloadFailure('Не удалось загрузить форму нагрузки с портала.');
+
+class PortalWorkloadClient {
+  PortalWorkloadClient({
+    required this.onSignedIn,
+    required this.onAuthRequest,
+    required this.onLoginFailure,
+  }) {
+    _ready = _initialize();
+  }
+
+  final VoidCallback onSignedIn;
+  final void Function(HttpAuthRequest) onAuthRequest;
+  final void Function(PortalWorkloadFailure) onLoginFailure;
+  final controller = WebViewController();
+  late final Future<void> _ready;
+  late final Future<String> _script =
+      rootBundle.loadString('assets/portal/workload.js');
+  Completer<String?>? _navigation;
+  Uri? _workload;
+  bool _login = false;
+  bool _authRequired = false;
+  int _submission = 0;
+
+  Future<void> _initialize() async {
+    await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await controller.setNavigationDelegate(NavigationDelegate(
+      onNavigationRequest: (request) {
+        final uri = Uri.tryParse(request.url);
+        return request.isMainFrame && (uri == null || !_onPortal(uri))
+            ? NavigationDecision.prevent
+            : NavigationDecision.navigate;
+      },
+      onHttpAuthRequest: (request) {
+        if (request.host == Uri.parse(_portal).host) {
+          if (_login) {
+            onAuthRequest(request);
+            return;
+          }
+          _authRequired = true;
+        }
+        request.onCancel();
+      },
+      onPageFinished: (url) async {
+        final uri = Uri.tryParse(url);
+        if (uri != null && _onPortal(uri)) {
+          // The gateway can return a plain 401 at either the login or profile URL.
+          final denied = await controller.runJavaScriptReturningResult(
+              r'/^401\s+unauthorized$/i.test(document.body?.innerText.trim() || "")');
+          if (denied.toString() == 'true') {
+            _authRequired = true;
+            if (_login) {
+              _login = false;
+              onLoginFailure(const PortalWorkloadFailure(
+                  'Портал не подтвердил вход. Попробуйте войти ещё раз.',
+                  signIn: true));
+            }
+          }
+        }
+        final navigation = _navigation;
+        if (navigation != null && !navigation.isCompleted) {
+          navigation.complete(url);
+        }
+        if (_login &&
+            !_authRequired &&
+            uri != null &&
+            (_isWorkload(uri) || url == _profile)) {
+          _login = false;
+          onSignedIn();
+        }
+      },
+      onWebResourceError: (error) {
+        if (error.isForMainFrame == true && _login) {
+          _login = false;
+          onLoginFailure(const PortalWorkloadFailure(
+              'Не удалось открыть страницу входа. Попробуйте ещё раз.',
+              signIn: true));
+        }
+        final navigation = _navigation;
+        if (error.isForMainFrame == true &&
+            navigation != null &&
+            !navigation.isCompleted) {
+          navigation.complete(null);
+        }
+      },
+    ));
+  }
+
+  Future<void> openLogin() async {
+    await _ready;
+    _authRequired = false;
+    _login = true;
+    await controller.loadRequest(Uri.parse(_profile));
+  }
+
+  void cancelLogin() => _login = false;
+
+  Future<void> _navigate(Uri uri) async {
+    final navigation = _navigation = Completer<String?>();
+    _authRequired = false;
+    try {
+      await controller.loadRequest(uri);
+      final url = await navigation.future.timeout(const Duration(seconds: 22));
+      if (_authRequired) throw _signIn;
+      if (url == null) throw _unavailable;
+      final loaded = Uri.parse(url);
+      if (_isLogin(loaded)) {
+        throw _signIn;
+      }
+      if (!_onPortal(loaded)) throw _unavailable;
+    } on TimeoutException {
+      throw _unavailable;
+    } finally {
+      _navigation = null;
+    }
+  }
+
+  Future<Map<String, dynamic>> _run(String action,
+      [Map<String, Object>? request]) async {
+    final script = await _script;
+    final url = await controller.currentUrl();
+    final uri = url == null ? null : Uri.tryParse(url);
+    if (uri != null && _isLogin(uri)) {
+      throw _signIn;
+    }
+    if (uri == null ||
+        (action == 'link' ? url != _profile : !_isWorkload(uri))) {
+      return {'error': 'loading'};
+    }
+    final args = [jsonEncode(action), jsonEncode(request)].join(', ');
+    final result =
+        await controller.runJavaScriptReturningResult('$script($args)');
+    final data = jsonDecode(result as String);
+    return _fields(data is String ? jsonDecode(data) : data);
+  }
+
+  Future<Map<String, dynamic>> _wait(
+      String action, bool Function(Map<String, dynamic>) accept) async {
+    final elapsed = Stopwatch()..start();
+    while (elapsed.elapsed < const Duration(seconds: 22)) {
+      try {
+        final result = await _run(action);
+        if (accept(result)) return result;
+      } on PlatformException {
+        // A postback can replace the document before the script returns.
+      } on FormatException {
+        // A WebView in the middle of navigation can return an empty result.
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    throw _unavailable;
+  }
+
+  Future<PortalWorkloadReport> load({
+    Map<String, String> selection = const {},
+    bool fresh = false,
+  }) async {
+    await _ready;
+    final current = Uri.tryParse(await controller.currentUrl() ?? '');
+    if (_workload == null) {
+      if (current == null || !_isWorkload(current)) {
+        if (current?.toString() != _profile) {
+          await _navigate(Uri.parse(_profile));
+        }
+        final link = (await _run('link'))['url'] as String?;
+        final url = link == null ? null : Uri.tryParse(link);
+        if (url == null || !_isWorkload(url)) throw _unavailable;
+        _workload = url;
+        await _navigate(url);
+      } else {
+        _workload = current;
+      }
+    } else if (fresh || current == null || !_isWorkload(current)) {
+      await _navigate(_workload!);
+    }
+
+    var info = await _wait('info', (result) {
+      final mode = result['mode'];
+      return mode == 'view' || mode == 'edit';
+    });
+    for (final name in ['department', 'year', 'month']) {
+      final value = selection[name];
+      if (value == null || _selected(info, name) == value) continue;
+      final started = await _run('select', {'filter': name, 'value': value});
+      if (started['started'] != true) throw _changed;
+      final revision = info['revision'];
+      info = await _wait(
+          'info',
+          (result) =>
+              result['revision'] != null &&
+              result['revision'] != revision &&
+              _selected(result, name) == value);
+    }
+    if (info['mode'] != 'edit') {
+      final started = await _run('edit');
+      if (started['started'] != true) throw _unavailable;
+      final revision = info['revision'];
+      await _wait(
+          'info',
+          (result) =>
+              result['mode'] == 'edit' && result['revision'] != revision);
+    }
+    final report = await _run('inspect');
+    if (report['error'] != null) throw _unavailable;
+    return PortalWorkloadReport(report);
+  }
+
+  String _selected(Map<String, dynamic> info, String name) =>
+      PortalWorkloadFilter(_fields(info['filters'])[name]).selected.value;
+
+  Future<PortalWorkloadReport> submit(
+      PortalWorkloadReport before, Map<String, int> changes) async {
+    final fresh = await load(selection: before.selection, fresh: true);
+    final previous = {for (final cell in before.cells) cell.key: cell.amount};
+    final current = {for (final cell in fresh.cells) cell.key: cell.amount};
+    if (fresh.scope != before.scope ||
+        changes.keys.any((key) =>
+            !previous.containsKey(key) || previous[key] != current[key])) {
+      throw _changed;
+    }
+    final id = ++_submission;
+    final result = await _run('submit', {
+      'scope': fresh.scope,
+      'id': id,
+      'changes': {
+        for (final entry in changes.entries)
+          entry.key: {'before': current[entry.key], 'after': entry.value},
+      },
+    });
+    if (result['error'] == 'value') {
+      throw const PortalWorkloadFailure(
+          'Портал отклонил одно из значений. Проверьте часы.');
+    }
+    if (result['started'] != true) throw _changed;
+    try {
+      await _wait('receipt',
+          (result) => result['id'] == id && result['state'] != 'pending');
+      return await load(selection: before.selection, fresh: true);
+    } on Exception {
+      throw const PortalWorkloadFailure(
+          'Не удалось проверить сохранение. Обновите месяц перед повторной отправкой.');
+    }
+  }
+}

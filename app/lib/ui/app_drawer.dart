@@ -16,6 +16,7 @@ import '../state/auth_controller.dart';
 import '../theme.dart';
 import 'glass.dart';
 import 'home_shell.dart';
+import 'portal_workload_page.dart';
 import 'web_view_page.dart';
 import 'widgets/person_avatar.dart';
 
@@ -183,6 +184,17 @@ class NavMenu extends StatelessWidget {
           subtitle: const Text('portal.volgatech.net'),
           onTap: () => _openWeb(context, 'Портал', _portalUrl),
         ),
+        if (!kIsWeb)
+          ListTile(
+            leading: Icon(Icons.edit_calendar_outlined, color: accent),
+            title: const Text('Учебная нагрузка'),
+            subtitle: const Text('заполнение за месяц на портале'),
+            onTap: () {
+              _close(context);
+              unawaited(Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => const PortalWorkloadPage())));
+            },
+          ),
         const Divider(),
         ListTile(
           leading: const Icon(Icons.settings, color: Colors.grey),
