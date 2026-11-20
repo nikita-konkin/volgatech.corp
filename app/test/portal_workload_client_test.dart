@@ -303,19 +303,23 @@ Future<T> _withWorkload<T>(
 /// A workload WebView with a configurable action whose reply is lost.
 final class _LossyPlatform extends WebViewPlatform {
   _LossyPlatform(this.month, this.cell, this.lostReply,
-      {this.losses = 1 << 30, this.probe = Duration.zero});
+      {this.losses = 1 << 30,
+      this.probe = Duration.zero,
+      this.timetable = Duration.zero});
 
   final String month;
   final String cell;
   final String lostReply;
   final int losses;
   final Duration probe;
+  final Duration timetable;
 
   @override
   PlatformWebViewController createPlatformWebViewController(
     PlatformWebViewControllerCreationParams params,
   ) =>
-      _LossyController(params, month, cell, lostReply, losses, probe);
+      _LossyController(
+          params, month, cell, lostReply, losses, probe, timetable);
 
   @override
   PlatformNavigationDelegate createPlatformNavigationDelegate(
@@ -327,7 +331,7 @@ final class _LossyPlatform extends WebViewPlatform {
 /// A workload page whose postbacks and saves can finish after losing a reply.
 final class _LossyController extends PlatformWebViewController {
   _LossyController(super.params, this.month, this.cell, this.lostReply,
-      this.losses, this.probe)
+      this.losses, this.probe, this.timetable)
       : super.implementation();
 
   final String month;
@@ -335,7 +339,9 @@ final class _LossyController extends PlatformWebViewController {
   final String lostReply;
   final int losses;
   final Duration probe;
+  final Duration timetable;
   int _lost = 0;
+  Map<String, Object> _timetable = {};
   late _GatewayDelegate _delegate;
   final _url = _page('Нагрузка на первую половину дня.aspx');
   String _selected = 'sep';
@@ -422,6 +428,21 @@ final class _LossyController extends PlatformWebViewController {
         reply = {'started': true};
       case 'receipt':
         reply = _receipt;
+      case 'timetableStart':
+        final id = (request as Map<String, Object?>)['id'] as int;
+        _timetable = {'id': id, 'state': 'pending'};
+        Timer(timetable, () {
+          _timetable = {
+            'id': id,
+            'state': 'ready',
+            'rows': [
+              {'group': 'ЩМ-$month', 'form': 'з'},
+            ],
+          };
+        });
+        reply = {'started': true};
+      case 'timetableReceipt':
+        reply = _timetable;
       default:
         throw StateError('Unexpected workload action $action');
     }
@@ -516,6 +537,24 @@ PortalWorkloadReport _report({
 }
 
 void main() {
+  test('A slow portal timetable still arrives after the workload wait',
+      () async {
+    final month = 'm${Random().nextInt(900) + 100}';
+    final outcome = await _workloadOutcome(
+      _LossyPlatform(month, 'cell', 'none',
+          timetable: Duration(seconds: 23 + Random().nextInt(13))),
+      (client) => client.readTimetable(),
+      const Duration(seconds: 50),
+    );
+    expect(
+      outcome,
+      [
+        {'group': 'ЩМ-$month', 'form': 'з'},
+      ],
+      reason: 'a slow timetable page was given up before it arrived',
+    );
+  });
+
   test('The timetable read leaves the workload document in place', () async {
     final month = '${Random().nextInt(11) + 1}';
     final platform = _WorkloadPlatform([month], 277);
@@ -526,8 +565,15 @@ void main() {
     });
     expect(
       result,
-      [[{'group': 'ЩМ-$month', 'form': 'оз'}], month, 0],
-      reason: 'the timetable bridge hid its rows or navigated away from the workload',
+      [
+        [
+          {'group': 'ЩМ-$month', 'form': 'оз'}
+        ],
+        month,
+        0
+      ],
+      reason:
+          'the timetable bridge hid its rows or navigated away from the workload',
     );
   });
 

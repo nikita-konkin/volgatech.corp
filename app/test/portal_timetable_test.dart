@@ -110,7 +110,7 @@ void main() {
     final timetable = PortalTimetable([_row(group, 'оз')]);
     final slot = groupParallelLessons([
       _event(group, date, subgroup: 'подгруппа 8'),
-        _event('$group-М', date),
+      _event('$group-М', date),
     ], studyForm: timetable.formFor)
         .single;
     expect(slot.groups, ['$group (оз) (подгруппа 8)', '$group-М'],

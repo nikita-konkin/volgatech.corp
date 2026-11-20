@@ -68,7 +68,7 @@
     const receipt = window.volgatechTimetable = {id: request.id, state: 'pending'};
     const url = new URL('Мое расписание занятий.aspx', location.href);
     const abort = new AbortController();
-    const timeout = setTimeout(() => abort.abort(), 15000);
+    const timeout = setTimeout(() => abort.abort(), 40000);
     fetch(url, {
       method: 'GET', credentials: 'same-origin', mode: 'same-origin',
       redirect: 'follow', cache: 'no-store', signal: abort.signal

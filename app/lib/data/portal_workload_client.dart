@@ -12,6 +12,7 @@ const _profile = '$_portal$_profilePath';
 const _loginPath = '/cookieauth.dll';
 const _callLimit = Duration(seconds: 3);
 const _waitLimit = Duration(seconds: 22);
+const _timetableLimit = Duration(seconds: 45);
 const _unauthorizedDocument =
     r'/^401\s+unauthorized$/i.test(document.body?.innerText.trim() || "")';
 
@@ -358,7 +359,8 @@ class PortalWorkloadClient {
 
   Future<Map<String, dynamic>> _run(String action,
       [Map<String, Object>? request]) async {
-    final timetable = action == 'timetableStart' || action == 'timetableReceipt';
+    final timetable =
+        action == 'timetableStart' || action == 'timetableReceipt';
     final script =
         await (timetable ? _timetableScript : _script).timeout(_callLimit);
     final url = await controller.currentUrl().timeout(_callLimit);
@@ -391,7 +393,8 @@ class PortalWorkloadClient {
         'timetableReceipt',
         (receipt) =>
             id != _timetableRead ||
-            (receipt['id'] == id && receipt['state'] != 'pending'));
+            (receipt['id'] == id && receipt['state'] != 'pending'),
+        limit: _timetableLimit);
     if (id != _timetableRead) throw _timetableUnavailable;
     if (result case {'state': 'ready', 'rows': final List<Object?> rows}) {
       return rows;
@@ -409,10 +412,10 @@ class PortalWorkloadClient {
   }
 
   Future<Map<String, dynamic>> _wait(
-      String action, bool Function(Map<String, dynamic>) accept) {
+      String action, bool Function(Map<String, dynamic>) accept,
+      {Duration limit = _waitLimit}) {
     var expired = false;
-    return _poll(action, accept, () => expired).timeout(_waitLimit,
-        onTimeout: () {
+    return _poll(action, accept, () => expired).timeout(limit, onTimeout: () {
       expired = true;
       throw _unavailable;
     });

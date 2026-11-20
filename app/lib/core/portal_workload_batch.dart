@@ -139,7 +139,9 @@ class WorkloadBatch {
           if (options.sameDiscipline) line._matching.add(row);
           if (month.availableCell(row) == null) continue;
           line._choices.add(row);
-          if (options.sameDiscipline && form != null && cell.studyForm == form) {
+          if (options.sameDiscipline &&
+              form != null &&
+              cell.studyForm == form) {
             line._matchingForm.add(row);
           }
           if (options.suggested == cell.key) line._hasSuggestion = true;
