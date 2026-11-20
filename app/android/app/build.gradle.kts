@@ -9,7 +9,9 @@ plugins {
 // Release signing key, from android/key.properties (kept locally, written by
 // the Release workflow from repository secrets; never committed). Every
 // published APK must carry the same key, or Android refuses to update the
-// installed app ("package conflicts with an existing package").
+// installed app ("package conflicts with an existing package"). A storeFile
+// starting with ~/ is in the home folder, so one key.properties serves both
+// the Mac and Windows.
 val releaseKey = Properties().apply {
     rootProject.file("key.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
@@ -49,7 +51,9 @@ android {
     signingConfigs {
         if (!releaseKey.isEmpty) {
             create("release") {
-                storeFile = file(releaseKey.getProperty("storeFile"))
+                storeFile = file(releaseKey.getProperty("storeFile").let {
+                    if (it.startsWith("~/")) System.getProperty("user.home") + it.substring(1) else it
+                })
                 storePassword = releaseKey.getProperty("storePassword")
                 keyAlias = releaseKey.getProperty("keyAlias")
                 keyPassword = releaseKey.getProperty("keyPassword")

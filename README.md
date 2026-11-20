@@ -144,7 +144,37 @@ hourly-load report all work, but:
   OWA opens in-app (WebView) as before.
 - **Портал** — the corporate portal opens **in-app** (WebView), keeping only
   the site session cookie, never the password.
+- **Учебная нагрузка** — on Android, the portal's monthly teaching-load form,
+  filled in from your schedule: only the chosen department's disciplines,
+  every change listed before saving, several months at once, and the
+  portal's sign-in as a native screen (the login is remembered, the
+  password never).
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.8
+
+<img src="docs/screenshots/workload-sign-in.webp" width="15%" alt="«Вход на портал» в разделе «Учебная нагрузка»"> <img src="docs/screenshots/workload-form.webp" width="15%" alt="Заполненная форма учебной нагрузки за месяц"> <img src="docs/screenshots/workload-review.webp" width="15%" alt="Проверка часов из расписания со сводкой по скрытым дисциплинам"> <img src="docs/screenshots/workload-confirm.webp" width="15%" alt="Подтверждение сохранения на портале со списком изменений и итогом часов">
+
+- **«Учебная нагрузка»** in the menu (Android) fills the monthly
+  teaching-load form on portal.volgatech.net («Нагрузка на первую половину
+  дня»):
+  - «Заполнить из расписания» offers the hours of the month's classes, only
+    for the disciplines in the chosen department's form; classes of other
+    departments are counted in a «Скрыто …» line instead.
+  - Before saving, every change is listed, old → new, with the total; a thin
+    bar shows how far the save has got, and leaving with unsaved hours asks
+    first.
+  - The form opens on the current month (the previous one during the first
+    week) and on the department used last.
+  - «Несколько месяцев» fills several months of the semester at once, with
+    one review and one confirmation.
+- **Portal sign-in on a native screen:** «Вход на портал» replaces the
+  gateway's desktop page. The login is remembered, the password is never
+  stored, and «Неверный логин или пароль» appears only when the portal says
+  so — each failed attempt counts toward locking the account.
+
+From v0.5.1 the app offers this update by itself (**Настройки →
+Обновления**).
 
 ## What's new — v0.5.7
 
@@ -489,8 +519,7 @@ GitHub Actions (Flutter **stable** channel):
 
 - [`ci.yml`](.github/workflows/ci.yml) — on every push/PR to `main`: a Linux job
   runs `flutter analyze` + `flutter test` and builds the release APKs and the
-  web version, and a macOS job builds the app for **iOS** (`--no-codesign`);
-  both upload their output as workflow artifacts.
+  web version, uploading the APKs as workflow artifacts.
 - [`release.yml`](.github/workflows/release.yml) — on a `v*` tag: builds the
   per-ABI release APKs twice (`app-mail-*` with `--dart-define=MAIL=true`,
   and the plain `app-*`), signed with the release key from the repository
