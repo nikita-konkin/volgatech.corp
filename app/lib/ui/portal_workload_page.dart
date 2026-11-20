@@ -207,7 +207,8 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
   void _handle(PortalWorkloadFailure error) {
     if (!mounted) return;
     setState(() {
-      _error = error.message;
+      _error =
+          error == PortalWorkloadFailure.signInRequired ? null : error.message;
       _signInRequired = error.signIn;
     });
   }

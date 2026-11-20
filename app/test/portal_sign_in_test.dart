@@ -27,6 +27,29 @@ Future<void> _showForm(
 }
 
 void main() {
+  testWidgets('The untouched sign-in form shows neutral instructions',
+      (tester) async {
+    final login = 'p.cha-${Random().nextInt(58139)}';
+    await _showForm(
+      tester,
+      (_, __) async => PortalSignInResult.unexpected,
+      preferences: {'portal_workload_login': login},
+    );
+    final hint =
+        find.text('Логин и пароль — те же, что для университетской почты');
+    final hintText = find
+        .descendant(of: hint, matching: find.byType(RichText))
+        .evaluate()
+        .singleOrNull;
+    final color = (hintText?.widget as RichText?)?.text.style?.color;
+    final theme = Theme.of(tester.element(find.byType(PortalSignIn)));
+    expect(
+      (find.text('Вход на портал').evaluate().length, color),
+      (1, theme.textTheme.bodyMedium?.color),
+      reason: 'the heading was missing or the hint did not use normal text',
+    );
+  });
+
   testWidgets('The sign-in callback receives the normalised login',
       (tester) async {
     final random = Random();

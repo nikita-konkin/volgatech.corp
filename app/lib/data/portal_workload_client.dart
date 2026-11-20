@@ -10,6 +10,8 @@ const _portal = 'https://portal.volgatech.net';
 const _profilePath = '/my/person.aspx';
 const _profile = '$_portal$_profilePath';
 const _loginPath = '/cookieauth.dll';
+const _unauthorizedDocument =
+    r'/^401\s+unauthorized$/i.test(document.body?.innerText.trim() || "")';
 
 Map<String, dynamic> _fields(Object? data) =>
     Map<String, dynamic>.from(data as Map<Object?, Object?>);
@@ -54,7 +56,15 @@ PortalSignInResult portalSignInLanding(Uri? uri) {
   if (_isProfile(uri) || isWorkloadPage(uri)) {
     return PortalSignInResult.signedIn;
   }
-  if (_isLogin(uri)) return PortalSignInResult.rejected;
+  if (_isLogin(uri)) {
+    final query = uri.query.replaceFirst(
+      RegExp(r'^GetLogon\?', caseSensitive: false),
+      '',
+    );
+    if (Uri.splitQueryString(query)['reason'] == '2') {
+      return PortalSignInResult.rejected;
+    }
+  }
   return PortalSignInResult.unexpected;
 }
 
@@ -120,11 +130,14 @@ Map<String, String> workloadSelection(
 
 class PortalWorkloadFailure implements Exception {
   const PortalWorkloadFailure(this.message, {this.signIn = false});
+
+  static const signInRequired =
+      PortalWorkloadFailure('Войдите на портал', signIn: true);
+
   final String message;
   final bool signIn;
 }
 
-const _signIn = PortalWorkloadFailure('Войдите на портал', signIn: true);
 const _changed = PortalWorkloadFailure(
     'Данные на портале изменились. Обновите месяц и проверьте часы.');
 const _unavailable =
@@ -180,12 +193,13 @@ class PortalWorkloadClient {
         request.onCancel();
       },
       onPageFinished: (url) async {
+        if (_nativeAuth != null) return;
         final navigation = _navigation;
         final uri = Uri.tryParse(url);
         if (uri != null && _onPortal(uri)) {
           // The gateway can return a plain 401 at either the login or profile URL.
-          final denied = await controller.runJavaScriptReturningResult(
-              r'/^401\s+unauthorized$/i.test(document.body?.innerText.trim() || "")');
+          final denied = await controller
+              .runJavaScriptReturningResult(_unauthorizedDocument);
           if (denied.toString() == 'true') {
             _authRequired = true;
             if (_login) {
@@ -255,37 +269,58 @@ class PortalWorkloadClient {
       }
       _authRequired = true;
       request.onCancel();
-      final navigation = _navigation;
-      if (navigation != null && !navigation.isCompleted) {
-        navigation.complete(null);
-      }
     };
     try {
       await _ready;
-      final initialUrl = await _awaitNavigation(
+      final initial = await _settledSignInLanding(
           () => controller.loadRequest(Uri.parse(_profile)));
-      if (_authRequired) return PortalSignInResult.rejected;
-      final initial = portalSignInLanding(Uri.tryParse(initialUrl ?? ''));
-      if (initial != PortalSignInResult.rejected || challenged) return initial;
+      if (initial == null || !_isLogin(initial) || challenged) {
+        return portalSignInLanding(initial);
+      }
       final script = await _logonScript;
-      if (_authRequired || challenged) return PortalSignInResult.rejected;
+      if (_authRequired || challenged) return PortalSignInResult.unexpected;
       final args = [jsonEncode(domainLogin), jsonEncode(password)].join(', ');
-      final landing = await _awaitNavigation(() async {
+      final landing = await _settledSignInLanding(() async {
         final started = await controller.runJavaScriptReturningResult(
             'location.origin === ${jsonEncode(_portal)} && '
             'location.pathname.toLowerCase() === ${jsonEncode(_loginPath)} && '
             '$script($args).started');
         if (started != true) throw _unavailable;
       });
-      if (_authRequired) return PortalSignInResult.rejected;
-      return portalSignInLanding(Uri.tryParse(landing ?? ''));
+      return portalSignInLanding(landing);
     } on Exception {
-      return _authRequired
-          ? PortalSignInResult.rejected
-          : PortalSignInResult.unexpected;
+      return PortalSignInResult.unexpected;
     } finally {
       _nativeAuth = null;
     }
+  }
+
+  Future<Uri?> _settledSignInLanding(Future<void> Function() start) async {
+    const budget = Duration(seconds: 22);
+    final elapsed = Stopwatch()..start();
+    await controller
+        .runJavaScript('window.volgatechStale = true')
+        .timeout(budget);
+    await start().timeout(budget - elapsed.elapsed);
+    while (!_authRequired) {
+      final result = await controller
+          .runJavaScriptReturningResult(
+            'window.volgatechStale || document.readyState !== "complete" '
+            '? false : $_unauthorizedDocument ? true : location.href',
+          )
+          .onError<PlatformException>((_, __) => false)
+          .timeout(budget - elapsed.elapsed);
+      if (result == true || _authRequired) return null;
+      if (result is String && result.isNotEmpty) {
+        final url =
+            result.startsWith('"') ? jsonDecode(result) as String : result;
+        final uri = Uri.tryParse(url);
+        if (uri?.hasScheme == true && url != 'about:blank') return uri;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250))
+          .timeout(budget - elapsed.elapsed);
+    }
+    return null;
   }
 
   Future<String?> _awaitNavigation(Future<void> Function() start) async {
@@ -303,11 +338,11 @@ class PortalWorkloadClient {
     _authRequired = false;
     try {
       final url = await _awaitNavigation(() => controller.loadRequest(uri));
-      if (_authRequired) throw _signIn;
+      if (_authRequired) throw PortalWorkloadFailure.signInRequired;
       if (url == null) throw _unavailable;
       final loaded = Uri.parse(url);
       if (_isLogin(loaded)) {
-        throw _signIn;
+        throw PortalWorkloadFailure.signInRequired;
       }
       if (!_onPortal(loaded)) throw _unavailable;
     } on TimeoutException {
@@ -321,7 +356,7 @@ class PortalWorkloadClient {
     final url = await controller.currentUrl();
     final uri = url == null ? null : Uri.tryParse(url);
     if (uri != null && _isLogin(uri)) {
-      throw _signIn;
+      throw PortalWorkloadFailure.signInRequired;
     }
     if (uri == null ||
         (action == 'link' ? !_isProfile(uri) : !isWorkloadPage(uri))) {

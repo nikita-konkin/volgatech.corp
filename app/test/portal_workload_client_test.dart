@@ -1,7 +1,136 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:volgatech_pro/data/portal_workload_client.dart';
+import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+
+/// The WebView platform for the gateway redirect sequence.
+final class _GatewayPlatform extends WebViewPlatform {
+  _GatewayPlatform(this.login, this.username);
+
+  final Uri login;
+  final String username;
+
+  @override
+  PlatformWebViewController createPlatformWebViewController(
+    PlatformWebViewControllerCreationParams params,
+  ) =>
+      _GatewayController(params, login, username);
+
+  @override
+  PlatformNavigationDelegate createPlatformNavigationDelegate(
+    PlatformNavigationDelegateCreationParams params,
+  ) =>
+      _GatewayDelegate(params);
+}
+
+/// The WebView whose cancelled redirects finish on the document still shown.
+final class _GatewayController extends PlatformWebViewController {
+  _GatewayController(super.params, this.login, this.username)
+      : _url = login,
+        super.implementation();
+
+  final Uri login;
+  final String username;
+  late final Uri _profile;
+  late final _GatewayDelegate _delegate;
+  Uri _url;
+  bool _loginReplayed = false;
+  bool _stale = false;
+
+  @override
+  Future<void> setJavaScriptMode(JavaScriptMode mode) async {}
+
+  @override
+  Future<void> setPlatformNavigationDelegate(
+    covariant _GatewayDelegate delegate,
+  ) async {
+    _delegate = delegate;
+  }
+
+  @override
+  Future<void> loadRequest(LoadRequestParams params) async {
+    _profile = params.uri;
+    await _redirect(login, () {
+      _loginReplayed = true;
+      _document(login);
+    });
+  }
+
+  Future<void> _redirect(Uri uri, void Function() replay) async {
+    final decision = await _delegate.request(
+      NavigationRequest(url: uri.toString(), isMainFrame: true),
+    );
+    if (decision != NavigationDecision.navigate) return;
+    _delegate.finished(_url.toString());
+    unawaited(Future<void>.delayed(const Duration(milliseconds: 173), replay));
+  }
+
+  void _document(Uri uri) {
+    _url = uri;
+    _stale = false;
+    _delegate.finished(_url.toString());
+  }
+
+  @override
+  Future<void> runJavaScript(String script) async {
+    _stale = script.contains('window.volgatechStale = true');
+  }
+
+  @override
+  Future<Object> runJavaScriptReturningResult(String script) async {
+    if (script.contains('window.volgatechStale')) {
+      return _stale ? false : jsonEncode(_url.toString());
+    }
+    if (!script.contains('#SubmitCreds')) return false;
+    if (_loginReplayed) {
+      await _redirect(_profile, () {
+        _delegate.authenticate(HttpAuthRequest(
+          host: _profile.host,
+          onProceed: (credential) {
+            if (credential.user == username && credential.password.isNotEmpty) {
+              _document(_profile);
+            }
+          },
+          onCancel: () {},
+        ));
+      });
+    }
+    return true;
+  }
+}
+
+/// The navigation callbacks captured by the fake gateway WebView.
+final class _GatewayDelegate extends PlatformNavigationDelegate {
+  _GatewayDelegate(super.params) : super.implementation();
+
+  late NavigationRequestCallback request;
+  late PageEventCallback finished;
+  late HttpAuthRequestCallback authenticate;
+
+  @override
+  Future<void> setOnNavigationRequest(
+    NavigationRequestCallback callback,
+  ) async {
+    request = callback;
+  }
+
+  @override
+  Future<void> setOnPageFinished(PageEventCallback callback) async {
+    finished = callback;
+  }
+
+  @override
+  Future<void> setOnHttpAuthRequest(HttpAuthRequestCallback callback) async {
+    authenticate = callback;
+  }
+
+  @override
+  Future<void> setOnWebResourceError(WebResourceErrorCallback callback) async {}
+}
 
 String _marker(Random random) =>
     '&AuthResend${List.generate(32, (_) => random.nextInt(16).toRadixString(16).toUpperCase()).join()}';
@@ -48,6 +177,33 @@ PortalWorkloadReport _report({
 }
 
 void main() {
+  test('Native sign-in survives both replayed gateway redirects', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final random = Random();
+    final username = 'MARSTU\\v.lei-${random.nextInt(76301)}';
+    final login = Uri.parse('https://portal.volgatech.net/'
+        'CookieAuth.dll?GetLogon?curl=Z2FmyZ2Fperson.aspx&reason=0&formdir=${random.nextInt(57) + 11}');
+    final platform = WebViewPlatform.instance;
+    await rootBundle.loadString('assets/portal/logon.js');
+    final PortalSignInResult result;
+    try {
+      WebViewPlatform.instance = _GatewayPlatform(login, username);
+      final client = PortalWorkloadClient(
+        onSignedIn: () {},
+        onAuthRequest: (request) => request.onCancel(),
+        onLoginFailure: (_) {},
+      );
+      result = await client.signIn(username, 'X?m-${random.nextInt(83617)}');
+    } finally {
+      if (platform != null) WebViewPlatform.instance = platform;
+    }
+    expect(
+      result,
+      PortalSignInResult.signedIn,
+      reason: 'the replayed gateway redirects prevented a valid sign-in',
+    );
+  });
+
   test('A profile with the gateway marker means the sign-in succeeded', () {
     final page = Uri.parse(
         'https://portal.volgatech.net/my/person.aspx${_marker(Random())}');
@@ -67,14 +223,27 @@ void main() {
     );
   });
 
-  test('A return to the gateway with a nonzero reason means rejection', () {
-    final reason = Random().nextInt(891) + 1;
-    final page = Uri.parse('https://portal.volgatech.net/'
-        'CookieAuth.dll?GetLogon?curl=Z2FmyZ2Fperson.aspx&reason=$reason&formdir=12');
+  test('Only gateway reason 2 means the credentials were rejected', () {
+    final random = Random();
+    final otherReason = random.nextInt(887) + 5;
+    final landings = [
+      for (final reason in [0, 2, 3, 4, otherReason, null])
+        portalSignInLanding(Uri.parse('https://portal.volgatech.net/'
+            'CookieAuth.dll?GetLogon?curl=Z2FmyZ2Fperson.aspx'
+            '${reason == null ? '' : '&reason=$reason'}'
+            '&formdir=${random.nextInt(63) + 11}')),
+    ];
     expect(
-      portalSignInLanding(page),
-      PortalSignInResult.rejected,
-      reason: 'a return to the gateway was not recognised as a rejection',
+      landings,
+      [
+        PortalSignInResult.unexpected,
+        PortalSignInResult.rejected,
+        PortalSignInResult.unexpected,
+        PortalSignInResult.unexpected,
+        PortalSignInResult.unexpected,
+        PortalSignInResult.unexpected,
+      ],
+      reason: 'a gateway landing was mistaken for a different sign-in result',
     );
   });
 

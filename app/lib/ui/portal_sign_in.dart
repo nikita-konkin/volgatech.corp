@@ -89,6 +89,7 @@ final class _PortalSignInState extends State<PortalSignIn> {
   @override
   Widget build(BuildContext context) {
     final message = _error ?? widget.message;
+    final theme = Theme.of(context);
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -97,6 +98,11 @@ final class _PortalSignInState extends State<PortalSignIn> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text('Вход на портал', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 8),
+              const Text(
+                  'Логин и пароль — те же, что для университетской почты'),
+              const SizedBox(height: 16),
               TextField(
                 controller: _login,
                 enabled: !_busy,
@@ -119,8 +125,7 @@ final class _PortalSignInState extends State<PortalSignIn> {
                 Semantics(
                   liveRegion: true,
                   child: Text(message,
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error)),
+                      style: TextStyle(color: theme.colorScheme.error)),
                 ),
               ],
               const SizedBox(height: 16),
