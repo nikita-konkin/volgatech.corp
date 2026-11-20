@@ -202,8 +202,8 @@ void main() {
 
     test('an encoded header names the utf-8 charset', () {
       final header = _header(
-          buildMime(ComposeDraft(
-              to: _mailbox(), subject: 'RE: ${_cyrillicName()}')),
+          buildMime(
+              ComposeDraft(to: _mailbox(), subject: 'RE: ${_cyrillicName()}')),
           'Subject');
       expect(header.toLowerCase(), isNot(contains('=?utf8?')),
           reason: 'the encoded subject named a charset mail clients dont know');
