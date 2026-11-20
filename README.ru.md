@@ -160,6 +160,8 @@ Chrome и Edge могут ещё установить его отдельным 
 
 ## Что нового — v0.5.8
 
+<img src="docs/screenshots/workload-sign-in.webp" width="15%" alt="«Вход на портал» в разделе «Учебная нагрузка»"> <img src="docs/screenshots/workload-form.webp" width="15%" alt="Заполненная форма учебной нагрузки за месяц"> <img src="docs/screenshots/workload-review.webp" width="15%" alt="Проверка часов из расписания со сводкой по скрытым дисциплинам"> <img src="docs/screenshots/workload-confirm.webp" width="15%" alt="Подтверждение сохранения на портале со списком изменений и итогом часов">
+
 - **«Учебная нагрузка»** в меню (Android) заполняет месячную форму учебной
   нагрузки на portal.volgatech.net («Нагрузка на первую половину дня»):
   - «Заполнить из расписания» предлагает часы занятий за месяц только по

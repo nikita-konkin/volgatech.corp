@@ -153,6 +153,8 @@ hourly-load report all work, but:
 
 ## What's new — v0.5.8
 
+<img src="docs/screenshots/workload-sign-in.webp" width="15%" alt="«Вход на портал» в разделе «Учебная нагрузка»"> <img src="docs/screenshots/workload-form.webp" width="15%" alt="Заполненная форма учебной нагрузки за месяц"> <img src="docs/screenshots/workload-review.webp" width="15%" alt="Проверка часов из расписания со сводкой по скрытым дисциплинам"> <img src="docs/screenshots/workload-confirm.webp" width="15%" alt="Подтверждение сохранения на портале со списком изменений и итогом часов">
+
 - **«Учебная нагрузка»** in the menu (Android) fills the monthly
   teaching-load form on portal.volgatech.net («Нагрузка на первую половину
   дня»):
