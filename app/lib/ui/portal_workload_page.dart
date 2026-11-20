@@ -10,11 +10,12 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../core/hourly_load.dart';
 import '../core/portal_workload.dart';
-import '../core/ru_plural.dart';
+import '../core/portal_workload_batch.dart';
 import '../data/portal_workload_client.dart';
 import '../data/volgatech_api.dart';
 import '../state/auth_controller.dart';
 import 'layout.dart';
+import 'portal_workload_batch_review.dart';
 
 const _departmentKey = 'portal_workload_department';
 
@@ -39,7 +40,9 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
   bool _signInRequired = false;
   bool _showLogin = false;
   bool _authDialog = false;
+  bool _batchNeedsReload = false;
   String? _error;
+  String? _batchProgress;
 
   @override
   void initState() {
@@ -185,7 +188,11 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
       await preferences.setString(
           _departmentKey, report.selection['department']!);
       final loaded = report;
-      setState(() => _setReport(loaded));
+      setState(() {
+        final preserve = _batchNeedsReload && loaded.scope == _report?.scope;
+        _setReport(loaded, submitted: preserve ? const {} : null);
+        _batchNeedsReload = false;
+      });
     } on PortalWorkloadFailure catch (error) {
       _handle(error);
     } on Exception {
@@ -319,6 +326,232 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
     }
   }
 
+  Future<void> _openBatch(PortalWorkloadReport original) async {
+    final auth = context.read<AuthController>();
+    final api = context.read<VolgatechApi>();
+    final personId = auth.personId;
+    final month = original.month;
+    if (_busy || personId == null) return;
+    if (month == null) {
+      _notice('Не удалось определить выбранный месяц.');
+      return;
+    }
+    if (_hasEdits &&
+        !await _confirm(
+            'Перейти к заполнению нескольких месяцев?',
+            'Изменения в открытой форме ещё не сохранены. Для нескольких месяцев будут предложены часы из расписания.',
+            'Продолжить')) {
+      return;
+    }
+    if (!mounted || auth.personId != personId || _busy) return;
+    final today = _moscowNow();
+    final options =
+        workloadBatchMonths(month, today, original.filters['month']!.options);
+    if (options.isEmpty) {
+      _notice('В этом семестре нет доступных месяцев с прошедшими днями.');
+      return;
+    }
+    final last = options.last.month;
+    final end = DateTime(last.year, last.month + 1, 0);
+    final yesterday = DateTime(today.year, today.month, today.day - 1);
+    final typed = {
+      for (final cell in original.cells)
+        if (_values.containsKey(cell.key)) workloadCellIdentity(cell),
+    };
+    setState(() {
+      _busy = true;
+      _error = null;
+      _batchProgress = 'Загружаем расписание…';
+    });
+    final reports = <String, PortalWorkloadReport>{};
+    var restore = false;
+    String? result;
+    try {
+      final days = await api.getSchedule(personId, options.first.month,
+          yesterday.isBefore(end) ? yesterday : end);
+      if (!mounted || auth.personId != personId) return;
+      final classes = hourlyClassesFrom(days);
+      final totals = {
+        for (final option in options)
+          option.value: monthlyWorkload(classes, option.month, today),
+      };
+      setState(() => _batchProgress = null);
+      final checked = await showDialog<List<WorkloadBatchOption>>(
+        context: context,
+        builder: (_) => WorkloadBatchChecklist([
+          for (final option in options)
+            (
+              option: option,
+              hours: departmentWorkload(totals[option.value]!, original.cells)
+                  .shown
+                  .fold(0, (sum, total) => sum + total.hours),
+            ),
+        ]),
+      );
+      if (!mounted || auth.personId != personId || checked == null) return;
+      final months = <WorkloadBatchMonth>[];
+      for (final option in checked) {
+        setState(() => _batchProgress = 'Загружаем ${option.label}…');
+        restore = true;
+        final selection = {...original.selection, 'month': option.value};
+        final report = await _portal.load(selection: selection);
+        if (!mounted || auth.personId != personId) return;
+        if (!mapEquals(report.selection, selection) ||
+            report.month != option.month ||
+            report.filters['person']!.selected !=
+                original.filters['person']!.selected) {
+          throw PortalWorkloadFailure(
+              'Портал открыл другую форму вместо «${option.label}».');
+        }
+        reports[option.value] = report;
+        months.add(WorkloadBatchMonth(
+          option,
+          totals[option.value]!,
+          report.cells,
+          occupied: {
+            if (option.month == month)
+              for (final cell in report.cells)
+                if (_values.containsKey(cell.key) ||
+                    typed.contains(workloadCellIdentity(cell)))
+                  cell.key,
+          },
+        ));
+      }
+      setState(() => _batchProgress = null);
+      final changes =
+          await Navigator.of(context).push<List<WorkloadMonthChanges>>(
+        MaterialPageRoute(
+          builder: (_) => WorkloadBatchReview(WorkloadBatch(months)),
+        ),
+      );
+      if (!mounted || auth.personId != personId || changes == null) return;
+      final confirmed = await _confirm(
+        'Сохранить на портале?',
+        [
+          for (final month in changes) ...[
+            month.option.label,
+            if (month.amounts.isEmpty) 'Нет изменений.',
+            ...month.descriptions,
+            'Итого за месяц: ${formatWorkloadHours(month.total)} ч.',
+            '',
+          ],
+          'Итого за все месяцы: ${formatWorkloadHours(workloadBatchTotal(changes))} ч.',
+        ].join('\n'),
+        'Сохранить',
+      );
+      if (!mounted || auth.personId != personId || !confirmed) return;
+      result = await _saveBatch(changes, reports, auth, personId);
+    } on ApiException catch (error) {
+      _notice(error.message);
+    } on PortalWorkloadFailure catch (error) {
+      _handle(error);
+    } on Exception {
+      _handle(PortalWorkloadFailure(_batchProgress == null
+          ? 'Не удалось подготовить нагрузку за несколько месяцев.'
+          : '$_batchProgress Не удалось завершить загрузку.'));
+    } finally {
+      if (restore && mounted && auth.personId == personId) {
+        await _restoreBatchMonth(original, auth, personId);
+      }
+      if (mounted) {
+        setState(() {
+          _batchProgress = null;
+          _saving = false;
+          _busy = false;
+        });
+      }
+    }
+    if (!mounted || auth.personId != personId || result == null) return;
+    final restoreError = _batchNeedsReload ? _error : null;
+    await showDialog<void>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Сохранение нагрузки'),
+        content: SingleChildScrollView(
+          child: Text(
+              [result, if (restoreError != null) restoreError].join('\n\n')),
+        ),
+        actions: [
+          FilledButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Закрыть')),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _saveBatch(
+    List<WorkloadMonthChanges> changes,
+    Map<String, PortalWorkloadReport> reports,
+    AuthController auth,
+    int personId,
+  ) async {
+    final pending = changes.where((month) => month.amounts.isNotEmpty).toList();
+    final labels = [for (final month in pending) month.option.label];
+    final unchanged = [
+      for (final month in changes)
+        if (month.amounts.isEmpty) month.option.label,
+    ];
+    setState(() => _saving = true);
+    var verified = 0;
+    String? failure;
+    try {
+      for (final month in pending) {
+        setState(
+            () => _batchProgress = workloadBatchProgress(labels, verified));
+        final before = reports[month.option.value]!;
+        final after = await _portal.submit(before, month.amounts);
+        if (!mounted || auth.personId != personId) return null;
+        if (after.scope != before.scope) {
+          throw const PortalWorkloadFailure(
+              'После отправки портал открыл другую форму.');
+        }
+        final count = month.verifiedCount(after.cells);
+        if (count != month.amounts.length) {
+          throw PortalWorkloadFailure(
+              'Портал подтвердил $count из ${month.amounts.length} полей.');
+        }
+        verified++;
+      }
+    } on PortalWorkloadFailure catch (error) {
+      failure = error.message;
+    } on Exception {
+      failure = 'Не удалось проверить сохранение.';
+    }
+    return [
+      workloadBatchResult(labels, verified, unchanged: unchanged),
+      if (failure != null) failure,
+    ].join('\n');
+  }
+
+  Future<void> _restoreBatchMonth(
+      PortalWorkloadReport original, AuthController auth, int personId) async {
+    final label = original.filters['month']!.selected.label;
+    setState(() => _batchProgress = 'Обновляем $label…');
+    PortalWorkloadFailure? failure;
+    try {
+      final report =
+          await _portal.load(selection: original.selection, fresh: true);
+      if (!mounted || auth.personId != personId) return;
+      if (report.scope != original.scope) {
+        throw const PortalWorkloadFailure('Портал открыл другую форму.');
+      }
+      setState(() {
+        _setReport(report, submitted: const {});
+        _signInRequired = false;
+      });
+    } on PortalWorkloadFailure catch (error) {
+      failure = error;
+    } on Exception {
+      failure = const PortalWorkloadFailure('Повторите загрузку.');
+    }
+    if (failure == null || !mounted || auth.personId != personId) return;
+    setState(() => _batchNeedsReload = true);
+    _handle(PortalWorkloadFailure(
+        'Не удалось обновить «$label». ${failure.message}',
+        signIn: failure.signIn));
+  }
+
   Future<void> _save(
       PortalWorkloadReport report, Map<String, int> changes) async {
     final auth = context.read<AuthController>();
@@ -391,7 +624,8 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
       );
     }
     final report = _report;
-    final canEdit = report != null && !_busy && !_signInRequired;
+    final canEdit =
+        report != null && !_busy && !_signInRequired && !_batchNeedsReload;
     final cells = [
       for (final cell in report?.cells ?? const <PortalWorkloadCell>[])
         if (cell.semester == _semester) cell,
@@ -428,10 +662,25 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
                   child: LinearProgressIndicator())
               : null,
         ),
-        body: _signInRequired || report == null
-            ? _connection()
-            : _form(report, cells, canEdit),
-        bottomNavigationBar: report == null || _signInRequired
+        body: Column(
+          children: [
+            if (_batchProgress case final progress?)
+              ReadableWidth(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Text(progress, textAlign: TextAlign.center),
+                ),
+              ),
+            Expanded(
+              child: _signInRequired || _batchNeedsReload || report == null
+                  ? _connection()
+                  : _form(report, cells, canEdit),
+            ),
+          ],
+        ),
+        bottomNavigationBar: report == null ||
+                _signInRequired ||
+                _batchNeedsReload
             ? null
             : SafeArea(
                 top: false,
@@ -448,6 +697,10 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
                               : null,
                           icon: const Icon(Icons.edit_calendar_outlined),
                           label: const Text('Заполнить из расписания'),
+                        ),
+                        OutlinedButton(
+                          onPressed: canEdit ? () => _openBatch(report) : null,
+                          child: const Text('Несколько месяцев'),
                         ),
                         FilledButton(
                           onPressed: canEdit && !invalid && changes.isNotEmpty
@@ -668,8 +921,7 @@ class _WorkloadReviewState extends State<_WorkloadReview> {
       draft.update(key, (value) => value + hours, ifAbsent: () => hours);
     }
     final hours = draft.values.fold(0, (sum, value) => sum + value);
-    final names = {for (final total in widget.hidden) total.discipline};
-    final offset = names.isEmpty ? 0 : 1;
+    final offset = widget.hidden.isEmpty ? 0 : 1;
     return Scaffold(
       appBar: AppBar(title: const Text('Из расписания')),
       body: ListView.separated(
@@ -678,18 +930,7 @@ class _WorkloadReviewState extends State<_WorkloadReview> {
         separatorBuilder: (_, __) => const Divider(height: 24),
         itemBuilder: (context, position) {
           if (position < offset) {
-            final skipped =
-                widget.hidden.fold(0, (sum, total) => sum + total.hours);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Скрыто ${names.length} '
-                    '${pluralRu(names.length, 'дисциплина', 'дисциплины', 'дисциплин')} '
-                    'других кафедр · $skipped ч.'),
-                Text(names.join(', '),
-                    style: Theme.of(context).textTheme.bodySmall),
-              ],
-            );
+            return WorkloadHiddenSummary(widget.hidden);
           }
           final index = position - offset;
           final total = widget.totals[index];
