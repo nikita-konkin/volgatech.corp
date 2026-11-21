@@ -221,14 +221,10 @@ class _ScheduleView extends StatelessWidget {
               hasForms: timetable!.hasForms,
               hasLessons: events.isNotEmpty,
               onOpen: () async {
-                final loaded = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => StudyFormsPage.portal(
-                      personId: personId,
-                      store: store,
-                    ),
-                  ),
-                );
+                final page =
+                    StudyFormsPage.portal(personId: personId, store: store);
+                final loaded = await Navigator.of(context)
+                    .push<bool>(MaterialPageRoute(builder: (_) => page));
                 if (context.mounted && loaded == true) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('Форма обучения групп загружена'),
