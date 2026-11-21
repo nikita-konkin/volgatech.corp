@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -20,6 +21,15 @@ android {
     namespace = "net.volgatech.volgatech_pro"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+
+    val dartDefines = providers.gradleProperty("dart-defines").orNull.orEmpty()
+    if (dartDefines.split(',').any {
+            String(Base64.getDecoder().decode(it), Charsets.UTF_8) == "STORE=rustore"
+        }) {
+        buildTypes.configureEach {
+            sourceSets.maybeCreate(name).manifest.srcFile("src/rustore/AndroidManifest.xml")
+        }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -101,6 +101,14 @@ class SettingsPage extends StatelessWidget {
           if (context.read<Updater>().enabled)
             const _Section(title: 'Обновления', children: [_UpdateTile()]),
           const _Section(title: 'Ошибки', children: [CrashLogTile()]),
+          ListTile(
+            title: const Text('Политика конфиденциальности'),
+            onTap: () => unawaited(launchUrl(
+              Uri.parse(
+                  'https://github.com/nikita-konkin/volgatech.corp/blob/main/PRIVACY.md'),
+              mode: LaunchMode.externalApplication,
+            )),
+          ),
           const EasterEggFooter(),
         ],
       ),

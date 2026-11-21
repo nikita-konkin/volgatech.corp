@@ -1,0 +1,102 @@
+name: RuStore
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build
+        default: main
+        required: false
+        type: string
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_CERT_SHA256: cc953cb084d7f4ecb121a9e6c7cce5b7d121b10e1bf72ac8f319925d7c0c3403
+  GRADLE_OPTS: -Dorg.gradle.project.kotlin.incremental=false
+
+jobs:
+  rustore:
+    name: Build and verify RuStore APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || 'main') || github.ref }}
+
+      - name: Set up the release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Secrets ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD are not set."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/upload-keystore.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=upload"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
+          } > android/key.properties
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Pinned: 3.50 deprecates package:flutter/material.dart (material_ui),
+          # and `flutter analyze` fails on the infos. Move up together with
+          # that migration.
+          flutter-version: 3.47.5
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter test
+
+      - name: Build universal APK
+        id: build
+        run: |
+          release=$(sed -n 's/^version: //p' pubspec.yaml)
+          version=${release%+*}
+          build=${release##*+}
+          [[ "$release" == *+* && "$build" =~ ^[0-9]+$ ]]
+          code=$((10#$build + 5000))
+          flutter build apk --release --dart-define=MAIL=true --dart-define=STORE=rustore --build-number="$code"
+          name="volgatech-rustore-$version-$code.apk"
+          mkdir -p build/rustore
+          cp build/app/outputs/flutter-apk/app-release.apk "build/rustore/$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Check APK signature and permissions
+        env:
+          APK_NAME: ${{ steps.build.outputs.name }}
+        run: |
+          apk="build/rustore/$APK_NAME"
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          certs=$("$tools/apksigner" verify --print-certs "$apk")
+          grep -Fqx "Signer #1 certificate SHA-256 digest: $RELEASE_CERT_SHA256" <<< "$certs" \
+            || { echo "::error::$apk is not signed with the release key"; exit 1; }
+          permissions=$("$tools/aapt" dump permissions "$apk")
+          echo "$permissions"
+          if grep -Fq android.permission.REQUEST_INSTALL_PACKAGES <<< "$permissions"; then
+            echo "::error::$apk requests permission to install APKs"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.name }}
+          path: app/build/rustore/${{ steps.build.outputs.name }}
+          if-no-files-found: error
