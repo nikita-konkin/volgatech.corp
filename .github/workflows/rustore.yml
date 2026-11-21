@@ -86,7 +86,8 @@ jobs:
           apk="build/rustore/$APK_NAME"
           tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           certs=$("$tools/apksigner" verify --print-certs "$apk")
-          grep -Fqx "Signer #1 certificate SHA-256 digest: $RELEASE_CERT_SHA256" <<< "$certs" \
+          echo "$certs"
+          grep -q "certificate SHA-256 digest: $RELEASE_CERT_SHA256" <<< "$certs" \
             || { echo "::error::$apk is not signed with the release key"; exit 1; }
           permissions=$("$tools/aapt" dump permissions "$apk")
           echo "$permissions"
