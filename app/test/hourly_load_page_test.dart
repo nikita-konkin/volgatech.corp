@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,11 +13,77 @@ import 'package:volgatech_pro/models/schedule.dart';
 import 'package:volgatech_pro/state/auth_controller.dart';
 import 'package:volgatech_pro/state/memo_controller.dart';
 import 'package:volgatech_pro/ui/hourly_load_page.dart';
+import 'package:volgatech_pro/ui/hourly_setup_pages.dart';
 
 import 'fakes.dart';
 
+Future<void> _page(WidgetTester tester, Map<String, Object> saved) async {
+  tester.view.physicalSize = const Size(1080, 2340);
+  tester.view.devicePixelRatio = 2.75;
+  addTearDown(tester.view.reset);
+  SharedPreferences.setMockInitialValues(saved);
+  FlutterSecureStorage.setMockInitialValues({});
+  final prefs = await Prefs.load();
+  final api = FakeApi()..onSchedule = (first) async => [];
+  final auth = AuthController(api, Session(), FakeCache())..personId = 7;
+  addTearDown(auth.dispose);
+  await tester.pumpWidget(MultiProvider(
+    providers: [
+      Provider<VolgatechApi>.value(value: api),
+      Provider<Prefs>.value(value: prefs),
+      ChangeNotifierProvider<AuthController>.value(value: auth),
+    ],
+    child: const MaterialApp(home: HourlyLoadPage()),
+  ));
+  await tester.pumpAndSettle();
+}
+
+String _name() {
+  final r = Random();
+  const letters = 'абвгдежзиклмнопрстуфхцчшэюя';
+  return [
+    for (var w = 0; w < 3; w++)
+      String.fromCharCodes([
+        for (var i = 0; i < 3 + r.nextInt(7); i++)
+          letters.codeUnitAt(r.nextInt(letters.length))
+      ])
+  ].join(' ');
+}
+
 void main() {
   setUpAll(() => initializeDateFormatting('ru_RU'));
+
+  testWidgets('An incomplete header offers to fill the form 28 header',
+      (tester) async {
+    await _page(tester, {});
+    expect(find.text('Заполнить шапку формы 28'), findsOneWidget,
+        reason: 'The empty screen did not offer to fill the header');
+  });
+
+  testWidgets('The header button opens the header page', (tester) async {
+    await _page(tester, {});
+    await tester.tap(find.text('Заполнить шапку формы 28'));
+    await tester.pumpAndSettle();
+    expect(find.byType(HourlyHeaderPage), findsOneWidget,
+        reason: 'The header button did not open the header page');
+  });
+
+  testWidgets('The header warning opens the header page', (tester) async {
+    await _page(tester, {});
+    await tester.tap(find.textContaining('Заполните шапку'));
+    await tester.pumpAndSettle();
+    expect(find.byType(HourlyHeaderPage), findsOneWidget,
+        reason: 'The header warning did not open the header page');
+  });
+
+  testWidgets('A complete header dont offer to fill it again', (tester) async {
+    await _page(tester, {
+      'hourly_7_header':
+          '{"teacherName": "${_name()}", "signerName": "${_name()}"}',
+    });
+    expect(find.text('Заполнить шапку формы 28'), findsNothing,
+        reason: 'The header button stayed although the header is complete');
+  });
 
   testWidgets('pick a discipline, give it topics, or leave them empty',
       (tester) async {
