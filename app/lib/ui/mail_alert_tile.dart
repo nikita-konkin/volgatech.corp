@@ -27,18 +27,48 @@ class MailAlertTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = context.watch<MailAlerts>().enabled;
+    final alerts = context.watch<MailAlerts>();
+    final enabled = alerts.enabled;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SwitchListTile(
           title: const Text('Новые письма'),
-          subtitle: const Text(
-              'Проверять «Входящие» раз в 15 минут, даже когда приложение закрыто'),
+          subtitle:
+              const Text('Проверять «Входящие», даже когда приложение закрыто'),
           value: enabled,
           onChanged: (v) => _set(context, v),
         ),
-        if (enabled) _MailBackgroundInfo(settings: settings),
+        if (enabled) ...[
+          ListTile(
+            title: const Text('Проверять почту'),
+            trailing: DropdownButton<int>(
+              value: alerts.checkMinutes,
+              items: [
+                for (final (minutes, label) in const [
+                  (1, 'каждую минуту'),
+                  (5, 'каждые 5 минут'),
+                  (10, 'каждые 10 минут'),
+                  (15, 'каждые 15 минут'),
+                  (30, 'каждые 30 минут'),
+                  (60, 'каждый час'),
+                  (1440, 'раз в день'),
+                ])
+                  DropdownMenuItem(value: minutes, child: Text(label)),
+              ],
+              onChanged: (minutes) async {
+                if (minutes != null) await alerts.setCheckMinutes(minutes);
+              },
+            ),
+          ),
+          if (alerts.checkMinutes < 15)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                  'Android может проверять реже, пока телефон не используется'),
+            ),
+          _MailBackgroundInfo(settings: settings),
+        ],
       ],
     );
   }

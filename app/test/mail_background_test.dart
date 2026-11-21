@@ -46,7 +46,68 @@ Future<MailCredentialStore> _signedIn(String login) async {
   return store;
 }
 
+/// Records scheduling operations without Android.
+final class _Work implements MailBackgroundWork {
+  final calls = <(String, int)>[];
+
+  @override
+  Future<void> periodic(Duration frequency) async =>
+      calls.add(('periodic', frequency.inMinutes));
+
+  @override
+  Future<void> short(Duration delay, {required bool append}) async =>
+      calls.add((append ? 'append' : 'replace', delay.inMinutes));
+
+  @override
+  Future<void> cancelPeriodic() async => calls.add(('cancel periodic', 0));
+
+  @override
+  Future<void> cancelShort() async => calls.add(('cancel short', 0));
+}
+
 void main() {
+  test('A daily interval cancels the short chain', () async {
+    final prefs = await _prefs();
+    await prefs.setMailCheckMinutes(1440);
+    final work = _Work();
+    await BackgroundMailCheck(prefs, work: work).start();
+
+    expect(work.calls, [('cancel short', 0), ('periodic', 1440)],
+        reason: 'The daily schedule did not replace the short chain');
+  });
+
+  test('A short check appends the next check at the saved interval', () async {
+    final prefs = await _prefs();
+    await (await Prefs.load()).setMailCheckMinutes(10);
+    final work = _Work();
+    await BackgroundMailCheck(prefs, work: work).continueShort();
+
+    expect(work.calls, [('append', 10)],
+        reason: 'The next check did not use the saved interval');
+  });
+
+  test('A running check cannot continue after notifications are disabled',
+      () async {
+    final prefs = await _prefs();
+    await prefs.setMailCheckMinutes(1);
+    await (await Prefs.load()).setMailNotify(false);
+    final work = _Work();
+    await BackgroundMailCheck(prefs, work: work).continueShort();
+
+    expect(work.calls, isEmpty,
+        reason: 'A check was queued after notifications were disabled');
+  });
+
+  test('A short interval retains the periodic fallback', () async {
+    final prefs = await _prefs();
+    await prefs.setMailCheckMinutes(5);
+    final work = _Work();
+    await BackgroundMailCheck(prefs, work: work).start();
+
+    expect(work.calls, [('periodic', 15), ('replace', 5)],
+        reason: 'The short job or its fallback was missing');
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('A network failure is written to the on-device error log', () async {

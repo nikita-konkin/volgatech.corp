@@ -42,6 +42,7 @@ class Prefs {
   static const _kUnread = 'mail_unread';
   static const _kMailNotify = 'mail_notify';
   static const _kMailLastBackgroundCheck = 'mail_last_background_check';
+  static const _kMailCheckMinutes = 'mail_check_minutes';
   static const _kMailSeenUntil = 'mail_seen_until';
   static const _kMailRefusals = 'mail_refusals';
   static const _kMailRefusedAt = 'mail_refused_at';
@@ -62,6 +63,12 @@ class Prefs {
   /// Notifications of new mail (MAIL builds on Android).
   bool get mailNotify => _p.getBool(_kMailNotify) ?? false;
   Future<void> setMailNotify(bool on) async => _p.setBool(_kMailNotify, on);
+
+  /// How many minutes pass between background mail checks.
+  int get mailCheckMinutes => _p.getInt(_kMailCheckMinutes) ?? 15;
+
+  Future<void> setMailCheckMinutes(int minutes) async =>
+      _p.setInt(_kMailCheckMinutes, minutes);
 
   /// When a background check last finished reading the inbox.
   DateTime? get mailLastBackgroundCheck =>
