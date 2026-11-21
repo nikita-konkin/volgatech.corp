@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import 'core/api_client.dart';
 import 'core/app_lock.dart';
 import 'core/notifications.dart';
+import 'core/prefs.dart';
+import 'core/release_notes.dart';
 import 'mail/mail_config.dart';
 import 'mail/ui/mail_page.dart';
 import 'state/auth_controller.dart';
@@ -13,6 +18,7 @@ import 'theme.dart';
 import 'ui/home_shell.dart';
 import 'ui/lock_screen.dart';
 import 'ui/login_page.dart';
+import 'ui/release_notes_dialog.dart';
 import 'ui/update_banner.dart';
 import 'web/a11y.dart';
 import 'web/insets.dart';
@@ -130,14 +136,78 @@ class _LockGateState extends State<_LockGate> with WidgetsBindingObserver {
   }
 }
 
-class _AuthGate extends StatelessWidget {
+/// Selects the first screen after session restoration.
+final class _AuthGate extends StatefulWidget {
   const _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+/// Handles release notes once across auth changes during this run.
+final class _AuthGateState extends State<_AuthGate> {
+  bool _checkedRelease = false;
+  ReleaseNotes? _pendingRelease;
+  DialogRoute<void>? _releaseDialog;
+
+  Future<void> _checkRelease(bool initiallySignedIn) async {
+    final version = await PackageInfo.fromPlatform()
+        .then((info) => info.version)
+        .catchError((Object _) => '');
+    if (!mounted || version.isEmpty) return;
+    final prefs = context.read<Prefs>();
+    final release = ReleaseNotes(
+      version: version,
+      notes: bundledReleaseNotes,
+      seenVersion: prefs.lastSeenVersion,
+      signedIn: initiallySignedIn,
+    );
+    if (!release.shouldRemember) return;
+    if (release.lines.isEmpty) {
+      await prefs.setLastSeenVersion(version);
+    } else {
+      setState(() => _pendingRelease = release);
+    }
+  }
+
+  void _showRelease(ReleaseNotes release) {
+    if (!mounted ||
+        _pendingRelease != release ||
+        context.read<AuthController>().status != AuthStatus.authenticated) {
+      return;
+    }
+    _pendingRelease = null;
+    final dialog = DialogRoute<void>(
+      context: context,
+      builder: (_) =>
+          ReleaseNotesDialog(version: release.version, lines: release.lines),
+    );
+    _releaseDialog = dialog;
+    unawaited(Navigator.of(context, rootNavigator: true).push(dialog).then((_) {
+      _releaseDialog = null;
+    }));
+    unawaited(context.read<Prefs>().setLastSeenVersion(release.version));
+  }
 
   @override
   Widget build(BuildContext context) {
     final status = context.watch<AuthController>().status;
+    if (!_checkedRelease && status != AuthStatus.unknown) {
+      _checkedRelease = true;
+      unawaited(_checkRelease(status == AuthStatus.authenticated));
+    }
+    if (_releaseDialog case final dialog?
+        when status != AuthStatus.authenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (dialog.isActive) dialog.navigator?.removeRoute(dialog);
+      });
+    }
     switch (status) {
       case AuthStatus.authenticated:
+        if (_pendingRelease case final release?) {
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _showRelease(release));
+        }
         return const _NotificationTaps(child: HomeShell());
       case AuthStatus.unauthenticated:
       case AuthStatus.authenticating:
