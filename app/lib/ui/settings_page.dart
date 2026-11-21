@@ -15,6 +15,7 @@ import 'crash_log_page.dart';
 import 'easter_egg.dart';
 import 'glass.dart';
 import 'layout.dart';
+import 'mail_alert_tile.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -95,7 +96,7 @@ class SettingsPage extends StatelessWidget {
               title: 'Уведомления',
               children: [
                 const _LessonReminderTile(),
-                if (MailAlerts.supported) const _MailAlertTile(),
+                if (MailAlerts.supported) const MailAlertTile(),
               ],
             ),
           if (context.read<Updater>().enabled)
@@ -328,33 +329,6 @@ class _LessonReminderTile extends StatelessWidget {
         ],
         onChanged: (m) => _set(context, m!),
       ),
-    );
-  }
-}
-
-/// New mail in «Входящие» as notifications.
-class _MailAlertTile extends StatelessWidget {
-  const _MailAlertTile();
-
-  Future<void> _set(BuildContext context, bool on) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final ok = await context.read<MailAlerts>().setEnabled(on);
-    if (!ok) {
-      messenger.showSnackBar(const SnackBar(
-        content: Text(
-            'Уведомления запрещены. Разрешите их приложению в настройках телефона.'),
-      ));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SwitchListTile(
-      title: const Text('Новые письма'),
-      subtitle: const Text(
-          'Проверять «Входящие» раз в 15 минут, даже когда приложение закрыто'),
-      value: context.watch<MailAlerts>().enabled,
-      onChanged: (v) => _set(context, v),
     );
   }
 }

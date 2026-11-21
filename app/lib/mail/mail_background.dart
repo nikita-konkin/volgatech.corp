@@ -12,6 +12,7 @@ import 'mail_alerts.dart';
 import 'mail_credentials.dart';
 import 'mail_models.dart';
 import 'mail_refusals.dart';
+import 'mail_service.dart';
 
 /// Android runs the check for new mail every 15 minutes (its shortest
 /// period), when there's a network, with the app closed too.
@@ -48,29 +49,67 @@ void mailCheckDispatcher() {
   Workmanager().executeTask((task, input) async {
     try {
       final prefs = await Prefs.load();
-      if (!prefs.mailNotify) return true;
-      await checkForNewMail(
+      await runBackgroundMailCheck(
         prefs: prefs,
         store: MailCredentialStore(),
         service: EwsMailService(),
         alerts: LocalMailAlerts(),
-        report: (e) async {
-          final log = CrashLog(prefs, platform: 'android');
-          try {
-            final app = await PackageInfo.fromPlatform();
-            log.version = '${app.version}+${app.buildNumber}';
-          } on Object {
-            // Reported without the version, then.
-          }
-          await log.add(refusalReport(e),
-              StackTrace.fromString('фоновая проверка почты'));
-        },
+        loadLog: () => _loadLog(prefs),
       );
     } on Object catch (e) {
       debugPrint('mail check: $e');
     }
     return true;
   });
+}
+
+/// Runs an enabled check and keeps its result on the device.
+Future<void> runBackgroundMailCheck({
+  required Prefs prefs,
+  required MailCredentialStore store,
+  required MailService service,
+  required MailAlertPlatform alerts,
+  required Future<CrashLog> Function() loadLog,
+  DateTime Function()? clock,
+}) async {
+  try {
+    await prefs.reload();
+    if (!prefs.mailNotify) return;
+    final completed = await checkForNewMail(
+      prefs: prefs,
+      store: store,
+      service: service,
+      alerts: alerts,
+      clock: clock,
+      report: (e) async {
+        final log = await loadLog();
+        await log.add(
+            refusalReport(e), StackTrace.fromString('фоновая проверка почты'));
+      },
+    );
+    if (completed) {
+      await prefs.setMailLastBackgroundCheck((clock ?? DateTime.now)());
+    }
+  } on MailAuthException {
+    return;
+  } on Object catch (error, stack) {
+    final log = await loadLog();
+    final detail =
+        '$error'.split('\n').first.trim().replaceFirst(RegExp(r'\.+$'), '');
+    await log.add('Фоновая проверка почты не удалась: $detail', stack);
+  }
+}
+
+Future<CrashLog> _loadLog(Prefs prefs) async {
+  String version;
+  try {
+    final app = await PackageInfo.fromPlatform();
+    version = '${app.version}+${app.buildNumber}';
+  } on Object {
+    version = '';
+  }
+  await prefs.reload().catchError((Object _) {});
+  return CrashLog(prefs, platform: 'android')..version = version;
 }
 
 /// New mail as Android notifications: one per message (the newest few),
