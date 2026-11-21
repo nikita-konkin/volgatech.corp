@@ -12,6 +12,7 @@ import '../core/hourly_load.dart';
 import '../core/portal_workload.dart';
 import '../core/portal_workload_batch.dart';
 import '../core/portal_workload_save_progress.dart';
+import '../data/portal_timetable_store.dart';
 import '../data/portal_workload_client.dart';
 import '../data/volgatech_api.dart';
 import '../state/auth_controller.dart';
@@ -190,6 +191,11 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
       if (!mounted || auth.personId != personId) return;
       await preferences.setString(
           _departmentKey, report.selection['department']!);
+      if (!mounted || auth.personId != personId) return;
+      if (personId != null) {
+        final timetable = context.read<PortalTimetableStore>();
+        unawaited(timetable.refresh(personId, _portal.readTimetable));
+      }
       final loaded = report;
       setState(() {
         final preserve = _batchNeedsReload && loaded.scope == _report?.scope;
@@ -289,8 +295,10 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
       final days = await api.getSchedule(
           personId, month, yesterday.isBefore(end) ? yesterday : end);
       if (!mounted || auth.personId != personId) return;
-      final split = departmentWorkload(
-          monthlyWorkload(hourlyClassesFrom(days), month, today), cells);
+      final timetable = context.read<PortalTimetableStore>().read(personId);
+      final classes = hourlyClassesFrom(days, studyForm: timetable.formFor);
+      final split =
+          departmentWorkload(monthlyWorkload(classes, month, today), cells);
       final totals = split.shown;
       if (totals.isEmpty) {
         _notice(split.hidden.isEmpty
@@ -374,7 +382,8 @@ class _PortalWorkloadPageState extends State<PortalWorkloadPage> {
       final days = await api.getSchedule(personId, options.first.month,
           yesterday.isBefore(end) ? yesterday : end);
       if (!mounted || auth.personId != personId) return;
-      final classes = hourlyClassesFrom(days);
+      final timetable = context.read<PortalTimetableStore>().read(personId);
+      final classes = hourlyClassesFrom(days, studyForm: timetable.formFor);
       final totals = {
         for (final option in options)
           option.value: monthlyWorkload(classes, option.month, today),

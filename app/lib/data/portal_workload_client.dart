@@ -12,6 +12,7 @@ const _profile = '$_portal$_profilePath';
 const _loginPath = '/cookieauth.dll';
 const _callLimit = Duration(seconds: 3);
 const _waitLimit = Duration(seconds: 22);
+const _timetableLimit = Duration(seconds: 45);
 const _unauthorizedDocument =
     r'/^401\s+unauthorized$/i.test(document.body?.innerText.trim() || "")';
 
@@ -144,6 +145,8 @@ const _changed = PortalWorkloadFailure(
     'Данные на портале изменились. Обновите месяц и проверьте часы.');
 const _unavailable =
     PortalWorkloadFailure('Не удалось загрузить форму нагрузки с портала.');
+const _timetableUnavailable =
+    PortalWorkloadFailure('Не удалось загрузить расписание с портала');
 
 class PortalWorkloadClient {
   PortalWorkloadClient({
@@ -163,12 +166,15 @@ class PortalWorkloadClient {
       rootBundle.loadString('assets/portal/workload.js');
   late final Future<String> _logonScript =
       rootBundle.loadString('assets/portal/logon.js');
+  late final Future<String> _timetableScript =
+      rootBundle.loadString('assets/portal/timetable.js');
   Completer<String?>? _navigation;
   void Function(HttpAuthRequest)? _nativeAuth;
   Uri? _workload;
   bool _login = false;
   bool _authRequired = false;
   int _submission = 0;
+  int _timetableRead = 0;
 
   Future<void> _initialize() async {
     await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
@@ -353,7 +359,10 @@ class PortalWorkloadClient {
 
   Future<Map<String, dynamic>> _run(String action,
       [Map<String, Object>? request]) async {
-    final script = await _script.timeout(_callLimit);
+    final timetable =
+        action == 'timetableStart' || action == 'timetableReceipt';
+    final script =
+        await (timetable ? _timetableScript : _script).timeout(_callLimit);
     final url = await controller.currentUrl().timeout(_callLimit);
     final uri = url == null ? null : Uri.tryParse(url);
     if (uri != null && _isLogin(uri)) {
@@ -364,8 +373,9 @@ class PortalWorkloadClient {
       return {'error': 'loading'};
     }
     final args = [jsonEncode(action), jsonEncode(request)].join(', ');
+    final invocation = timetable ? '$script.run($args)' : '$script($args)';
     final result = await controller
-        .runJavaScriptReturningResult('$script($args)')
+        .runJavaScriptReturningResult(invocation)
         .timeout(_callLimit);
     final data = jsonDecode(result as String);
     return _fields(data is String ? jsonDecode(data) : data);
@@ -373,6 +383,24 @@ class PortalWorkloadClient {
 
   Future<Map<String, dynamic>> _read(String action) =>
       _wait(action, (_) => true);
+
+  Future<List<Object?>> readTimetable() async {
+    await _ready.timeout(_callLimit);
+    final id = ++_timetableRead;
+    final start = await _start('timetableStart', {'id': id});
+    if (start != null && start['started'] != true) throw _timetableUnavailable;
+    final result = await _wait(
+        'timetableReceipt',
+        (receipt) =>
+            id != _timetableRead ||
+            (receipt['id'] == id && receipt['state'] != 'pending'),
+        limit: _timetableLimit);
+    if (id != _timetableRead) throw _timetableUnavailable;
+    if (result case {'state': 'ready', 'rows': final List<Object?> rows}) {
+      return rows;
+    }
+    throw _timetableUnavailable;
+  }
 
   Future<Map<String, dynamic>?> _start(String action,
       [Map<String, Object>? request]) async {
@@ -384,10 +412,10 @@ class PortalWorkloadClient {
   }
 
   Future<Map<String, dynamic>> _wait(
-      String action, bool Function(Map<String, dynamic>) accept) {
+      String action, bool Function(Map<String, dynamic>) accept,
+      {Duration limit = _waitLimit}) {
     var expired = false;
-    return _poll(action, accept, () => expired).timeout(_waitLimit,
-        onTimeout: () {
+    return _poll(action, accept, () => expired).timeout(limit, onTimeout: () {
       expired = true;
       throw _unavailable;
     });

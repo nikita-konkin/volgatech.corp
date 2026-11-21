@@ -76,14 +76,15 @@ class HourlyClass {
 
 /// Every timetable class in [days], in date and time order. Groups taught
 /// together in one room at one time are one class, credited once.
-List<HourlyClass> hourlyClassesFrom(List<ScheduleDay> days) {
+List<HourlyClass> hourlyClassesFrom(List<ScheduleDay> days,
+    {String? Function(ScheduleEvent)? studyForm}) {
   final out = <HourlyClass>[];
   for (final day in [...days]..sort((a, b) => a.date.compareTo(b.date))) {
     final classes = [
       for (final e in day.events)
         if (_isClass(e)) e,
     ]..sort((a, b) => (a.timeBegin ?? '').compareTo(b.timeBegin ?? ''));
-    for (final slot in groupParallelLessons(classes)) {
+    for (final slot in groupParallelLessons(classes, studyForm: studyForm)) {
       final lead = slot.lead;
       final discipline =
           (lead.description ?? '').trim().replaceAll(_spaces, ' ');
