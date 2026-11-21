@@ -136,9 +136,19 @@ class _HourlyView extends StatelessWidget {
         icon: Icons.checklist,
         text: 'Отметьте дисциплины с почасовой нагрузкой — '
             'их занятия попадут в отчёт.',
-        action: FilledButton.tonal(
-            onPressed: () => _open(context, c, const HourlyCoursesPage()),
-            child: const Text('Выбрать дисциплины')),
+        action: Column(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 8,
+          children: [
+            if (c.header.missing.isNotEmpty)
+              OutlinedButton(
+                  onPressed: () => _open(context, c, const HourlyHeaderPage()),
+                  child: const Text('Заполнить шапку формы 28')),
+            FilledButton.tonal(
+                onPressed: () => _open(context, c, const HourlyCoursesPage()),
+                child: const Text('Выбрать дисциплины')),
+          ],
+        ),
       );
     }
     if (entries.isEmpty) {
@@ -386,18 +396,25 @@ class _Summary extends StatelessWidget {
               '${c.totalHours} ч.',
               style: TextStyle(color: muted, fontSize: 14)),
           if (h.missing.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, size: 16, color: Brand.coral),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text('Заполните шапку: ${h.missing.join(', ')}',
-                        style:
-                            const TextStyle(color: Brand.coral, fontSize: 13)),
-                  ),
-                ],
+            InkWell(
+              onTap: () =>
+                  _HourlyView._open(context, c, const HourlyHeaderPage()),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 16, color: Brand.coral),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text('Заполните шапку: ${h.missing.join(', ')}',
+                          style: const TextStyle(
+                              color: Brand.coral, fontSize: 13)),
+                    ),
+                    const Icon(Icons.chevron_right,
+                        size: 18, color: Brand.coral),
+                  ],
+                ),
               ),
             ),
           SwitchListTile(
