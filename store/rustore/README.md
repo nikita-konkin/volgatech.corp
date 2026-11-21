@@ -5,7 +5,7 @@ Everything the RuStore console asks for, and where it comes from. Fill the test 
 1. Ask the university's IT department for a test staff account that works in the cabinet, the mail and the portal.
 2. Register in the [RuStore console](https://console.rustore.ru) as «Физическое лицо» with VK ID.
 3. Check that [PRIVACY.md](../../PRIVACY.md) opens at `https://github.com/nikita-konkin/volgatech.corp/blob/main/PRIVACY.md`.
-4. Run the **RuStore** workflow (Actions → RuStore → Run workflow, ref `main`). Download its artifact, `volgatech-rustore-<version>-<build + 5000>.apk` (for 0.5.9: `volgatech-rustore-0.5.9-5026.apk`), signed with the release key, without the in-app updater.
+4. Run the **RuStore** workflow (Actions → RuStore → Run workflow, ref `main`). Download its artifact, `volgatech-rustore-<version>-<build + 5000>.apk` (for 0.5.10: `volgatech-rustore-0.5.10-5027.apk`), signed with the release key, without the in-app updater.
 5. Create the app and upload that APK. The package is `net.volgatech.volgatech_pro`.
 6. Fill the card:
    - name, short and full description, category, age rating, tags, «Что нового» and FAQ: [listing.md](listing.md);

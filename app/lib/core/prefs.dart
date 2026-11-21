@@ -21,6 +21,14 @@ class Prefs {
   static Future<Prefs> load() async =>
       Prefs(await SharedPreferences.getInstance());
 
+  static const _kStudyFormsHintDismissed = 'study_forms_hint_dismissed';
+
+  bool get studyFormsHintDismissed =>
+      _p.getBool(_kStudyFormsHintDismissed) ?? false;
+
+  Future<void> dismissStudyFormsHint() async =>
+      _p.setBool(_kStudyFormsHintDismissed, true);
+
   static const _kLogin = 'remembered_login';
   static const _kRemember = 'remember_login';
   static const _kTheme = 'theme_mode';
@@ -38,6 +46,7 @@ class Prefs {
   static const _kSizeColors = 'mail_size_colors';
   static const _kQuota = 'mail_quota';
   static const _kUpdateDismissed = 'update_dismissed';
+  static const _kLastSeenVersion = 'last_seen_version';
   static const _kSignature = 'mail_signature';
   static const _kUnread = 'mail_unread';
   static const _kMailNotify = 'mail_notify';
@@ -192,6 +201,11 @@ class Prefs {
   Future<void> setUpdateDismissed(String? v) async => v == null
       ? _p.remove(_kUpdateDismissed)
       : _p.setString(_kUpdateDismissed, v);
+
+  /// The installed version already handled by the release notes prompt.
+  String get lastSeenVersion => _p.getString(_kLastSeenVersion) ?? '';
+  Future<void> setLastSeenVersion(String version) async =>
+      _p.setString(_kLastSeenVersion, version);
 
   /// «Закреплённые» folded away at the top of the mail list.
   bool get mailPinsFolded => _p.getBool(_kPinsFolded) ?? false;

@@ -37,6 +37,8 @@ class PortalTimetable {
   final _lessons = <_Slot, List<_Lesson>>{};
   final _forms = <String, Set<String>>{};
 
+  bool get hasForms => _forms.isNotEmpty;
+
   String? formFor(ScheduleEvent event) {
     final group = event.fullDescription?.trim() ?? '';
     final date = event.date;

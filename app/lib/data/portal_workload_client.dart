@@ -368,8 +368,15 @@ class PortalWorkloadClient {
     if (uri != null && _isLogin(uri)) {
       throw PortalWorkloadFailure.signInRequired;
     }
-    if (uri == null ||
-        (action == 'link' ? !_isProfile(uri) : !isWorkloadPage(uri))) {
+    final allowed = uri != null &&
+        switch (action) {
+          'link' => _isProfile(uri),
+          'timetableStart' ||
+          'timetableReceipt' =>
+            _isProfile(uri) || isWorkloadPage(uri),
+          _ => isWorkloadPage(uri),
+        };
+    if (!allowed) {
       return {'error': 'loading'};
     }
     final args = [jsonEncode(action), jsonEncode(request)].join(', ');
@@ -386,6 +393,11 @@ class PortalWorkloadClient {
 
   Future<List<Object?>> readTimetable() async {
     await _ready.timeout(_callLimit);
+    final current =
+        Uri.tryParse(await controller.currentUrl().timeout(_callLimit) ?? '');
+    if (current == null || !isWorkloadPage(current)) {
+      await _navigate(Uri.parse(_profile));
+    }
     final id = ++_timetableRead;
     final start = await _start('timetableStart', {'id': id});
     if (start != null && start['started'] != true) throw _timetableUnavailable;

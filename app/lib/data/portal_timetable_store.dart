@@ -26,20 +26,21 @@ class PortalTimetableStore extends ChangeNotifier {
     return PortalTimetable();
   }
 
-  Future<void> refresh(
+  Future<bool> refresh(
       int personId, Future<List<Object?>> Function() fetch) async {
     final request = _refreshes[personId] = Object();
     try {
       final rows = await fetch();
-      if (_refreshes[personId] != request) return;
+      if (_refreshes[personId] != request) return false;
       PortalTimetable(rows);
       await _prefs.writeJson(_key(personId), {
         'fetchedAt': DateTime.now().toUtc().toIso8601String(),
         'rows': rows,
       });
       notifyListeners();
+      return true;
     } catch (_) {
-      return;
+      return false;
     } finally {
       if (_refreshes[personId] == request) _refreshes.remove(personId);
     }
