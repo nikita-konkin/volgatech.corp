@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import '../core/cache.dart';
 import '../core/lesson_grouping.dart';
 import '../core/lesson_reminders.dart';
 import '../core/lesson_widget.dart';
+import '../core/prefs.dart';
 import '../core/ru_plural.dart';
 import '../data/portal_timetable_store.dart';
 import '../data/volgatech_api.dart';
@@ -21,6 +23,8 @@ import 'glass.dart';
 import 'home_shell.dart';
 import 'layout.dart';
 import 'offline_banner.dart';
+import 'study_forms_hint.dart';
+import 'study_forms_page.dart';
 import 'week_summary_page.dart';
 import 'widgets/copy_text.dart';
 import 'widgets/skeleton.dart';
@@ -198,14 +202,43 @@ class _ScheduleView extends StatelessWidget {
     }
     // Merge lessons that share a time + room + subject (two groups together).
     final personId = context.read<AuthController>().personId;
-    final timetable = context.watch<PortalTimetableStore?>()?.read(personId);
+    final store = context.watch<PortalTimetableStore?>();
+    final timetable = store?.read(personId);
+    final prefs = context.read<Prefs?>();
+    final showHint =
+        !kIsWeb && personId != null && store != null && prefs != null;
+    final offset = showHint ? 1 : 0;
     final slots = groupParallelLessons(events, studyForm: timetable?.formFor);
     return RefreshIndicator(
       onRefresh: c.refresh,
       child: ListView.builder(
         padding: readable(context, const EdgeInsets.fromLTRB(12, 4, 12, 16)),
-        itemCount: slots.length,
-        itemBuilder: (_, i) => _LessonCard(slots[i], accent: accent),
+        itemCount: slots.length + offset,
+        itemBuilder: (_, i) {
+          if (showHint && i == 0) {
+            return StudyFormsHint(
+              prefs: prefs,
+              hasForms: timetable!.hasForms,
+              hasLessons: events.isNotEmpty,
+              onOpen: () async {
+                final loaded = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => StudyFormsPage.portal(
+                      personId: personId,
+                      store: store,
+                    ),
+                  ),
+                );
+                if (context.mounted && loaded == true) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Форма обучения групп загружена'),
+                  ));
+                }
+              },
+            );
+          }
+          return _LessonCard(slots[i - offset], accent: accent);
+        },
       ),
     );
   }

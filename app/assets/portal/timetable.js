@@ -60,13 +60,32 @@
 
   function run(action, request) {
     const reply = data => JSON.stringify(data);
-    if (location.origin !== 'https://portal.volgatech.net' ||
-        !/^\/my\/personal\/[^/]+\/sitepages\/[^/]+$/i.test(location.pathname)) {
+    if (location.origin !== 'https://portal.volgatech.net') return reply({error: 'page'});
+    const sitePage = /^\/my\/personal\/[^/]+\/sitepages\/[^/]+$/i;
+    const pageName = 'Мое расписание занятий.aspx';
+    const path = location.pathname.replace(/&authresend[0-9a-f]+$/i, '');
+    let base = location.href;
+    if (path.toLowerCase() === '/my/person.aspx') {
+      const personal = Array.from(document.links, link => new URL(link.href, location.href))
+        .filter(url => url.origin === location.origin && !url.username &&
+          !url.password && sitePage.test(url.pathname));
+      const named = name => personal.find(url => {
+        try {
+          const path = url.pathname.replace(/&authresend[0-9a-f]+$/i, '');
+          return decodeURIComponent(path.split('/').pop()).toLowerCase() === name.toLowerCase();
+        } catch {
+          return false;
+        }
+      });
+      const folder = named(pageName) ?? named('нагрузка на первую половину дня.aspx');
+      if (!folder) return reply({error: 'page'});
+      base = folder.href;
+    } else if (!sitePage.test(path)) {
       return reply({error: 'page'});
     }
     if (action === 'timetableReceipt') return reply(window.volgatechTimetable ?? {});
     const receipt = window.volgatechTimetable = {id: request.id, state: 'pending'};
-    const url = new URL('Мое расписание занятий.aspx', location.href);
+    const url = new URL(pageName, base);
     const abort = new AbortController();
     const timeout = setTimeout(() => abort.abort(), 40000);
     fetch(url, {

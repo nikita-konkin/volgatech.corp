@@ -109,3 +109,36 @@ test('the bridge reads only the same-origin timetable and returns its rows', {ti
     {id: 39, state: 'ready', rows: []}
   ], 'the WebView did not make a read-only timetable request');
 });
+
+test('the profile uses the personal folder without opening the workload page', {timeout: 1000}, async () => {
+  const folder = 'fiction-' + Math.floor(Math.random() * 71347);
+  const profile = new URL('https://portal.volgatech.net/my/person.aspx&AuthResendc84e9d');
+  const workload = new URL('/my/personal/' + folder + '/SitePages/' +
+    encodeURIComponent('Нагрузка на первую половину дня.aspx'), profile);
+  const calls = [];
+  let complete;
+  const completed = new Promise(resolve => { complete = resolve; });
+  const bridge = script({
+    location: profile,
+    document: {links: [{href: workload.href}]},
+    window: {},
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout(id) {
+      clearTimeout(id);
+      complete();
+    },
+    async fetch(url, options) {
+      calls.push([url.href, options.method]);
+      return {ok: true, url: url.href, text: async () => ''};
+    },
+    DOMParser: class {
+      parseFromString() { return documentWith(); }
+    }
+  });
+  bridge.run('timetableStart', {id: 137});
+  await completed;
+  assert.deepEqual(calls, [[new URL('Мое расписание занятий.aspx', workload).href, 'GET']],
+    'the profile did not make exactly one timetable GET');
+});
