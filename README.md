@@ -109,7 +109,8 @@ hourly-load report all work, but:
   pairs, tap a day to jump); the week goes to a calendar app with «В
   календарь». On Android: **reminders** before lessons and the **«Ближайшая
   пара»** home-screen widget; groups show their study form («ИТС-21 (оз)»)
-  from the portal timetable.
+  from the portal timetable, and a hint above the lessons signs in to the
+  portal to load it.
 - **Расписание экзаменов** — study-year picker, grouped by date, offline
   cache, «В календарь».
 - **Профиль** — photo, birthday, and every appointment (main department first)
@@ -120,7 +121,8 @@ hourly-load report all work, but:
   your schedule and shared as a .docx in the portal's own template.
 - **Почасовая нагрузка** — «Приложение к форме 28» for the disciplines you
   tick, over any months, with lesson topics from a plan per discipline (or
-  left for you to fill in), shared as a .docx.
+  left for you to fill in), shared as a .docx; «Заполнить шапку формы 28»
+  opens the header until it is complete.
 - **Дисциплины** — every discipline in a semester's schedule with its groups
   and class counts, to look over and copy (one name or all of them); a held
   lesson or exam copies its name too.
@@ -133,7 +135,8 @@ hourly-load report all work, but:
   hand, and the privacy policy.
 - **Обновления** — a new release on GitHub shows up as a banner in the app;
   «Обновить» downloads the right APK for the phone, checks it and opens the
-  Android installer.
+  Android installer; after an update, a short «Что нового» says what
+  changed.
 - **Почта** — in the `app-mail-*` APKs, a **built-in client** for the
   university's Exchange mailbox (EWS): folders, search, pin and «В архив»,
   several messages at once, attachments that open in the app, replies with
@@ -155,6 +158,20 @@ hourly-load report all work, but:
   preview and fill the portal form with the «Заполнить из Волгатех» bookmark,
   then save on the portal.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.10
+
+<img src="docs/screenshots/study-forms-hint.webp" width="15%" alt="Подсказка в расписании: показать форму обучения групп и войти на портал"> <img src="docs/screenshots/form28-header.webp" width="15%" alt="«Почасовая нагрузка»: кнопка «Заполнить шапку формы 28» над «Выбрать дисциплины»"> <img src="docs/screenshots/whats-new.webp" width="15%" alt="Окно «Что нового в 0.5.10» после обновления">
+
+- **Study forms in one tap:** a hint above the lessons — «Показать форму
+  обучения групп (оз, з, о)? Войти на портал ›» — signs in to the portal and
+  loads the groups' study forms, without opening «Учебная нагрузка» first.
+  The hint hides once the forms are loaded, or for good with ✕.
+- **«Заполнить шапку формы 28»** in «Почасовая нагрузка», above «Выбрать
+  дисциплины», while the header misses the teacher or the signer; the red
+  «Заполните шапку» line opens it too.
+- **«Что нового»:** after an update the app shows once, in a short dialog,
+  what the new version brings.
 
 ## What's new — v0.5.9
 
