@@ -38,8 +38,9 @@ abstract class MailCheckSchedule {
 /// messages that came after the newest one already shown or told of. The
 /// first time it only notes where «new» begins. A refused password is kept
 /// (see [MailRefusals]): the checks pause, longer each time, and the first
-/// refusal in a row is told of, and [report]ed.
-Future<void> checkForNewMail({
+/// refusal in a row is told of, and [report]ed. Returns true after a
+/// successful check.
+Future<bool> checkForNewMail({
   required Prefs prefs,
   required MailCredentialStore store,
   required MailService service,
@@ -48,9 +49,9 @@ Future<void> checkForNewMail({
   DateTime Function()? clock,
 }) async {
   final creds = await store.read();
-  if (creds == null) return;
+  if (creds == null) return false;
   final refusals = MailRefusals(prefs, clock: clock);
-  if (!await refusals.mayTry()) return;
+  if (!await refusals.mayTry()) return false;
   try {
     await service.connect(creds);
     if (await refusals.accepted()) await alerts.hideRefused();
@@ -61,9 +62,11 @@ Future<void> checkForNewMail({
       if (fresh.isNotEmpty) await alerts.show(fresh);
     }
     await _advance(prefs, inbox);
+    return true;
   } on MailAuthException catch (e) {
     if (await refusals.refused() == 1) await alerts.showRefused();
     await report?.call(e);
+    return false;
   } finally {
     await service.disconnect();
   }
@@ -96,7 +99,21 @@ class MailAlerts extends ChangeNotifier {
   static bool get supported =>
       kNativeMail && defaultTargetPlatform == TargetPlatform.android;
 
+  int get checkMinutes => _prefs.mailCheckMinutes;
+
+  Future<void> setCheckMinutes(int minutes) async {
+    await _prefs.setMailCheckMinutes(minutes);
+    if (enabled) await _schedule.start();
+    notifyListeners();
+  }
+
   bool get enabled => _prefs.mailNotify;
+
+  /// Reads the completion time from the background isolate's preferences.
+  Future<DateTime?> lastBackgroundCheck() async {
+    await _prefs.reload();
+    return _prefs.mailLastBackgroundCheck;
+  }
 
   /// At launch: Android keeps the schedule, but an update may have lost it.
   Future<void> resume() async {
@@ -113,10 +130,9 @@ class MailAlerts extends ChangeNotifier {
         await _prefs.setMailSeenUntil(_clock().toUtc());
       }
       await _schedule.start();
-    } else {
-      await _schedule.stop();
     }
     await _prefs.setMailNotify(on);
+    if (!on) await _schedule.stop();
     notifyListeners();
     return true;
   }

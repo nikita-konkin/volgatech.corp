@@ -1,4 +1,4 @@
-((action, request) => {
+(window.volgatechWorkload = (action, request) => {
   const portal = 'https://portal.volgatech.net';
   const pageName = 'нагрузка на первую половину дня.aspx';
   const pagePath = url => url.pathname.replace(/&authresend[0-9a-f]+$/i, '');
@@ -16,7 +16,7 @@
     return reply({url: link ? link.href : null});
   }
   if (!isWorkloadPage(location)) return fail('page');
-  const bridge = window.volgatechWorkload ??= {revision: 0, receipt: null};
+  const bridge = window.volgatechWorkloadState ??= {revision: 0, receipt: null};
   if (action === 'receipt') return reply(bridge.receipt ?? {});
 
   const postback = window.Sys?.WebForms?.PageRequestManager?.getInstance();
@@ -76,8 +76,6 @@
       const item = items.getItem(i);
       if (item.get_value() === request.value && item.get_enabled()) {
         if (!validForm) return fail('grid');
-        // The legacy Web Forms submit wrapper inspects its callers. Capture
-        // the native dropdown event before it enters that wrapper.
         let event = null;
         const original = window.WebForm_DoPostBackWithOptions;
         try {
@@ -164,17 +162,18 @@
   if (action === 'inspect') {
     return reply({scope, filters, cells: Array.from(cells.values(), entry => entry.data)});
   }
-  if (action !== 'submit' || request.scope !== scope || bridge.receipt?.state === 'pending') {
+  if ((action !== 'fill' && action !== 'submit') ||
+      request?.scope !== scope || bridge.receipt?.state === 'pending') {
     return fail('changed');
   }
-  const pending = Object.entries(request.changes);
-  if (!pending.length || !validForm ||
-      grid.ClientSettings.PostBackFunction.trim() !== "__doPostBack('{0}','{1}')" ||
+  const pending = Object.entries(request.changes ?? {});
+  if (!pending.length || (action === 'submit' && (!validForm ||
+      grid.ClientSettings.PostBackFunction.trim() !== "__doPostBack('{0}','{1}')")) ||
       batch.hasChanges(grid.get_masterTableView())) {
     return fail('changed');
   }
   for (const [key, change] of pending) {
-    if (cells.get(key)?.data.amount !== change.before || !Number.isSafeInteger(change.after) ||
+    if (!change || cells.get(key)?.data.amount !== change.before || !Number.isSafeInteger(change.after) ||
         change.after < 0 || change.before === change.after) return fail('changed');
   }
   for (const [key, change] of pending) {
@@ -183,8 +182,7 @@
     if (hundredths(cell) !== change.after) return fail('value');
   }
 
-  // Telerik produces the portal's event argument. Capture it without running
-  // the browser postback, then send the authenticated Web Forms request.
+  if (action === 'fill') return reply({filled: true});
   let event = null;
   const original = window.__doPostBack;
   try {

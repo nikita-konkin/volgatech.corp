@@ -12,65 +12,169 @@ import 'mail_alerts.dart';
 import 'mail_credentials.dart';
 import 'mail_models.dart';
 import 'mail_refusals.dart';
+import 'mail_service.dart';
 
-/// Android runs the check for new mail every 15 minutes (its shortest
-/// period), when there's a network, with the app closed too.
-class BackgroundMailCheck implements MailCheckSchedule {
-  static const _name = 'mail-check';
+/// Registers and cancels the two jobs used for background mail checks.
+abstract interface class MailBackgroundWork {
+  Future<void> periodic(Duration frequency);
+  Future<void> short(Duration delay, {required bool append});
+  Future<void> cancelPeriodic();
+  Future<void> cancelShort();
+}
+
+/// Schedules mail checks with a periodic fallback for short intervals.
+final class BackgroundMailCheck implements MailCheckSchedule {
+  const BackgroundMailCheck(this._prefs,
+      {MailBackgroundWork work = const _AndroidMailBackgroundWork()})
+      : _work = work;
+
+  final Prefs _prefs;
+  final MailBackgroundWork _work;
+
+  @override
+  Future<void> start() async {
+    final minutes = _prefs.mailCheckMinutes;
+    if (minutes < 15) {
+      await _work.periodic(const Duration(minutes: 15));
+      await _work.short(Duration(minutes: minutes), append: false);
+    } else {
+      await _work.cancelShort();
+      await _work.periodic(Duration(minutes: minutes));
+    }
+  }
+
+  Future<void> continueShort() async {
+    await _prefs.reload();
+    final minutes = _prefs.mailCheckMinutes;
+    if (_prefs.mailNotify && minutes < 15) {
+      await _work.short(Duration(minutes: minutes), append: true);
+    }
+  }
+
+  @override
+  Future<void> stop() async {
+    await _work.cancelShort();
+    await _work.cancelPeriodic();
+  }
+}
+
+/// Registers the Android jobs through WorkManager.
+final class _AndroidMailBackgroundWork implements MailBackgroundWork {
+  const _AndroidMailBackgroundWork();
+
+  static const _periodicName = 'mail-check';
+  static const shortName = 'mail-check-short';
   static Future<void>? _ready;
 
   Future<void> _init() =>
       _ready ??= Workmanager().initialize(mailCheckDispatcher);
 
   @override
-  Future<void> start() async {
+  Future<void> periodic(Duration frequency) async {
     await _init();
     await Workmanager().registerPeriodicTask(
-      _name,
-      _name,
-      frequency: const Duration(minutes: 15),
+      _periodicName,
+      _periodicName,
+      frequency: frequency,
       constraints: Constraints(networkType: NetworkType.connected),
-      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.update,
     );
   }
 
   @override
-  Future<void> stop() async {
-    await _init();
-    await Workmanager().cancelByUniqueName(_name);
+  Future<void> short(Duration delay, {required bool append}) async {
+    if (!append) await _init();
+    await Workmanager().registerOneOffTask(
+      shortName,
+      shortName,
+      initialDelay: delay,
+      constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy:
+          append ? ExistingWorkPolicy.update : ExistingWorkPolicy.replace,
+    );
   }
+
+  @override
+  Future<void> cancelPeriodic() =>
+      Workmanager().cancelByUniqueName(_periodicName);
+
+  @override
+  Future<void> cancelShort() => Workmanager().cancelByUniqueName(shortName);
 }
 
-/// The background isolate's start: one check, then done. A failure waits
-/// for the next turn rather than retrying.
+/// Checks mail in the background and continues the short schedule when enabled.
 @pragma('vm:entry-point')
 void mailCheckDispatcher() {
   Workmanager().executeTask((task, input) async {
     try {
       final prefs = await Prefs.load();
-      if (!prefs.mailNotify) return true;
-      await checkForNewMail(
-        prefs: prefs,
-        store: MailCredentialStore(),
-        service: EwsMailService(),
-        alerts: LocalMailAlerts(),
-        report: (e) async {
-          final log = CrashLog(prefs, platform: 'android');
-          try {
-            final app = await PackageInfo.fromPlatform();
-            log.version = '${app.version}+${app.buildNumber}';
-          } on Object {
-            // Reported without the version, then.
-          }
-          await log.add(refusalReport(e),
-              StackTrace.fromString('фоновая проверка почты'));
-        },
-      );
+      try {
+        await runBackgroundMailCheck(
+          prefs: prefs,
+          store: MailCredentialStore(),
+          service: EwsMailService(),
+          alerts: LocalMailAlerts(),
+          loadLog: () => _loadLog(prefs),
+        );
+      } finally {
+        if (task == _AndroidMailBackgroundWork.shortName) {
+          await BackgroundMailCheck(prefs).continueShort();
+        }
+      }
     } on Object catch (e) {
       debugPrint('mail check: $e');
     }
     return true;
   });
+}
+
+/// Runs an enabled check and keeps its result on the device.
+Future<void> runBackgroundMailCheck({
+  required Prefs prefs,
+  required MailCredentialStore store,
+  required MailService service,
+  required MailAlertPlatform alerts,
+  required Future<CrashLog> Function() loadLog,
+  DateTime Function()? clock,
+}) async {
+  try {
+    await prefs.reload();
+    if (!prefs.mailNotify) return;
+    final completed = await checkForNewMail(
+      prefs: prefs,
+      store: store,
+      service: service,
+      alerts: alerts,
+      clock: clock,
+      report: (e) async {
+        final log = await loadLog();
+        await log.add(
+            refusalReport(e), StackTrace.fromString('фоновая проверка почты'));
+      },
+    );
+    if (completed) {
+      await prefs.setMailLastBackgroundCheck((clock ?? DateTime.now)());
+    }
+  } on MailAuthException {
+    return;
+  } on Object catch (error, stack) {
+    final log = await loadLog();
+    final detail =
+        '$error'.split('\n').first.trim().replaceFirst(RegExp(r'\.+$'), '');
+    await log.add('Фоновая проверка почты не удалась: $detail', stack);
+  }
+}
+
+Future<CrashLog> _loadLog(Prefs prefs) async {
+  String version;
+  try {
+    final app = await PackageInfo.fromPlatform();
+    version = '${app.version}+${app.buildNumber}';
+  } on Object {
+    version = '';
+  }
+  await prefs.reload().catchError((Object _) {});
+  return CrashLog(prefs, platform: 'android')..version = version;
 }
 
 /// New mail as Android notifications: one per message (the newest few),

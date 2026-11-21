@@ -11,8 +11,31 @@ import '../core/ru_plural.dart';
 import 'layout.dart';
 
 /// «Отчёты об ошибках» in Settings: how many there were, and the way in.
-class CrashLogTile extends StatelessWidget {
+class CrashLogTile extends StatefulWidget {
   const CrashLogTile({super.key});
+
+  @override
+  State<CrashLogTile> createState() => _CrashLogTileState();
+}
+
+/// Refreshes the report count when the tile appears or the app resumes.
+class _CrashLogTileState extends State<CrashLogTile> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _lifecycle = AppLifecycleListener(onResume: _refresh);
+  }
+
+  void _refresh() => context.read<CrashLog>().refresh().ignore();
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

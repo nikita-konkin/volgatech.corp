@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:enough_mail/enough_mail.dart';
@@ -62,6 +63,25 @@ String _challenge() {
       for (final c in 'MARSTU'.codeUnits) ...[c, 0]
     ]);
   return base64Encode(b.toBytes());
+}
+
+String _cyrillicName() {
+  final random = Random();
+  String word(int length) => String.fromCharCodes([
+        0x0410 + random.nextInt(32),
+        for (var i = 1; i < length; i++) 0x0430 + random.nextInt(32),
+      ]);
+  return [for (var i = 0; i < 3; i++) word(7 + random.nextInt(9))].join(' ');
+}
+
+String _mailbox() =>
+    'user${Random().nextInt(1 << 20).toRadixString(36)}@volgatech.net';
+
+String _header(Uint8List mime, String name) {
+  final head = utf8.decode(mime).split('\r\n\r\n').first;
+  return RegExp('^$name: (.*(?:\r\n[ \t].*)*)', multiLine: true)
+      .firstMatch(head)![1]!
+      .replaceAll(RegExp('\r\n[ \t]'), ' ');
 }
 
 void main() {
@@ -152,6 +172,41 @@ void main() {
       expect(m.decodeTextPlainPart()?.trim(), 'Спасибо!');
       expect(m.findContentInfo().single.fileName, 'отчёт.txt');
       expect(m.getHeaderValue('from'), isNull); // Exchange fills it in
+    });
+
+    test('a long cyrillic recipient name reads back whole', () {
+      final name = _cyrillicName();
+      final m = MimeMessage.parseFromData(
+          buildMime(ComposeDraft(to: '$name <${_mailbox()}>', text: 'Да')));
+      expect(m.to!.single.personalName, name,
+          reason: 'the recipient name did not survive the message');
+    });
+
+    test('a cyrillic recipient name is not encoded inside quotes', () {
+      final header = _header(
+          buildMime(ComposeDraft(to: '${_cyrillicName()} <${_mailbox()}>')),
+          'To');
+      expect(header, isNot(contains('"=?')),
+          reason: 'the encoded recipient name was hidden in a quoted string');
+    });
+
+    test('a multipart message root declares no base64 encoding', () {
+      final head = utf8
+          .decode(buildMime(ComposeDraft(
+              to: _mailbox(), subject: _cyrillicName(), text: _cyrillicName())))
+          .split('\r\n\r\n')
+          .first;
+      expect(head, isNot(contains('Content-Transfer-Encoding: base64')),
+          reason: 'the multipart root told Exchange to decode its parts');
+    });
+
+    test('an encoded header names the utf-8 charset', () {
+      final header = _header(
+          buildMime(
+              ComposeDraft(to: _mailbox(), subject: 'RE: ${_cyrillicName()}')),
+          'Subject');
+      expect(header.toLowerCase(), isNot(contains('=?utf8?')),
+          reason: 'the encoded subject named a charset mail clients dont know');
     });
   });
 

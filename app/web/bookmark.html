@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Закладка «Заполнить из Волгатех»</title>
+  <style>
+    :root { color-scheme: light dark; font: 1rem/1.55 system-ui, sans-serif; }
+    main { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
+    #bookmark { display: inline-block; padding: .5rem .9rem; border: 1px solid currentColor; border-radius: .5rem; cursor: grab; }
+    textarea { box-sizing: border-box; width: 100%; min-height: 7rem; margin-top: .5rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Заполнить из Волгатех</h1>
+    <p>Включите панель закладок и перетащите на неё эту ссылку</p>
+    <a id="bookmark" draggable="true">Заполнить из Волгатех</a>
+    <ul>
+      <li>Chrome и Edge — нажмите Ctrl+Shift+B или ⌘+Shift+B на Mac</li>
+      <li>Firefox — откройте «Вид» → «Панели инструментов» → «Панель закладок»</li>
+      <li>Safari на Mac — откройте «Вид» → «Показать строку „Избранное“»</li>
+    </ul>
+    <h2>Добавить вручную</h2>
+    <ol>
+      <li>Нажмите Ctrl+D или ⌘+D на Mac и сохраните эту страницу на панели закладок или в «Избранном» с именем «Заполнить из Волгатех»</li>
+      <li>Откройте контекстное меню новой закладки, выберите редактирование и замените адрес кодом из поля ниже целиком, включая <code>javascript:</code></li>
+    </ol>
+    <label for="bookmark-code">Адрес закладки</label>
+    <textarea id="bookmark-code" readonly spellcheck="false"></textarea>
+    <h2>Заполнить форму на портале</h2>
+    <ol>
+      <li>Скопируйте часы через «Подготовить для портала» в разделе «Учебная нагрузка»</li>
+      <li>На портале откройте «Нагрузка на первую половину дня», выберите тот же месяц и нажмите «Редактировать»</li>
+      <li>Нажмите закладку, проверьте часы, нажмите «Заполнить» и затем «Сохранить» на портале</li>
+    </ol>
+  </main>
+  <script>
+    (() => {
+      const url = new URL('portal/fill.js?v=1', location.href);
+      const href = 'javascript:(function(){if(location.origin!=="https://portal.volgatech.net"){alert("Откройте форму учебной нагрузки на портале");return;}var script=document.createElement("script");script.src=' +
+        JSON.stringify(url.href) +
+        ';script.referrerPolicy="no-referrer";script.onerror=function(){script.remove();alert("Не удалось загрузить панель Волгатех");};script.onload=function(){script.remove();};document.head.append(script);})()';
+      const bookmark = document.getElementById('bookmark');
+      bookmark.href = href;
+      bookmark.onclick = event => event.preventDefault();
+      document.getElementById('bookmark-code').value = href;
+    })();
+  </script>
+</body>
+</html>

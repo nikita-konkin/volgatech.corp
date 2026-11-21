@@ -73,6 +73,15 @@ class CrashLog extends ChangeNotifier {
   /// Newest first.
   List<CrashEntry> get entries => _entries;
 
+  /// Picks up errors saved by the background isolate.
+  Future<void> refresh() async {
+    final previous = _entries;
+    await _prefs.reload();
+    if (!identical(_entries, previous)) return;
+    _entries = _read(_prefs);
+    notifyListeners();
+  }
+
   static List<CrashEntry> _read(Prefs prefs) => switch (prefs.readJson(_key)) {
         final List<dynamic> list => [
             for (final e in list)

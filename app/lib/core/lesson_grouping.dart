@@ -5,7 +5,10 @@ import '../models/schedule.dart';
 /// 15:15. The API returns one event per group, so the UI would otherwise show
 /// visual duplicates; grouping collapses them into a single slot.
 class LessonSlot {
-  LessonSlot(this.events);
+  LessonSlot(this.events, {String? Function(ScheduleEvent)? studyForm})
+      : _studyForm = studyForm;
+
+  final String? Function(ScheduleEvent)? _studyForm;
 
   /// All events sharing this slot (≥1); [lead] carries the shared fields.
   final List<ScheduleEvent> events;
@@ -25,8 +28,10 @@ class LessonSlot {
     for (final e in events) {
       final g = (e.fullDescription ?? '').trim();
       if (g.isEmpty) continue;
+      final form = _studyForm?.call(e);
+      final group = form == null ? g : '$g ($form)';
       final sub = (e.subGroup ?? '').trim();
-      final label = sub.isEmpty ? g : '$g ($sub)';
+      final label = sub.isEmpty ? group : '$group ($sub)';
       if (seen.add(label)) out.add(label);
     }
     return out;
@@ -40,7 +45,8 @@ String _slotKey(ScheduleEvent e) =>
 
 /// Collapse events that share the same time + place + subject into one
 /// [LessonSlot], preserving the input order (already sorted by start time).
-List<LessonSlot> groupParallelLessons(List<ScheduleEvent> events) {
+List<LessonSlot> groupParallelLessons(List<ScheduleEvent> events,
+    {String? Function(ScheduleEvent)? studyForm}) {
   final order = <String>[];
   final byKey = <String, List<ScheduleEvent>>{};
   for (final e in events) {
@@ -51,5 +57,5 @@ List<LessonSlot> groupParallelLessons(List<ScheduleEvent> events) {
     });
     list.add(e);
   }
-  return [for (final k in order) LessonSlot(byKey[k]!)];
+  return [for (final k in order) LessonSlot(byKey[k]!, studyForm: studyForm)];
 }
