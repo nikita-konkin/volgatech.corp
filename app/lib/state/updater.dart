@@ -14,6 +14,8 @@ import '../mail/mail_config.dart';
 
 enum UpdateStage { none, available, downloading, ready, failed }
 
+const _isRuStore = String.fromEnvironment('STORE') == 'rustore';
+
 /// The installed build: its version name and code.
 typedef InstalledBuild = ({String version, int code});
 
@@ -35,7 +37,7 @@ class Updater extends ChangeNotifier {
     Future<Directory> Function()? folder,
     DateTime Function()? now,
   })  : _prefs = prefs,
-        enabled = enabled ?? (!kIsWeb && Platform.isAndroid),
+        enabled = !_isRuStore && (enabled ?? (!kIsWeb && Platform.isAndroid)),
         _mail = mail,
         _installed = installed ?? _installedBuild,
         _fetchLatest = fetchLatest ?? _fetchFromGitHub,
@@ -46,7 +48,7 @@ class Updater extends ChangeNotifier {
 
   final Prefs _prefs;
 
-  /// Android only: elsewhere there is no APK to install.
+  /// Whether this build uses the Android updater.
   final bool enabled;
   final bool _mail;
   final Future<InstalledBuild> Function() _installed;
@@ -121,6 +123,7 @@ class Updater extends ChangeNotifier {
   /// The banner over the app: a new version (unless put off with «Позже»),
   /// or how its download is going.
   bool get showBanner {
+    if (!enabled) return false;
     final r = release;
     if (r == null || _bannerHidden || stage == UpdateStage.none) return false;
     return stage != UpdateStage.available ||
@@ -140,6 +143,7 @@ class Updater extends ChangeNotifier {
   /// Fetches the APK, checks it against GitHub's size and digest, and opens
   /// the installer.
   Future<void> download() async {
+    if (!enabled) return;
     final r = release;
     if (r == null || stage == UpdateStage.downloading) return;
     stage = UpdateStage.downloading;
@@ -188,6 +192,7 @@ class Updater extends ChangeNotifier {
 
   /// Opens Android's installer with the downloaded APK.
   Future<void> install() async {
+    if (!enabled) return;
     final path = _apk;
     if (path == null) return;
     error = await _install(path);
