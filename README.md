@@ -108,7 +108,8 @@ hourly-load report all work, but:
   **«Обзор недели»** overview (Пн–Вс, lessons per day, gaps «окна», total
   pairs, tap a day to jump); the week goes to a calendar app with «В
   календарь». On Android: **reminders** before lessons and the **«Ближайшая
-  пара»** home-screen widget.
+  пара»** home-screen widget; groups show their study form («ИТС-21 (оз)»)
+  from the portal timetable.
 - **Расписание экзаменов** — study-year picker, grouped by date, offline
   cache, «В календарь».
 - **Профиль** — photo, birthday, and every appointment (main department first)
@@ -128,8 +129,8 @@ hourly-load report all work, but:
   leaves, frost as fractal crystals, spring flowers, schoolchildren on kick
   scooters; picked by the date or in «Узор», with «Сила эффекта» and a slider
   for how much of it), an optional fingerprint / PIN **app-lock**,
-  notifications, and **«Отчёты об ошибках»** kept on the device to send by
-  hand.
+  notifications, **«Отчёты об ошибках»** kept on the device to send by
+  hand, and the privacy policy.
 - **Обновления** — a new release on GitHub shows up as a banner in the app;
   «Обновить» downloads the right APK for the phone, checks it and opens the
   Android installer.
@@ -137,7 +138,8 @@ hourly-load report all work, but:
   university's Exchange mailbox (EWS): folders, search, pin and «В архив»,
   several messages at once, attachments that open in the app, replies with
   a signature, address-book suggestions, «Автоответ», mailbox size, an
-  unread badge and new-mail notifications; links, phone numbers, addresses
+  unread badge and new-mail notifications, checked as often as you choose;
+  links, phone numbers, addresses
   and dates in a letter open a sheet of actions, with find in a letter and
   pictures from the internet on request. The mail password is kept
   in the OS keystore and deleted on «Выйти из почты». In the plain APKs,
@@ -153,6 +155,30 @@ hourly-load report all work, but:
   preview and fill the portal form with the «Заполнить из Волгатех» bookmark,
   then save on the portal.
 - Friendly Russian error/empty/retry states; honours OS font scaling.
+
+## What's new — v0.5.9
+
+<img src="docs/screenshots/study-forms.webp" width="15%" alt="Группы в расписании с формой обучения: (оз), (з), (о)"> <img src="docs/screenshots/mail-interval.webp" width="15%" alt="«Новые письма»: как часто проверять почту, последняя проверка в фоне и кнопки для Honor">
+
+- **Study forms in the timetable:** once «Учебная нагрузка» has signed in to
+  the portal, groups show their form — «ИТС-21 (оз)», «(з)» or «(о)» — from
+  the portal's «Мое расписание занятий», and «Заполнить из расписания» picks
+  the form row of the matching study form.
+- **How often to check mail:** «Новые письма» → «Проверять почту» — every
+  minute, every 5, 10, 15 or 30 minutes, every hour or once a day. Below 15
+  minutes Android may check less often while the phone is idle.
+- **Background mail on Honor and Huawei:** settings show when the last
+  background check finished, with buttons for «Запуск приложений» and the
+  battery exemption — without them these phones stop the checks once the app
+  is swiped away. A failed background check goes to «Отчёты об ошибках».
+- **Sent letters fixed:** a long Cyrillic recipient name and the letter's
+  text arrive whole (the text could be lost before).
+- **«Политика конфиденциальности»** in Settings.
+- **Учебная нагрузка in the browser:** the «Заполнить из Волгатех» bookmark
+  fills the portal's form with the month's hours from the web app.
+
+From v0.5.1 the app offers this update by itself (**Настройки →
+Обновления**).
 
 ## What's new — v0.5.8
 
