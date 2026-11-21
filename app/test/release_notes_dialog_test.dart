@@ -26,9 +26,9 @@ void main() {
     final counts = [
       for (final text in [
         'Что нового в 13.7.26',
-        '• Keep the last filter',
-        '• Print room changes',
-        '• Find drafts',
+        'Keep the last filter',
+        'Print room changes',
+        'Find drafts',
       ])
         find.text(text).evaluate().length,
     ];

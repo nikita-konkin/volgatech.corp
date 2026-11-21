@@ -18,7 +18,15 @@ final class ReleaseNotesDialog extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [for (final line in lines) Text('• $line')],
+          spacing: 8,
+          children: [
+            for (final line in lines)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 8,
+                children: [const Text('•'), Expanded(child: Text(line))],
+              ),
+          ],
         ),
         actions: [
           TextButton(
