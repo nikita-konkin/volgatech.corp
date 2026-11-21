@@ -64,6 +64,11 @@ class Prefs {
   Future<void> setMailNotify(bool on) async => _p.setBool(_kMailNotify, on);
 
   /// When a background check last finished reading the inbox.
+  int get mailCheckMinutes => _p.getInt('mail_check_minutes') ?? 15;
+
+  Future<void> setMailCheckMinutes(int minutes) async =>
+      _p.setInt('mail_check_minutes', minutes);
+
   DateTime? get mailLastBackgroundCheck =>
       switch (_p.getInt(_kMailLastBackgroundCheck)) {
         final ms? => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true),

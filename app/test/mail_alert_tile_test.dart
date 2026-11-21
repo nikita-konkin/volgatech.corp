@@ -43,14 +43,16 @@ Future<void> _pump(
   _Settings settings, {
   bool enabled = true,
   DateTime? last,
+  int minutes = 15,
 }) async {
   SharedPreferences.setMockInitialValues({'mail_notify': enabled});
   final prefs = await Prefs.load();
+  await prefs.setMailCheckMinutes(minutes);
   if (last != null) await prefs.setMailLastBackgroundCheck(last);
   await tester.pumpWidget(
     ChangeNotifierProvider(
       create: (_) =>
-          MailAlerts(prefs, LocalMailAlerts(), BackgroundMailCheck()),
+          MailAlerts(prefs, LocalMailAlerts(), BackgroundMailCheck(prefs)),
       child:
           MaterialApp(home: Scaffold(body: MailAlertTile(settings: settings))),
     ),
@@ -59,6 +61,16 @@ Future<void> _pump(
 }
 
 void main() {
+  testWidgets('A short interval shows the Android idle warning',
+      (tester) async {
+    await _pump(tester, _Settings(hasAppLaunch: false), minutes: 10);
+
+    expect(
+        find.text('Android может проверять реже, пока телефон не используется'),
+        findsOneWidget,
+        reason: 'The short interval did not show the idle warning');
+  });
+
   testWidgets('Enabled notifications show when no checks have completed',
       (tester) async {
     await _pump(tester, _Settings(hasAppLaunch: false));

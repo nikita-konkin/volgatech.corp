@@ -51,7 +51,7 @@ Future<void> main() async {
 
   if (Notifications.supported) unawaited(Notifications.start());
   final mailAlerts = MailAlerts.supported
-      ? (MailAlerts(prefs, LocalMailAlerts(), BackgroundMailCheck())
+      ? (MailAlerts(prefs, LocalMailAlerts(), BackgroundMailCheck(prefs))
         ..resume().ignore())
       : null;
 

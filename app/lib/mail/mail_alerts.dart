@@ -99,6 +99,14 @@ class MailAlerts extends ChangeNotifier {
   static bool get supported =>
       kNativeMail && defaultTargetPlatform == TargetPlatform.android;
 
+  int get checkMinutes => _prefs.mailCheckMinutes;
+
+  Future<void> setCheckMinutes(int minutes) async {
+    await _prefs.setMailCheckMinutes(minutes);
+    if (enabled) await _schedule.start();
+    notifyListeners();
+  }
+
   bool get enabled => _prefs.mailNotify;
 
   /// Reads the completion time from the background isolate's preferences.
@@ -122,10 +130,9 @@ class MailAlerts extends ChangeNotifier {
         await _prefs.setMailSeenUntil(_clock().toUtc());
       }
       await _schedule.start();
-    } else {
-      await _schedule.stop();
     }
     await _prefs.setMailNotify(on);
+    if (!on) await _schedule.stop();
     notifyListeners();
     return true;
   }
