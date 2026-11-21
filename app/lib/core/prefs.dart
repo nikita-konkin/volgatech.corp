@@ -21,6 +21,14 @@ class Prefs {
   static Future<Prefs> load() async =>
       Prefs(await SharedPreferences.getInstance());
 
+  static const _kStudyFormsHintDismissed = 'study_forms_hint_dismissed';
+
+  bool get studyFormsHintDismissed =>
+      _p.getBool(_kStudyFormsHintDismissed) ?? false;
+
+  Future<void> dismissStudyFormsHint() async =>
+      _p.setBool(_kStudyFormsHintDismissed, true);
+
   static const _kLogin = 'remembered_login';
   static const _kRemember = 'remember_login';
   static const _kTheme = 'theme_mode';
