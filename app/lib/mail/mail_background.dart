@@ -90,7 +90,7 @@ final class _AndroidMailBackgroundWork implements MailBackgroundWork {
       initialDelay: delay,
       constraints: Constraints(networkType: NetworkType.connected),
       existingWorkPolicy:
-          append ? ExistingWorkPolicy.append : ExistingWorkPolicy.replace,
+          append ? ExistingWorkPolicy.update : ExistingWorkPolicy.replace,
     );
   }
 

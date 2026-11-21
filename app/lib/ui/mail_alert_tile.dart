@@ -35,7 +35,7 @@ class MailAlertTile extends StatelessWidget {
         SwitchListTile(
           title: const Text('Новые письма'),
           subtitle:
-              const Text('Проверять «Входящие» даже когда приложение закрыто'),
+              const Text('Проверять «Входящие», даже когда приложение закрыто'),
           value: enabled,
           onChanged: (v) => _set(context, v),
         ),
