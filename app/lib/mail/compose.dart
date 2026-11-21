@@ -184,9 +184,10 @@ List<MailAddress>? parseRecipients(String text) {
 }
 
 /// The message to send, as RFC 822 bytes. No From: Exchange puts the
-/// signed-in mailbox there.
+/// signed-in mailbox there. Multipart from the start: enough_mail 3.0.0
+/// otherwise marks the root base64, which Exchange obeys and loses the text.
 Uint8List buildMime(ComposeDraft d) {
-  final b = MessageBuilder()
+  final b = MessageBuilder.prepareMultipartMixedMessage()
     ..to = parseRecipients(d.to)
     ..cc = parseRecipients(d.cc)
     ..subject = d.subject.trim()
