@@ -10,7 +10,7 @@ Everything the RuStore console asks for, and where it comes from. Fill the test 
 6. Fill the card:
    - name, short and full description, category, age rating, tags, «Что нового» and FAQ: [listing.md](listing.md);
    - icon: [icon-512.png](icon-512.png) (512×512, the launcher icon);
-   - screenshots: [screenshots/](screenshots/), five 1080×2340 PNGs with made-up data;
+   - screenshots: [screenshots/](screenshots/), ten 1080×1920 PNGs with made-up data, in upload order. They must be 9:16, because RuStore crops other ratios (moderation rule 6.6);
    - privacy policy: the URL from step 3;
    - contact: your support e-mail.
 7. «Безопасность данных пользователя»: data types from [data-safety.md](data-safety.md); a justification for each permission from [permissions.md](permissions.md).
